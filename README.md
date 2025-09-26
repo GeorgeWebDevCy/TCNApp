@@ -61,3 +61,36 @@ The network operates on a tiered membership and vendor model, providing varying 
 |-------------|--------------|-------------------|----------------|
 | Sapphire    | 2.5%         | 5%                | 10%            |
 | Diamond     | 5%           | 10%               | 20%            |
+
+---
+
+## 📱 React Native Boilerplate Setup
+
+This repository now includes the starter code for a React Native application that uses [OneSignal](https://onesignal.com/) for push notifications.
+
+### Prerequisites
+- [Node.js](https://nodejs.org/) 18 LTS or newer
+- [Yarn](https://classic.yarnpkg.com/) or npm
+- Android Studio and/or Xcode for native builds
+- A OneSignal account with an application ID
+
+### Getting started
+1. Install dependencies
+   ```bash
+   yarn install
+   # or
+   npm install
+   ```
+2. Update the placeholder ID in `src/notifications/OneSignalProvider.js` with your OneSignal app ID.
+3. Run the Metro bundler
+   ```bash
+   yarn start
+   ```
+4. Launch a platform target (in another terminal)
+   ```bash
+   yarn android
+   # or
+   yarn ios
+   ```
+
+The app initializes OneSignal on start, requests notification permissions, and ensures foreground notifications display by default. Customize the UI in `src/App.js` and expand notification handling in `src/notifications/OneSignalProvider.js` as you build out the project.
