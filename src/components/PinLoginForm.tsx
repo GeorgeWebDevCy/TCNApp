@@ -10,6 +10,7 @@ import {
 
 interface PinLoginFormProps {
   hasPin: boolean;
+  canManagePin: boolean;
   loading?: boolean;
   error?: string | null;
   onSubmit: (pin: string) => void;
@@ -19,6 +20,7 @@ interface PinLoginFormProps {
 
 export const PinLoginForm: React.FC<PinLoginFormProps> = ({
   hasPin,
+  canManagePin,
   loading = false,
   error,
   onSubmit,
@@ -44,8 +46,12 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
       return pin.length >= 4;
     }
 
+    if (!canManagePin) {
+      return false;
+    }
+
     return pin.length >= 4 && pin === confirmationPin;
-  }, [confirmationPin, loading, mode, pin]);
+  }, [canManagePin, confirmationPin, loading, mode, pin]);
 
   const handlePrimaryAction = () => {
     if (!canSubmit) {
@@ -73,7 +79,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>{mode === 'login' ? 'PIN Login' : 'Create a PIN'}</Text>
-        {hasPin ? (
+        {hasPin && canManagePin ? (
           <Pressable onPress={toggleMode} accessibilityRole="button" hitSlop={8}>
             <Text style={styles.linkText}>
               {mode === 'login' ? 'Create / Reset PIN' : 'Use existing PIN'}
@@ -110,6 +116,12 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
         </View>
       ) : null}
 
+      {mode === 'create' && !canManagePin ? (
+        <Text style={styles.helperText}>
+          Log in with your username and password before creating or updating your PIN.
+        </Text>
+      ) : null}
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Pressable
@@ -126,7 +138,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
         )}
       </Pressable>
 
-      {mode === 'login' && hasPin && onResetPin ? (
+      {mode === 'login' && hasPin && onResetPin && canManagePin ? (
         <Pressable onPress={onResetPin} hitSlop={8} style={styles.dangerButton}>
           <Text style={styles.dangerButtonText}>Remove PIN</Text>
         </Pressable>
@@ -180,6 +192,11 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#DC2626',
+    textAlign: 'center',
+  },
+  helperText: {
+    color: '#475569',
+    fontSize: 13,
     textAlign: 'center',
   },
   primaryButton: {
