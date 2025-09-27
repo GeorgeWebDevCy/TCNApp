@@ -2,7 +2,7 @@
 setlocal ENABLEEXTENSIONS ENABLEDELAYEDEXPANSION
 
 REM === Optional: ADB over Wi-Fi target (leave empty if USB) ==================
-set "ADB_WIFI_TARGET=192.168.10.7:44705"
+set "ADB_WIFI_TARGET=192.168.10.7:35291"
 REM =========================================================================
 
 REM Jump to project root (folder of this bat)
