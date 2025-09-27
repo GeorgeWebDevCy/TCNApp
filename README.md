@@ -94,4 +94,27 @@ This repository now includes the starter code for a React Native application tha
    yarn ios
    ```
 
-The app initializes OneSignal on start, requests notification permissions, and ensures foreground notifications display by default. Customize the UI in `src/App.js` and expand notification handling in `src/notifications/OneSignalProvider.js` as you build out the project.
+The app initializes OneSignal on start, requests notification permissions, and ensures foreground notifications display by default. Customize the UI in `src/App.js` and expand notification handling in `src/notifications/OneSignalProvider.js` as you build out the project.---
+
+## Mobile App Authentication
+
+The React Native app now ships with a modular login flow connected to WordPress:
+
+- **Password login**: Uses the WordPress JWT endpoint (`/wp-json/jwt-auth/v1/token`).
+- **PIN login**: Stores a salted hash locally so returning users can unlock without credentials.
+- **Biometric login**: Leverages native biometrics (Face ID / Touch ID / etc.) as a fast path once a session exists.
+- **Account actions**: "Forgot password" and "Register" links point to the WordPress site and can be customised.
+
+### Configuration
+
+Update `src/config/authConfig.ts` with the correct URLs for your WordPress deployment before building the app.
+
+### Installation Notes
+
+After pulling these changes run `npm install` (or `yarn install`) to add the new native modules:
+
+- `@react-native-async-storage/async-storage`
+- `crypto-js`
+- `react-native-biometrics`
+
+Remember to run the native linking steps required by React Native for any newly added native modules.
