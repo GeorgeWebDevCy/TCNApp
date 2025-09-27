@@ -12,26 +12,44 @@ import {
   refreshPersistedUserProfile,
   setSessionLock,
 } from '../services/wordpressAuthService';
-import { AuthContextValue, AuthState, AuthUser, LoginOptions, PinLoginOptions } from '../types/auth';
+import {
+  AuthContextValue,
+  AuthState,
+  AuthUser,
+  LoginOptions,
+  MembershipInfo,
+  PinLoginOptions,
+} from '../types/auth';
 
 interface LoginSuccessPayload {
   user: AuthUser | null;
   method: AuthState['authMethod'];
   passwordAuthenticated: boolean;
+  membership: MembershipInfo | null;
 }
 
 type AuthAction =
   | { type: 'BOOTSTRAP_START' }
   | {
       type: 'BOOTSTRAP_COMPLETE';
-      payload: { user: AuthUser | null; locked: boolean; passwordAuthenticated: boolean };
+      payload: {
+        user: AuthUser | null;
+        locked: boolean;
+        passwordAuthenticated: boolean;
+        membership: MembershipInfo | null;
+      };
     }
   | { type: 'LOGIN_START' }
   | { type: 'LOGIN_SUCCESS'; payload: LoginSuccessPayload }
   | { type: 'LOGIN_ERROR'; payload: string }
   | {
       type: 'SET_LOCKED';
-      payload: { locked: boolean; user: AuthUser | null; passwordAuthenticated: boolean };
+      payload: {
+        locked: boolean;
+        user: AuthUser | null;
+        passwordAuthenticated: boolean;
+        membership: MembershipInfo | null;
+      };
     }
   | { type: 'LOGOUT' }
   | { type: 'RESET_ERROR' };
@@ -41,6 +59,7 @@ const initialState: AuthState = {
   isLocked: false,
   isLoading: true,
   user: null,
+  membership: null,
   authMethod: null,
   error: null,
   hasPasswordAuthenticated: false,
@@ -60,6 +79,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: Boolean(action.payload.user) && !action.payload.locked,
         isLocked: action.payload.locked,
         user: action.payload.user,
+        membership: action.payload.membership,
         hasPasswordAuthenticated: action.payload.passwordAuthenticated,
       };
     case 'LOGIN_START':
@@ -75,6 +95,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: true,
         isLocked: false,
         user: action.payload.user,
+        membership: action.payload.membership,
         authMethod: action.payload.method,
         error: null,
         hasPasswordAuthenticated: action.payload.passwordAuthenticated,
@@ -91,6 +112,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isAuthenticated: !action.payload.locked && Boolean(action.payload.user),
         isLocked: action.payload.locked,
         user: action.payload.user,
+        membership: action.payload.membership,
         authMethod: null,
         isLoading: false,
         hasPasswordAuthenticated: action.payload.passwordAuthenticated,
@@ -126,6 +148,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       payload: {
         user: session?.user ?? null,
         locked: session?.locked ?? false,
+        membership: session?.user?.membership ?? null,
         passwordAuthenticated,
       },
     });
@@ -143,7 +166,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       await markPasswordAuthenticated();
       dispatch({
         type: 'LOGIN_SUCCESS',
-        payload: { user: session.user, method: 'password', passwordAuthenticated: true },
+        payload: {
+          user: session.user,
+          method: 'password',
+          membership: session.user?.membership ?? null,
+          passwordAuthenticated: true,
+        },
       });
       deviceLog.success('Password login succeeded');
     } catch (error) {
@@ -176,6 +204,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           payload: {
             user: refreshedUser,
             method: 'pin',
+            membership: refreshedUser?.membership ?? null,
             passwordAuthenticated: state.hasPasswordAuthenticated,
           },
         });
@@ -188,6 +217,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         payload: {
           user: session.user,
           method: 'pin',
+          membership: session.user?.membership ?? state.membership,
           passwordAuthenticated: state.hasPasswordAuthenticated,
         },
       });
@@ -226,6 +256,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           payload: {
             user: refreshedUser,
             method: 'biometric',
+            membership: refreshedUser?.membership ?? null,
             passwordAuthenticated: state.hasPasswordAuthenticated,
           },
         });
@@ -238,6 +269,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         payload: {
           user: session.user,
           method: 'biometric',
+          membership: session.user?.membership ?? state.membership,
           passwordAuthenticated: state.hasPasswordAuthenticated,
         },
       });
@@ -277,9 +309,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     deviceLog.info('Session locked. User logged out.');
     dispatch({
       type: 'SET_LOCKED',
-      payload: { locked: true, user: state.user, passwordAuthenticated: false },
+      payload: {
+        locked: true,
+        user: state.user,
+        membership: state.membership,
+        passwordAuthenticated: false,
+      },
     });
-  }, [state.user]);
+  }, [state.membership, state.user]);
 
   const resetError = useCallback(() => {
     dispatch({ type: 'RESET_ERROR' });
@@ -302,6 +339,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         payload: {
           locked: true,
           user: session.user ?? state.user,
+          membership: session.user?.membership ?? state.membership,
           passwordAuthenticated: false,
         },
       });
@@ -313,10 +351,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       payload: {
         user: session.user,
         method: state.authMethod,
+        membership: session.user?.membership ?? state.membership,
         passwordAuthenticated,
       },
     });
-  }, [state.authMethod, state.user]);
+  }, [state.authMethod, state.membership, state.user]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

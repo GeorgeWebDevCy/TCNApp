@@ -1,10 +1,24 @@
 export type AuthMethod = 'password' | 'pin' | 'biometric';
 
+export interface MembershipBenefit {
+  id: string;
+  title: string;
+  description?: string;
+  discountPercentage?: number;
+}
+
+export interface MembershipInfo {
+  tier: string;
+  expiresAt: string | null;
+  benefits: MembershipBenefit[];
+}
+
 export interface AuthUser {
   id: number;
   email: string;
   name: string;
   avatarUrl?: string;
+  membership?: MembershipInfo | null;
 }
 
 export interface WordPressTokenResponse {
@@ -20,6 +34,7 @@ export interface AuthState {
   isLocked: boolean;
   isLoading: boolean;
   user: AuthUser | null;
+  membership: MembershipInfo | null;
   authMethod: AuthMethod | null;
   error: string | null;
   hasPasswordAuthenticated: boolean;
