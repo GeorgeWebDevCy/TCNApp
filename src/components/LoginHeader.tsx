@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 interface LoginHeaderProps {
   title?: string;
@@ -8,15 +9,19 @@ interface LoginHeaderProps {
 }
 
 export const LoginHeader: React.FC<LoginHeaderProps> = ({
-  title = 'Welcome back',
-  subtitle = 'Sign in to continue',
+  title,
+  subtitle,
   logoSource,
 }) => {
+  const { t } = useLocalization();
+  const resolvedTitle = useMemo(() => title ?? t('login.header.title'), [title, t]);
+  const resolvedSubtitle = useMemo(() => subtitle ?? t('login.header.subtitle'), [subtitle, t]);
+
   return (
     <View style={styles.container}>
       {logoSource ? <Image source={logoSource} style={styles.logo} resizeMode="contain" /> : null}
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      <Text style={styles.title}>{resolvedTitle}</Text>
+      <Text style={styles.subtitle}>{resolvedSubtitle}</Text>
     </View>
   );
 };

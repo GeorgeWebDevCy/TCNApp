@@ -12,16 +12,15 @@ import {
 } from 'react-native';
 import { WORDPRESS_CONFIG } from '../config/authConfig';
 import { BiometricLoginButton } from '../components/BiometricLoginButton';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { LoginHeader } from '../components/LoginHeader';
 import { PinLoginForm } from '../components/PinLoginForm';
 import { WordPressLoginForm } from '../components/WordPressLoginForm';
 import { useAuthContext } from '../contexts/AuthContext';
+import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
 
-const authTabs = [
-  { id: 'password', label: 'Password' },
-  { id: 'pin', label: 'PIN' },
-] as const;
+type AuthTabId = 'password' | 'pin';
 
 export const LoginScreen: React.FC = () => {
   const {
@@ -36,9 +35,19 @@ export const LoginScreen: React.FC = () => {
     useAuthContext();
   const { pin: hasStoredPin, biometrics, biometryType, loading: availabilityLoading, refresh } =
     useAuthAvailability();
-  const [activeTab, setActiveTab] = useState<(typeof authTabs)[number]['id']>('password');
+  const { t, translateError } = useLocalization();
+  const [activeTab, setActiveTab] = useState<AuthTabId>('password');
   const [lastAttempt, setLastAttempt] = useState<'password' | 'pin' | 'biometric' | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
+
+  const authTabs = useMemo(
+    () =>
+      ([
+        { id: 'password' as const, label: t('login.tabs.password') },
+        { id: 'pin' as const, label: t('login.tabs.pin') },
+      ] satisfies Array<{ id: AuthTabId; label: string }>),
+    [t],
+  );
 
   useEffect(() => {
     if (hasStoredPin && state.isLocked) {
@@ -49,11 +58,14 @@ export const LoginScreen: React.FC = () => {
   const handleOpenLink = useCallback(async (url: string) => {
     const supported = await Linking.canOpenURL(url);
     if (!supported) {
-      Alert.alert('Unable to open link', `Please copy and open the link manually:\n${url}`);
+      Alert.alert(
+        t('login.alerts.cannotOpenLink.title'),
+        t('login.alerts.cannotOpenLink.message', { replace: { url } }),
+      );
       return;
     }
     await Linking.openURL(url);
-  }, []);
+  }, [t]);
 
   const handlePasswordSubmit = useCallback(
     async ({ username, password }: { username: string; password: string }) => {
@@ -80,33 +92,37 @@ export const LoginScreen: React.FC = () => {
       try {
         await registerPin(pin);
         await refresh();
-        Alert.alert('PIN saved', 'You can now log in quickly using your PIN.');
+        Alert.alert(
+          t('login.alerts.pinSaved.title'),
+          t('login.alerts.pinSaved.message'),
+        );
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : 'Something went wrong while saving your PIN.';
+        const message = error instanceof Error ? error.message : 'errors.pinSaveGeneric';
         setPinError(message);
       }
     },
-    [refresh, registerPin],
+    [refresh, registerPin, t],
   );
 
   const handleRemovePin = useCallback(async () => {
     try {
       await removePin();
       await refresh();
-      Alert.alert('PIN removed', 'Your saved PIN has been removed.');
+      Alert.alert(
+        t('login.alerts.pinRemoved.title'),
+        t('login.alerts.pinRemoved.message'),
+      );
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Something went wrong while removing your PIN.';
+      const message = error instanceof Error ? error.message : 'errors.pinRemoveGeneric';
       setPinError(message);
     }
-  }, [refresh, removePin]);
+  }, [refresh, removePin, t]);
 
   const handleBiometricLogin = useCallback(async () => {
     setLastAttempt('biometric');
     resetError();
-    await loginWithBiometrics();
-  }, [loginWithBiometrics, resetError]);
+    await loginWithBiometrics(t('biometrics.prompt'));
+  }, [loginWithBiometrics, resetError, t]);
 
   const changeTab = useCallback(
     (tabId: (typeof authTabs)[number]['id']) => {
@@ -132,15 +148,23 @@ export const LoginScreen: React.FC = () => {
   }, [activeTab, lastAttempt, pinError, state.error]);
 
   const isLoading = state.isLoading;
-  const greeting = state.user?.name ? `Welcome back, ${state.user.name}` : undefined;
-  const lockMessage = state.isLocked ? 'Session locked. Use your PIN or biometrics to continue.' : undefined;
+  const greeting =
+    state.user?.name !== undefined
+      ? t('login.greeting', { replace: { name: state.user.name } })
+      : undefined;
+  const lockMessage = state.isLocked ? t('login.lockMessage') : undefined;
+  const translatedError = translateError(activeError);
+  const passwordError = lastAttempt === 'password' ? translateError(state.error) : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <View style={styles.switcherContainer}>
+          <LanguageSwitcher />
+        </View>
         <View style={styles.card}>
-          <LoginHeader title="TCN" subtitle={greeting ?? 'Sign in to your account'} />
+          <LoginHeader title={t('common.appName')} subtitle={greeting ?? t('login.subtitle')} />
 
           {lockMessage ? <Text style={styles.lockMessage}>{lockMessage}</Text> : null}
 
@@ -163,7 +187,7 @@ export const LoginScreen: React.FC = () => {
           {activeTab === 'password' ? (
             <WordPressLoginForm
               loading={isLoading && lastAttempt === 'password'}
-              error={lastAttempt === 'password' ? state.error : null}
+              error={passwordError}
               onSubmit={handlePasswordSubmit}
               onForgotPassword={() => handleOpenLink(WORDPRESS_CONFIG.links.forgotPassword)}
               onRegister={() => handleOpenLink(WORDPRESS_CONFIG.links.register)}
@@ -173,7 +197,7 @@ export const LoginScreen: React.FC = () => {
               hasPin={hasStoredPin}
               canManagePin={state.hasPasswordAuthenticated}
               loading={isLoading && lastAttempt === 'pin'}
-              error={activeError}
+              error={translatedError}
               onSubmit={handlePinSubmit}
               onCreatePin={handlePinCreate}
               onResetPin={hasStoredPin ? handleRemovePin : undefined}
@@ -182,7 +206,7 @@ export const LoginScreen: React.FC = () => {
 
           <View style={styles.dividerSection}>
             <View style={styles.divider} />
-            <Text style={styles.dividerText}>or</Text>
+            <Text style={styles.dividerText}>{t('common.or')}</Text>
             <View style={styles.divider} />
           </View>
 
@@ -209,6 +233,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     backgroundColor: '#F1F5F9',
+  },
+  switcherContainer: {
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'flex-end',
+    marginBottom: 16,
   },
   card: {
     width: '100%',

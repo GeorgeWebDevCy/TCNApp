@@ -193,7 +193,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     }
   }, [state.hasPasswordAuthenticated]);
 
-  const loginWithBiometrics = useCallback(async () => {
+  const loginWithBiometrics = useCallback(async (promptMessage?: string) => {
     dispatch({ type: 'LOGIN_START' });
     try {
       const { available } = await isBiometricsAvailable();
@@ -201,7 +201,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         throw new Error('Biometric authentication is not available on this device.');
       }
 
-      const success = await authenticateWithBiometrics();
+      const success = await authenticateWithBiometrics(promptMessage);
       if (!success) {
         throw new Error('Biometric authentication was cancelled.');
       }

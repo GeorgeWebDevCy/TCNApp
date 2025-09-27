@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 interface PinLoginFormProps {
   hasPin: boolean;
@@ -30,6 +31,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
   const [pin, setPin] = useState('');
   const [confirmationPin, setConfirmationPin] = useState('');
   const [mode, setMode] = useState<'login' | 'create'>(hasPin ? 'login' : 'create');
+  const { t } = useLocalization();
 
   useEffect(() => {
     setMode(hasPin ? 'login' : 'create');
@@ -78,18 +80,20 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <Text style={styles.title}>{mode === 'login' ? 'PIN Login' : 'Create a PIN'}</Text>
+        <Text style={styles.title}>
+          {mode === 'login' ? t('auth.pinForm.titleLogin') : t('auth.pinForm.titleCreate')}
+        </Text>
         {hasPin && canManagePin ? (
           <Pressable onPress={toggleMode} accessibilityRole="button" hitSlop={8}>
             <Text style={styles.linkText}>
-              {mode === 'login' ? 'Create / Reset PIN' : 'Use existing PIN'}
+              {mode === 'login' ? t('auth.pinForm.toggleCreate') : t('auth.pinForm.toggleUseExisting')}
             </Text>
           </Pressable>
         ) : null}
       </View>
 
       <View style={styles.formGroup}>
-        <Text style={styles.label}>PIN (4 digits minimum)</Text>
+        <Text style={styles.label}>{t('auth.pinForm.pinLabel')}</Text>
         <TextInput
           value={pin}
           onChangeText={setPin}
@@ -103,7 +107,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
 
       {mode === 'create' ? (
         <View style={styles.formGroup}>
-          <Text style={styles.label}>Confirm PIN</Text>
+          <Text style={styles.label}>{t('auth.pinForm.confirmPinLabel')}</Text>
           <TextInput
             value={confirmationPin}
             onChangeText={setConfirmationPin}
@@ -118,7 +122,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
 
       {mode === 'create' && !canManagePin ? (
         <Text style={styles.helperText}>
-          Log in with your username and password before creating or updating your PIN.
+          {t('auth.pinForm.helperRequiresPassword')}
         </Text>
       ) : null}
 
@@ -133,14 +137,14 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
           <ActivityIndicator color="#FFFFFF" />
         ) : (
           <Text style={styles.primaryButtonText}>
-            {mode === 'login' ? 'Unlock with PIN' : 'Save PIN'}
+            {mode === 'login' ? t('auth.pinForm.submitLogin') : t('auth.pinForm.submitCreate')}
           </Text>
         )}
       </Pressable>
 
       {mode === 'login' && hasPin && onResetPin && canManagePin ? (
         <Pressable onPress={onResetPin} hitSlop={8} style={styles.dangerButton}>
-          <Text style={styles.dangerButtonText}>Remove PIN</Text>
+          <Text style={styles.dangerButtonText}>{t('auth.pinForm.removePin')}</Text>
         </Pressable>
       ) : null}
     </View>

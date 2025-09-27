@@ -38,7 +38,7 @@ export interface AuthContextValue {
   state: AuthState;
   loginWithPassword: (options: LoginOptions) => Promise<void>;
   loginWithPin: (options: PinLoginOptions) => Promise<void>;
-  loginWithBiometrics: () => Promise<void>;
+  loginWithBiometrics: (promptMessage?: string) => Promise<void>;
   registerPin: (pin: string) => Promise<void>;
   removePin: () => Promise<void>;
   logout: () => Promise<void>;
