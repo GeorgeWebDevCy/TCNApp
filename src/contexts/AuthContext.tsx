@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
+import deviceLog from 'react-native-device-log';
 import { authenticateWithBiometrics, isBiometricsAvailable } from '../services/biometricService';
 import { clearPin, registerPin as persistPin, verifyPin } from '../services/pinService';
 import {
@@ -144,9 +145,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
         type: 'LOGIN_SUCCESS',
         payload: { user: session.user, method: 'password', passwordAuthenticated: true },
       });
+      deviceLog.success('Password login succeeded');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to complete password login.';
+      deviceLog.error('Password login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
   }, []);
@@ -176,6 +179,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
             passwordAuthenticated: state.hasPasswordAuthenticated,
           },
         });
+        deviceLog.success('PIN login succeeded for refreshed user');
         return;
       }
 
@@ -187,8 +191,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           passwordAuthenticated: state.hasPasswordAuthenticated,
         },
       });
+      deviceLog.success('PIN login succeeded');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to sign in with PIN.';
+      deviceLog.error('PIN login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
   }, [state.hasPasswordAuthenticated]);
@@ -223,6 +229,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
             passwordAuthenticated: state.hasPasswordAuthenticated,
           },
         });
+        deviceLog.success('Biometric login succeeded for refreshed user');
         return;
       }
 
@@ -234,9 +241,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
           passwordAuthenticated: state.hasPasswordAuthenticated,
         },
       });
+      deviceLog.success('Biometric login succeeded');
     } catch (error) {
       const message =
         error instanceof Error ? error.message : 'Unable to complete biometric login.';
+      deviceLog.error('Biometric login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
   }, [state.hasPasswordAuthenticated]);
@@ -265,6 +274,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
   const logout = useCallback(async () => {
     await setSessionLock(true);
     await clearPasswordAuthenticated();
+    deviceLog.info('Session locked. User logged out.');
     dispatch({
       type: 'SET_LOCKED',
       payload: { locked: true, user: state.user, passwordAuthenticated: false },
