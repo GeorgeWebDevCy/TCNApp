@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useLocalization } from '../contexts/LocalizationContext';
 import type { BiometryType } from '../services/biometricService';
 
 interface BiometricLoginButtonProps {
@@ -9,12 +10,12 @@ interface BiometricLoginButtonProps {
   onPress: () => void;
 }
 
-const biometryLabelMap: Record<NonNullable<BiometryType>, string> = {
-  FaceID: 'Face ID',
-  TouchID: 'Touch ID',
-  Iris: 'Iris ID',
-  Biometrics: 'Biometrics',
-  Unknown: 'Biometrics',
+const biometryLabelKeyMap: Record<NonNullable<BiometryType>, string> = {
+  FaceID: 'biometrics.types.FaceID',
+  TouchID: 'biometrics.types.TouchID',
+  Iris: 'biometrics.types.Iris',
+  Biometrics: 'biometrics.types.Biometrics',
+  Unknown: 'biometrics.types.Unknown',
 };
 
 export const BiometricLoginButton: React.FC<BiometricLoginButtonProps> = ({
@@ -23,15 +24,20 @@ export const BiometricLoginButton: React.FC<BiometricLoginButtonProps> = ({
   biometryType = 'Biometrics',
   onPress,
 }) => {
+  const { t } = useLocalization();
+
   if (!available) {
     return null;
   }
 
-  const label = biometryType ? biometryLabelMap[biometryType] ?? 'Biometrics' : 'Biometrics';
+  const label = useMemo(() => {
+    const key = biometryLabelKeyMap[biometryType ?? 'Biometrics'] ?? 'biometrics.types.Biometrics';
+    return t(key);
+  }, [biometryType, t]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.subtitle}>Quick login</Text>
+      <Text style={styles.subtitle}>{t('biometrics.quickLogin')}</Text>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
@@ -41,7 +47,7 @@ export const BiometricLoginButton: React.FC<BiometricLoginButtonProps> = ({
         {loading ? (
           <ActivityIndicator color="#0EA5E9" />
         ) : (
-          <Text style={styles.buttonText}>Use {label}</Text>
+          <Text style={styles.buttonText}>{t('biometrics.useLabel', { replace: { method: label } })}</Text>
         )}
       </Pressable>
     </View>

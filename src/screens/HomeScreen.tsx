@@ -1,19 +1,29 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { useAuthContext } from '../contexts/AuthContext';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 export const HomeScreen: React.FC = () => {
   const { state, logout } = useAuthContext();
   const user = state.user;
+  const { t } = useLocalization();
+  const greeting = useMemo(
+    () => t('home.title', { replace: { name: user?.name ? `, ${user.name}` : '' } }),
+    [t, user?.name],
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <Text style={styles.title}>Welcome{user?.name ? `, ${user.name}` : ''}!</Text>
+        <View style={styles.switcherWrapper}>
+          <LanguageSwitcher />
+        </View>
+        <Text style={styles.title}>{greeting}</Text>
         {user?.email ? <Text style={styles.subtitle}>{user.email}</Text> : null}
 
         <Pressable onPress={logout} style={styles.button} accessibilityRole="button">
-          <Text style={styles.buttonText}>Log out</Text>
+          <Text style={styles.buttonText}>{t('home.logout')}</Text>
         </Pressable>
       </View>
     </SafeAreaView>
@@ -31,6 +41,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 12,
     padding: 24,
+  },
+  switcherWrapper: {
+    alignSelf: 'flex-end',
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,

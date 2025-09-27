@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useLocalization } from '../contexts/LocalizationContext';
 
 interface WordPressLoginFormProps {
   loading?: boolean;
@@ -27,6 +28,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
 }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const { t } = useLocalization();
 
   const handleSubmit = () => {
     if (loading) {
@@ -45,24 +47,24 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
       style={styles.container}
     >
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Email / Username</Text>
+        <Text style={styles.label}>{t('auth.forms.usernameLabel')}</Text>
         <TextInput
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
           keyboardType="email-address"
           style={styles.input}
-          placeholder="you@example.com"
+          placeholder={t('auth.forms.usernamePlaceholder')}
         />
       </View>
       <View style={styles.formGroup}>
-        <Text style={styles.label}>Password</Text>
+        <Text style={styles.label}>{t('auth.forms.passwordLabel')}</Text>
         <TextInput
           value={password}
           onChangeText={setPassword}
           secureTextEntry
           style={styles.input}
-          placeholder="Your WordPress password"
+          placeholder={t('auth.forms.passwordPlaceholder')}
         />
       </View>
 
@@ -74,15 +76,19 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
         style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
         disabled={disabled}
       >
-        {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Sign in</Text>}
+        {loading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.primaryButtonText}>{t('auth.forms.submit')}</Text>
+        )}
       </Pressable>
 
       <View style={styles.secondaryActions}>
         <Pressable onPress={onForgotPassword} hitSlop={8} accessibilityRole="link">
-          <Text style={styles.linkText}>Forgot password?</Text>
+          <Text style={styles.linkText}>{t('auth.forms.forgotPassword')}</Text>
         </Pressable>
         <Pressable onPress={onRegister} hitSlop={8} accessibilityRole="link">
-          <Text style={styles.linkText}>Register</Text>
+          <Text style={styles.linkText}>{t('auth.forms.register')}</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>
