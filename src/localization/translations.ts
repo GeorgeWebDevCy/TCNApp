@@ -86,6 +86,28 @@ export const translations: Record<Language, TranslationDictionary> = {
     home: {
       title: 'Welcome{{name}}!',
       logout: 'Log out',
+      membership: {
+        heading: 'Membership status',
+        tierLabel: 'Tier',
+        noExpiry: 'No renewal date available',
+        renewsOn: 'Renews on {{date}}',
+        expiredOn: 'Expired on {{date}}',
+        discountSummary: 'Save up to {{percent}}% with member perks',
+        discountSummaryDefault: 'Enjoy exclusive discounts with partner vendors.',
+        empty: 'No active membership yet. Upgrade to unlock more benefits.',
+      },
+      benefits: {
+        heading: 'Your benefits',
+        empty: 'Benefits will appear here once they are available for your tier.',
+      },
+      quickActions: {
+        heading: 'Quick actions',
+        viewVendors: 'View vendors',
+        viewVendorsMessage: 'Browse participating vendors in your area.',
+        upgradeOptions: 'Upgrade options',
+        upgradeOptionsMessage: 'Contact support to explore higher membership tiers.',
+        comingSoonTitle: 'Coming soon',
+      },
     },
     errors: {
       passwordLogin: 'Unable to complete password login.',
@@ -186,6 +208,28 @@ export const translations: Record<Language, TranslationDictionary> = {
     home: {
       title: 'ยินดีต้อนรับ{{name}}!',
       logout: 'ออกจากระบบ',
+      membership: {
+        heading: 'สถานะสมาชิก',
+        tierLabel: 'ระดับสมาชิก',
+        noExpiry: 'ยังไม่มีวันต่ออายุ',
+        renewsOn: 'ต่ออายุในวันที่ {{date}}',
+        expiredOn: 'หมดอายุในวันที่ {{date}}',
+        discountSummary: 'รับส่วนลดสูงสุด {{percent}}% กับสิทธิพิเศษสมาชิก',
+        discountSummaryDefault: 'เพลิดเพลินกับส่วนลดพิเศษจากพันธมิตรของเรา',
+        empty: 'ยังไม่มีสมาชิกภาพ อัปเกรดเพื่อปลดล็อกสิทธิประโยชน์เพิ่มเติม',
+      },
+      benefits: {
+        heading: 'สิทธิประโยชน์ของคุณ',
+        empty: 'สิทธิประโยชน์จะแสดงที่นี่เมื่อพร้อมสำหรับระดับของคุณ',
+      },
+      quickActions: {
+        heading: 'เมนูลัด',
+        viewVendors: 'ดูร้านค้าพันธมิตร',
+        viewVendorsMessage: 'สำรวจร้านค้าที่เข้าร่วมในพื้นที่ของคุณ',
+        upgradeOptions: 'ตัวเลือกการอัปเกรด',
+        upgradeOptionsMessage: 'ติดต่อทีมงานเพื่อดูตัวเลือกการอัปเกรดระดับสมาชิก',
+        comingSoonTitle: 'เร็ว ๆ นี้',
+      },
     },
     errors: {
       passwordLogin: 'ไม่สามารถเข้าสู่ระบบด้วยรหัสผ่านได้',
