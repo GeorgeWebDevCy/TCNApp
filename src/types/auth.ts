@@ -22,6 +22,7 @@ export interface AuthState {
   user: AuthUser | null;
   authMethod: AuthMethod | null;
   error: string | null;
+  hasPasswordAuthenticated: boolean;
 }
 
 export interface LoginOptions {

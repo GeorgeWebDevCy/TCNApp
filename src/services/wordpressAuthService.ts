@@ -60,6 +60,19 @@ export const setSessionLock = async (locked: boolean) => {
   }
 };
 
+export const markPasswordAuthenticated = async () => {
+  await AsyncStorage.setItem(AUTH_STORAGE_KEYS.passwordAuthenticated, 'true');
+};
+
+export const clearPasswordAuthenticated = async () => {
+  await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.passwordAuthenticated);
+};
+
+export const hasPasswordAuthenticated = async (): Promise<boolean> => {
+  const value = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.passwordAuthenticated);
+  return value === 'true';
+};
+
 const storeSession = async ({ token, refreshToken, user }: Omit<PersistedSession, 'locked'>) => {
   const entries: [string, string][] = [[AUTH_STORAGE_KEYS.token, token]];
 
@@ -81,6 +94,7 @@ export const clearSession = async () => {
     AUTH_STORAGE_KEYS.refreshToken,
     AUTH_STORAGE_KEYS.userProfile,
     AUTH_STORAGE_KEYS.sessionLock,
+    AUTH_STORAGE_KEYS.passwordAuthenticated,
   ]);
 };
 
@@ -201,6 +215,7 @@ export const loginWithPassword = async ({
   };
 
   await storeSession(session);
+  await markPasswordAuthenticated();
 
   return session;
 };

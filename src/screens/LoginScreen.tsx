@@ -24,7 +24,15 @@ const authTabs = [
 ] as const;
 
 export const LoginScreen: React.FC = () => {
-  const { state, loginWithPassword, loginWithPin, loginWithBiometrics, registerPin, removePin, resetError } =
+  const {
+    state,
+    loginWithPassword,
+    loginWithPin,
+    loginWithBiometrics,
+    registerPin,
+    removePin,
+    resetError,
+  } =
     useAuthContext();
   const { pin: hasStoredPin, biometrics, biometryType, loading: availabilityLoading, refresh } =
     useAuthAvailability();
@@ -83,9 +91,15 @@ export const LoginScreen: React.FC = () => {
   );
 
   const handleRemovePin = useCallback(async () => {
-    await removePin();
-    await refresh();
-    Alert.alert('PIN removed', 'Your saved PIN has been removed.');
+    try {
+      await removePin();
+      await refresh();
+      Alert.alert('PIN removed', 'Your saved PIN has been removed.');
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Something went wrong while removing your PIN.';
+      setPinError(message);
+    }
   }, [refresh, removePin]);
 
   const handleBiometricLogin = useCallback(async () => {
@@ -157,6 +171,7 @@ export const LoginScreen: React.FC = () => {
           ) : (
             <PinLoginForm
               hasPin={hasStoredPin}
+              canManagePin={state.hasPasswordAuthenticated}
               loading={isLoading && lastAttempt === 'pin'}
               error={activeError}
               onSubmit={handlePinSubmit}
