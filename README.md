@@ -1,6 +1,27 @@
 Here's the current README.md for the project. 
 # Consumer Network Program Overview
 
+## 📚 Table of Contents
+
+- [🎯 Overview](#-overview)
+- [🪪 Membership Types (Annual Fee)](#-membership-types-annual-fee)
+- [🏪 Vendor Types](#-vendor-types)
+- [📢 Promotions Summary](#-promotions-summary)
+- [🤝 Vendor Network Program (B2B)](#-vendor-network-program-b2b)
+- [📈 Membership Network Program](#-membership-network-program)
+- [🔁 Discount Summary Table](#-discount-summary-table)
+- [📱 React Native Boilerplate Setup](#-react-native-boilerplate-setup)
+- [Mobile App Authentication](#mobile-app-authentication)
+- [🧭 Application Structure](#-application-structure)
+- [🔐 Authentication Flow Details](#-authentication-flow-details)
+- [🧪 Testing](#-testing)
+- [🛠️ Configuration Checklist](#-configuration-checklist)
+- [📲 Key Screens & Components](#-key-screens--components)
+- [🧠 Supporting Services & Hooks](#-supporting-services--hooks)
+- [🗄️ Persisted Storage Keys](#-persisted-storage-keys)
+- [🛡️ WordPress Backend Requirements](#-wordpress-backend-requirements)
+- [⚙️ Development Scripts & Tooling](#-development-scripts--tooling)
+
 ## 🎯 Overview
 A membership-based consumer discount network that connects consumers (members) with local vendors.  
 The network operates on a tiered membership and vendor model, providing varying discounts and promotional opportunities.
@@ -67,7 +88,7 @@ The network operates on a tiered membership and vendor model, providing varying 
 
 ## 📱 React Native Boilerplate Setup
 
-This repository now includes the starter code for a React Native application that uses [OneSignal](https://onesignal.com/) for push notifications.
+This repository now includes the starter code for a React Native application that can integrate with [OneSignal](https://onesignal.com/) for push notifications.
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) 18 LTS or newer
@@ -82,7 +103,7 @@ This repository now includes the starter code for a React Native application tha
    # or
    npm install
    ```
-2. Update the placeholder ID in `src/notifications/OneSignalProvider.js` with your OneSignal app ID.
+2. If you scaffold the optional notification provider, update the placeholder app ID in `src/notifications/OneSignalProvider.ts` (create this file when you wire up OneSignal) with your OneSignal credentials.
 3. Run the Metro bundler
    ```bash
    yarn start
@@ -94,7 +115,9 @@ This repository now includes the starter code for a React Native application tha
    yarn ios
    ```
 
-The app initializes OneSignal on start, requests notification permissions, and ensures foreground notifications display by default. Customize the UI in `src/App.js` and expand notification handling in `src/notifications/OneSignalProvider.js` as you build out the project.---
+When a `OneSignalProvider` is added, initialize OneSignal on start, request notification permissions, and ensure foreground notifications display by default. Customize the UI in `App.tsx` and expand notification handling in your notification provider as you build out the project.
+
+---
 
 ## Mobile App Authentication
 
@@ -118,3 +141,92 @@ After pulling these changes run `npm install` (or `yarn install`) to add the new
 - `react-native-biometrics`
 
 Remember to run the native linking steps required by React Native for any newly added native modules.
+
+---
+
+## 🧭 Application Structure
+
+Key parts of the React Native application live under the `src/` directory:
+
+- `contexts/`: Contains the `AuthContext`, which bootstraps persisted sessions, exposes authentication actions, and keeps track of the current user and lock state.
+- `screens/`: Holds UI screens such as `LoginScreen` (tabbed password/PIN login with biometric quick actions) and `HomeScreen` (simple authenticated landing view).
+- `components/`: Shared presentation components like `WordPressLoginForm`, `PinLoginForm`, `BiometricLoginButton`, and `LoginHeader` used to compose the login experience.
+- `services/`: Business-logic utilities for WordPress JWT authentication, PIN hashing/storage, and biometric prompts.
+- `hooks/`: Reusable hooks including `useAuthAvailability`, which reports whether PIN or biometric login options are available on the device.
+- `utils/`: Helper functions such as hashing utilities used by the PIN service.
+- `types/`: TypeScript interfaces and enums representing authentication state, users, and service contracts.
+
+The top-level `App.tsx` wraps the UI with `SafeAreaProvider` and `AuthProvider`, ensuring authentication state is available throughout the component tree before deciding whether to render the login or home experience.
+
+---
+
+## 🔐 Authentication Flow Details
+
+- **Session Bootstrapping**: `AuthProvider` restores persisted tokens via `ensureValidSession` on launch, fetching fresh profile data if needed and respecting the session lock flag saved in AsyncStorage.
+- **Password Login**: `loginWithPassword` posts credentials to the WordPress JWT endpoint, stores tokens plus user profile data, and clears any existing session lock.
+- **PIN Login**: `pinService` securely stores a salted PIN hash. Users can create, reset, and verify PINs directly from the login screen.
+- **Biometrics**: `biometricService` wraps `react-native-biometrics` to check sensor availability and trigger prompts. Errors surface in the login UI for graceful fallbacks.
+- **Session Locking**: Logging out sets a persisted lock flag instead of clearing tokens, allowing PIN or biometric re-entry without re-entering credentials. Full logout/expiry clears tokens via `clearSession`.
+
+These flows are orchestrated in `LoginScreen.tsx`, which coordinates UI state (active tab, recent auth attempt, inline errors) and deep-links to WordPress for registration or password recovery.
+
+---
+
+## 🧪 Testing
+
+- Unit tests are located in `__tests__/`. Run `npm test` (or `yarn test`) to execute the Jest test suite, which currently verifies that the main `App` component renders without crashing.
+
+---
+
+## 🛠️ Configuration Checklist
+
+Before building, update the placeholders in `src/config/authConfig.ts`:
+
+1. Replace `baseUrl` with your WordPress site's root URL.
+2. Confirm the JWT token, validation, and profile endpoint paths match your WordPress setup.
+3. Update the registration and password reset links to match your deployment.
+4. Optionally customize the AsyncStorage keys if you need to namespace multiple environments.
+
+For PIN storage and biometrics to work correctly, ensure the listed native dependencies are linked and the necessary platform permissions (e.g., Face ID usage description on iOS) are set in your native project files.
+
+---
+
+## 📲 Key Screens & Components
+
+- **`LoginScreen.tsx`** (under `src/screens/`): hosts the tabbed password/PIN login experience, surfaces recent auth errors, and links to WordPress for registration and password resets. It also wires in biometric shortcuts so users with an existing session can authenticate quickly.【F:src/screens/LoginScreen.tsx†L1-L206】
+- **`HomeScreen.tsx`** (under `src/screens/`): simple authenticated landing screen that confirms the session is active and exposes a logout control to lock the session again.【F:src/screens/HomeScreen.tsx†L1-L69】
+- **`WordPressLoginForm.tsx`** and **`PinLoginForm.tsx`** (under `src/components/`): reusable forms that emit submit events to the context. The PIN form supports creation/reset flows with 4+ digit enforcement and inline validation feedback.【F:src/components/WordPressLoginForm.tsx†L1-L161】【F:src/components/PinLoginForm.tsx†L1-L170】
+- **`BiometricLoginButton.tsx`** and **`LoginHeader.tsx`**: presentation components that encapsulate native biometric triggers and shared branding for the login experience.【F:src/components/BiometricLoginButton.tsx†L1-L118】【F:src/components/LoginHeader.tsx†L1-L73】
+
+---
+
+## 🧠 Supporting Services & Hooks
+
+- **`AuthContext.tsx`** (under `src/contexts/`): centralizes authentication state with a reducer that handles bootstrapping, locking/unlocking, and success/error transitions. It exposes helpers to initiate password, PIN, and biometric login flows that are used throughout the UI.【F:src/contexts/AuthContext.tsx†L1-L246】
+- **`wordpressAuthService.ts`**: wraps the WordPress JWT endpoints for login, validation, profile hydration, and session persistence in AsyncStorage. It also manages session locking semantics so credentials stay cached while requiring a PIN/biometric unlock.【F:src/services/wordpressAuthService.ts†L1-L205】
+- **`pinService.ts`**: stores salted hashes for device-level PIN unlocks, using utilities from `src/utils/hash.ts` to generate secure digests.【F:src/services/pinService.ts†L1-L149】【F:src/utils/hash.ts†L1-L64】
+- **`biometricService.ts`**: wraps `react-native-biometrics` to check sensor availability and request authentication, returning structured results consumed by the context and UI.【F:src/services/biometricService.ts†L1-L90】
+- **`useAuthAvailability.ts`**: reports which quick-login methods are currently enabled (existing PIN, biometric sensor availability) so the login screen can conditionally render shortcuts.【F:src/hooks/useAuthAvailability.ts†L1-L81】
+
+---
+
+## 🗄️ Persisted Storage Keys
+
+- Configure storage keys in `src/config/authConfig.ts` to match your environment or namespace requirements. Keys exist for JWT tokens, refresh tokens, cached user profiles, and the session lock flag, alongside PIN hash and salt entries.【F:src/config/authConfig.ts†L1-L22】
+- `wordpressAuthService.ts` and `pinService.ts` both rely on these constants when reading or writing to AsyncStorage, so keep them in sync if you change the keys.【F:src/services/wordpressAuthService.ts†L63-L111】【F:src/services/pinService.ts†L21-L66】
+
+---
+
+## 🛡️ WordPress Backend Requirements
+
+- Expose the JWT auth endpoints listed in `WORDPRESS_CONFIG` (`/wp-json/jwt-auth/v1/token`, `/validate`, and `/wp/v2/users/me`). Popular plugins such as "JWT Authentication for WP-API" can provide these routes.【F:src/config/authConfig.ts†L1-L11】【F:src/services/wordpressAuthService.ts†L126-L205】
+- Ensure CORS and HTTPS are enabled so the React Native app can reach the WordPress API from devices and simulators.
+- Grant users permission to call the profile endpoint so their display name and avatar can be hydrated after login.【F:src/services/wordpressAuthService.ts†L29-L61】
+
+---
+
+## ⚙️ Development Scripts & Tooling
+
+- **Node version**: The project expects Node.js 20 or newer as declared in `package.json`.
+- **Scripts**: use `npm run android` / `ios` for native builds, `npm run start` for Metro, `npm run test` for Jest, and `npm run lint` for ESLint checks.【F:package.json†L1-L28】
+- **Testing**: Jest is configured in `__tests__/App.test.tsx` to validate the root `App` component renders; expand this directory with additional coverage as needed.【F:__tests__/App.test.tsx†L1-L24】
