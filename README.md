@@ -124,7 +124,7 @@ The application bootstraps the `OneSignalProvider`, initializes the SDK during s
    - Replace the placeholder app ID in `src/config/notificationsConfig.ts` with your OneSignal application ID.
    - Optionally adjust the tag keys if you need to align with an existing messaging strategy.
 2. **Android**
-   - The project applies the OneSignal Gradle plugin and dependency; after updating the config, run `./gradlew clean` from the `android/` directory or simply build the app with `npm run android` to regenerate resources.
+   - The project already includes the OneSignal React Native package and native dependency; after updating the config, rebuild the app (for example, `npm run android`) so Gradle regenerates the required resources.
    - Ensure the `POST_NOTIFICATIONS` permission remains in `android/app/src/main/AndroidManifest.xml` for Android 13+.
 3. **iOS**
    - Run `npx pod-install` (or open the workspace in Xcode and install pods) after changing dependencies to pull in the OneSignal XCFramework.

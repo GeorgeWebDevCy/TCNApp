@@ -1,13 +1,15 @@
+const BASE_URL = 'http://dominicb72.sg-host.com';
+
 export const WORDPRESS_CONFIG = {
-  baseUrl: 'https://your-wordpress-site.com',
+  baseUrl: BASE_URL,
   endpoints: {
     token: '/wp-json/jwt-auth/v1/token',
     validate: '/wp-json/jwt-auth/v1/token/validate',
     profile: '/wp-json/wp/v2/users/me',
   },
   links: {
-    register: 'https://your-wordpress-site.com/register',
-    forgotPassword: 'https://your-wordpress-site.com/wp-login.php?action=lostpassword',
+    register: `${BASE_URL}/register`,
+    forgotPassword: `${BASE_URL}/wp-login.php?action=lostpassword`,
   },
 };
 

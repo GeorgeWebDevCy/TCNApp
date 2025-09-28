@@ -1,8 +1,6 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
-apply plugin: "com.onesignal.androidsdk.onesignal-gradle-plugin"
-
 /**
  * This is the configuration block to customize your React Native Android app.
  * By default you don't need to apply any configuration, just uncomment the lines you need.
@@ -118,7 +116,7 @@ dependencies {
         implementation jscFlavor
     }
 
-    implementation(platform("com.onesignal:OneSignal-bom:5.1.6"))
-    implementation("com.onesignal:OneSignal")
-}
+    // Explicit OneSignal dependency to match the React Native SDK
+    implementation("com.onesignal:OneSignal:5.1.35")
 
+}
