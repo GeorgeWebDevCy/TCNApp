@@ -227,7 +227,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       deviceLog.error('PIN login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
-  }, [state.hasPasswordAuthenticated]);
+  }, [state.hasPasswordAuthenticated, state.membership]);
 
   const loginWithBiometrics = useCallback(async (promptMessage?: string) => {
     dispatch({ type: 'LOGIN_START' });
@@ -280,7 +280,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       deviceLog.error('Biometric login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
-  }, [state.hasPasswordAuthenticated]);
+  }, [state.hasPasswordAuthenticated, state.membership]);
 
   const registerPin = useCallback(async (pin: string) => {
     if (!state.hasPasswordAuthenticated) {
