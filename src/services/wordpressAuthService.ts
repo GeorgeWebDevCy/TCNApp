@@ -15,7 +15,49 @@ export interface PersistedSession {
   locked: boolean;
 }
 
-const buildUrl = (path: string) => `${WORDPRESS_CONFIG.baseUrl}${path}`;
+const normalizeBaseUrl = (baseUrl: string): string => baseUrl.replace(/\/+$/, '');
+
+const ensureLeadingSlash = (path: string): string => (path.startsWith('/') ? path : `/${path}`);
+
+const buildUrl = (path: string) =>
+  `${normalizeBaseUrl(WORDPRESS_CONFIG.baseUrl)}${ensureLeadingSlash(path)}`;
+
+const buildRestRouteUrl = (path: string) => {
+  const normalizedPath = ensureLeadingSlash(path);
+  const restRoute = normalizedPath.startsWith('/wp-json')
+    ? normalizedPath.slice('/wp-json'.length) || '/'
+    : normalizedPath;
+
+  return `${normalizeBaseUrl(WORDPRESS_CONFIG.baseUrl)}/?rest_route=${restRoute}`;
+};
+
+const fetchWithRouteFallback = async (
+  path: string,
+  init?: RequestInit,
+): Promise<Response> => {
+  const primaryUrl = buildUrl(path);
+  const primaryResponse = await fetch(primaryUrl, init);
+
+  if (primaryResponse.status !== 404) {
+    return primaryResponse;
+  }
+
+  let shouldFallback = false;
+  try {
+    const payload = await primaryResponse.clone().json();
+    shouldFallback =
+      payload && typeof payload === 'object' && 'code' in payload && payload.code === 'rest_no_route';
+  } catch (error) {
+    shouldFallback = false;
+  }
+
+  if (!shouldFallback) {
+    return primaryResponse;
+  }
+
+  const fallbackUrl = buildRestRouteUrl(path);
+  return fetch(fallbackUrl, init);
+};
 
 const parseDiscountValue = (value: unknown): number | undefined => {
   if (typeof value === 'number') {
@@ -137,7 +179,7 @@ const parseUserFromToken = (
 
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
-    const response = await fetch(buildUrl(WORDPRESS_CONFIG.endpoints.profile), {
+    const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.profile, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -253,7 +295,7 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
 
 export const validateToken = async (token: string): Promise<boolean> => {
   try {
-    const response = await fetch(buildUrl(WORDPRESS_CONFIG.endpoints.validate), {
+    const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.validate, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
@@ -307,7 +349,7 @@ export const loginWithPassword = async ({
   username,
   password,
 }: LoginOptions): Promise<PersistedSession> => {
-  const response = await fetch(buildUrl(WORDPRESS_CONFIG.endpoints.token), {
+  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.token, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
