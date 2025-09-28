@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.onesignal.androidsdk.onesignal-gradle-plugin"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -84,6 +85,10 @@ android {
         targetSdkVersion = rootProject.ext.targetSdkVersion
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders = [
+            onesignal_app_id: project.hasProperty("ONESIGNAL_APP_ID") ? project.property("ONESIGNAL_APP_ID") : "00000000-0000-0000-0000-000000000000",
+            onesignal_google_project_number: "REMOTE"
+        ]
     }
     signingConfigs {
         debug {

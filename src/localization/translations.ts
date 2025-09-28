@@ -86,6 +86,27 @@ export const translations: Record<Language, TranslationDictionary> = {
     home: {
       title: 'Welcome{{name}}!',
       logout: 'Log out',
+      notifications: {
+        title: 'Notifications',
+        marketingLabel: 'Marketing pushes',
+        marketingDescription: 'Enable vendor promotions and renewal reminders.',
+        toggleAccessibility: 'Toggle marketing notifications',
+        activeSection: 'Current section: {{section}}',
+        intentTitle: 'New alert',
+        intentMessage: 'Open the {{section}} section to review this {{context}}.',
+        openSection: 'Open {{section}}',
+        dismiss: 'Dismiss',
+        sections: {
+          dashboard: 'Dashboard',
+          vendors: 'Vendors',
+          membership: 'Membership',
+        },
+        contexts: {
+          promotion: 'promotion',
+          renewal: 'renewal reminder',
+          unknown: 'update',
+        },
+      },
     },
     errors: {
       passwordLogin: 'Unable to complete password login.',
@@ -186,6 +207,27 @@ export const translations: Record<Language, TranslationDictionary> = {
     home: {
       title: 'ยินดีต้อนรับ{{name}}!',
       logout: 'ออกจากระบบ',
+      notifications: {
+        title: 'การแจ้งเตือน',
+        marketingLabel: 'การแจ้งเตือนการตลาด',
+        marketingDescription: 'เปิดรับโปรโมชันจากร้านค้าและการเตือนต่ออายุสมาชิก',
+        toggleAccessibility: 'สลับการแจ้งเตือนการตลาด',
+        activeSection: 'หน้าปัจจุบัน: {{section}}',
+        intentTitle: 'การแจ้งเตือนใหม่',
+        intentMessage: 'เปิดหน้าดู {{section}} เพื่อดูรายละเอียด{{context}}',
+        openSection: 'เปิดหน้า{{section}}',
+        dismiss: 'ปิด',
+        sections: {
+          dashboard: 'แดชบอร์ด',
+          vendors: 'ร้านค้า',
+          membership: 'สมาชิก',
+        },
+        contexts: {
+          promotion: 'โปรโมชัน',
+          renewal: 'การต่ออายุสมาชิก',
+          unknown: 'อัปเดต',
+        },
+      },
     },
     errors: {
       passwordLogin: 'ไม่สามารถเข้าสู่ระบบด้วยรหัสผ่านได้',

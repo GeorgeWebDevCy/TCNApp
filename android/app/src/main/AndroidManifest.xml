@@ -11,6 +11,12 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+      <meta-data
+        android:name="onesignal_app_id"
+        android:value="${onesignal_app_id}" />
+      <meta-data
+        android:name="onesignal_google_project_number"
+        android:value="${onesignal_google_project_number}" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

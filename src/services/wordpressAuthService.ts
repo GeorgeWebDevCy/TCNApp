@@ -1,6 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
+import { DEFAULT_MEMBERSHIP_TIER } from '../config/notificationsConfig';
 import { AuthUser, LoginOptions, WordPressTokenResponse } from '../types/auth';
+
+const resolveMembershipTier = (value: unknown): AuthUser['membershipTier'] => {
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase();
+    if (normalized === 'gold' || normalized === 'platinum' || normalized === 'black') {
+      return normalized;
+    }
+  }
+
+  return DEFAULT_MEMBERSHIP_TIER;
+};
 
 export interface PersistedSession {
   token: string;
@@ -22,6 +34,7 @@ const parseUserFromToken = (
     id: -1,
     email: tokenResponse.user_email,
     name: tokenResponse.user_display_name ?? tokenResponse.user_email,
+    membershipTier: DEFAULT_MEMBERSHIP_TIER,
   };
 };
 
@@ -39,13 +52,29 @@ const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
       return null;
     }
 
-    const payload = await response.json();
+    const payload = (await response.json()) as {
+      id?: number;
+      email?: string;
+      user_email?: string;
+      name?: string;
+      user_display_name?: string;
+      username?: string;
+      avatar_urls?: Record<string, string>;
+      membershipTier?: string;
+      membership?: { tier?: string };
+      meta?: { membershipTier?: string };
+    };
+
+    const membershipTier = resolveMembershipTier(
+      payload.membershipTier ?? payload.membership?.tier ?? payload.meta?.membershipTier,
+    );
 
     return {
-      id: payload.id,
+      id: payload.id ?? -1,
       email: payload.email ?? payload.user_email ?? '',
-      name: payload.name ?? payload.user_display_name ?? payload.username,
+      name: payload.name ?? payload.user_display_name ?? payload.username ?? '',
       avatarUrl: payload.avatar_urls?.['96'] ?? payload.avatar_urls?.['48'],
+      membershipTier,
     };
   } catch (error) {
     return null;

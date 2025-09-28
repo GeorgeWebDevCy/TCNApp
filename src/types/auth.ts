@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string;
   name: string;
   avatarUrl?: string;
+  membershipTier?: 'gold' | 'platinum' | 'black';
 }
 
 export interface WordPressTokenResponse {

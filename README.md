@@ -139,6 +139,7 @@ After pulling these changes run `npm install` (or `yarn install`) to add the new
 - `@react-native-async-storage/async-storage`
 - `crypto-js`
 - `react-native-biometrics`
+- `react-native-onesignal`
 
 Remember to run the native linking steps required by React Native for any newly added native modules.
 
@@ -155,8 +156,9 @@ Key parts of the React Native application live under the `src/` directory:
 - `hooks/`: Reusable hooks including `useAuthAvailability`, which reports whether PIN or biometric login options are available on the device.
 - `utils/`: Helper functions such as hashing utilities used by the PIN service.
 - `types/`: TypeScript interfaces and enums representing authentication state, users, and service contracts.
+- `notifications/`: Contains `OneSignalProvider`, which boots the OneSignal SDK, manages user tags, tracks navigation intents, and exposes notification preferences to the UI.
 
-The top-level `App.tsx` wraps the UI with `SafeAreaProvider` and `AuthProvider`, ensuring authentication state is available throughout the component tree before deciding whether to render the login or home experience.
+The top-level `App.tsx` wraps the UI with `SafeAreaProvider`, `AuthProvider`, and the notification provider so authentication state and notification preferences are available throughout the component tree before deciding whether to render the login or home experience.
 
 ---
 
@@ -174,7 +176,7 @@ These flows are orchestrated in `LoginScreen.tsx`, which coordinates UI state (a
 
 ## 🧪 Testing
 
-- Unit tests are located in `__tests__/`. Run `npm test` (or `yarn test`) to execute the Jest test suite, which currently verifies that the main `App` component renders without crashing.
+- Unit tests are located in `__tests__/`. Run `npm test` (or `yarn test`) to execute the Jest suite, which now covers the root `App` render along with `OneSignalProvider` initialization, tag updates, and notification event handling.【F:__tests__/App.test.tsx†L1-L22】【F:__tests__/OneSignalProvider.test.tsx†L1-L145】
 
 ---
 
@@ -186,6 +188,7 @@ Before building, update the placeholders in `src/config/authConfig.ts`:
 2. Confirm the JWT token, validation, and profile endpoint paths match your WordPress setup.
 3. Update the registration and password reset links to match your deployment.
 4. Optionally customize the AsyncStorage keys if you need to namespace multiple environments.
+5. Populate `src/config/notificationsConfig.ts` with your OneSignal app ID and adjust tag keys if you want to align with an existing messaging taxonomy.【F:src/config/notificationsConfig.ts†L1-L15】
 
 For PIN storage and biometrics to work correctly, ensure the listed native dependencies are linked and the necessary platform permissions (e.g., Face ID usage description on iOS) are set in your native project files.
 
@@ -194,7 +197,7 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 ## 📲 Key Screens & Components
 
 - **`LoginScreen.tsx`** (under `src/screens/`): hosts the tabbed password/PIN login experience, surfaces recent auth errors, and links to WordPress for registration and password resets. It also wires in biometric shortcuts so users with an existing session can authenticate quickly.【F:src/screens/LoginScreen.tsx†L1-L206】
-- **`HomeScreen.tsx`** (under `src/screens/`): simple authenticated landing screen that confirms the session is active and exposes a logout control to lock the session again.【F:src/screens/HomeScreen.tsx†L1-L69】
+- **`HomeScreen.tsx`** (under `src/screens/`): authenticated dashboard that now surfaces notification preferences, displays deep-link prompts for incoming pushes, and exposes a logout control to lock the session again.【F:src/screens/HomeScreen.tsx†L1-L175】
 - **`WordPressLoginForm.tsx`** and **`PinLoginForm.tsx`** (under `src/components/`): reusable forms that emit submit events to the context. The PIN form supports creation/reset flows with 4+ digit enforcement and inline validation feedback.【F:src/components/WordPressLoginForm.tsx†L1-L161】【F:src/components/PinLoginForm.tsx†L1-L170】
 - **`BiometricLoginButton.tsx`** and **`LoginHeader.tsx`**: presentation components that encapsulate native biometric triggers and shared branding for the login experience.【F:src/components/BiometricLoginButton.tsx†L1-L118】【F:src/components/LoginHeader.tsx†L1-L73】
 
@@ -204,6 +207,7 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 
 - **`AuthContext.tsx`** (under `src/contexts/`): centralizes authentication state with a reducer that handles bootstrapping, locking/unlocking, and success/error transitions. It exposes helpers to initiate password, PIN, and biometric login flows that are used throughout the UI.【F:src/contexts/AuthContext.tsx†L1-L246】
 - **`wordpressAuthService.ts`**: wraps the WordPress JWT endpoints for login, validation, profile hydration, and session persistence in AsyncStorage. It also manages session locking semantics so credentials stay cached while requiring a PIN/biometric unlock.【F:src/services/wordpressAuthService.ts†L1-L205】
+- **`OneSignalProvider.tsx`**: centralizes OneSignal initialization, tag management, and notification preference persistence, exposing a hook that powers the dashboard toggles and deep-link prompts.【F:src/notifications/OneSignalProvider.tsx†L1-L258】
 - **`pinService.ts`**: stores salted hashes for device-level PIN unlocks, using utilities from `src/utils/hash.ts` to generate secure digests.【F:src/services/pinService.ts†L1-L149】【F:src/utils/hash.ts†L1-L64】
 - **`biometricService.ts`**: wraps `react-native-biometrics` to check sensor availability and request authentication, returning structured results consumed by the context and UI.【F:src/services/biometricService.ts†L1-L90】
 - **`useAuthAvailability.ts`**: reports which quick-login methods are currently enabled (existing PIN, biometric sensor availability) so the login screen can conditionally render shortcuts.【F:src/hooks/useAuthAvailability.ts†L1-L81】
@@ -214,6 +218,7 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 
 - Configure storage keys in `src/config/authConfig.ts` to match your environment or namespace requirements. Keys exist for JWT tokens, refresh tokens, cached user profiles, and the session lock flag, alongside PIN hash and salt entries.【F:src/config/authConfig.ts†L1-L22】
 - `wordpressAuthService.ts` and `pinService.ts` both rely on these constants when reading or writing to AsyncStorage, so keep them in sync if you change the keys.【F:src/services/wordpressAuthService.ts†L63-L111】【F:src/services/pinService.ts†L21-L66】
+- Notification preferences are persisted under `NOTIFICATION_STORAGE_KEYS.preferences` so users keep their marketing opt-in state between launches.【F:src/config/notificationsConfig.ts†L1-L15】【F:src/notifications/OneSignalProvider.tsx†L94-L133】
 
 ---
 
