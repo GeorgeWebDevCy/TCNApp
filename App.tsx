@@ -11,6 +11,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import deviceLog, { LogView } from 'react-native-device-log';
 import { AuthProvider, useAuthContext } from './src/contexts/AuthContext';
 import { LocalizationProvider } from './src/contexts/LocalizationContext';
+import { OneSignalProvider } from './src/notifications/OneSignalProvider';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 
@@ -53,39 +54,41 @@ function App(): JSX.Element {
     <LocalizationProvider>
       <SafeAreaProvider>
         <AuthProvider>
-          <View style={styles.appContainer}>
-            <AppContent />
-            {!areLogsVisible && (
-              <TouchableOpacity
-                accessibilityRole="button"
-                accessibilityLabel="Show device logs"
-                style={styles.logToggle}
-                onPress={() => setAreLogsVisible(true)}
-              >
-                <Text style={styles.logToggleText}>Show Logs</Text>
-              </TouchableOpacity>
-            )}
-            {areLogsVisible && (
-              <View style={styles.logOverlay}>
-                <View style={styles.logOverlayHeader}>
-                  <Text style={styles.logOverlayTitle}>Device Logs</Text>
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Hide device logs"
-                    onPress={() => setAreLogsVisible(false)}
-                    style={styles.logOverlayClose}
-                  >
-                    <Text style={styles.logOverlayCloseText}>Close</Text>
-                  </TouchableOpacity>
+          <OneSignalProvider>
+            <View style={styles.appContainer}>
+              <AppContent />
+              {!areLogsVisible && (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Show device logs"
+                  style={styles.logToggle}
+                  onPress={() => setAreLogsVisible(true)}
+                >
+                  <Text style={styles.logToggleText}>Show Logs</Text>
+                </TouchableOpacity>
+              )}
+              {areLogsVisible && (
+                <View style={styles.logOverlay}>
+                  <View style={styles.logOverlayHeader}>
+                    <Text style={styles.logOverlayTitle}>Device Logs</Text>
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Hide device logs"
+                      onPress={() => setAreLogsVisible(false)}
+                      style={styles.logOverlayClose}
+                    >
+                      <Text style={styles.logOverlayCloseText}>Close</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <LogView
+                    style={styles.logView}
+                    multiExpanded
+                    timeStampFormat="HH:mm:ss"
+                  />
                 </View>
-                <LogView
-                  style={styles.logView}
-                  multiExpanded
-                  timeStampFormat="HH:mm:ss"
-                />
-              </View>
-            )}
-          </View>
+              )}
+            </View>
+          </OneSignalProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </LocalizationProvider>

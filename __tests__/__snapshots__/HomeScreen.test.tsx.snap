@@ -438,6 +438,139 @@ exports[`HomeScreen renders the membership overview 1`] = `
       <View
         style={
           {
+            "backgroundColor": "#F8FAFC",
+            "borderColor": "#E2E8F0",
+            "borderRadius": 16,
+            "borderWidth": 1,
+            "gap": 16,
+            "padding": 20,
+          }
+        }
+      >
+        <Text
+          style={
+            {
+              "color": "#1E293B",
+              "fontSize": 18,
+              "fontWeight": "600",
+              "marginBottom": 12,
+            }
+          }
+        >
+          Notifications
+        </Text>
+        <View
+          style={
+            {
+              "alignItems": "center",
+              "flexDirection": "row",
+              "gap": 16,
+              "justifyContent": "space-between",
+            }
+          }
+        >
+          <View
+            style={
+              {
+                "flex": 1,
+                "gap": 4,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#0F172A",
+                  "fontSize": 16,
+                  "fontWeight": "600",
+                }
+              }
+            >
+              Marketing push alerts
+            </Text>
+            <Text
+              style={
+                {
+                  "color": "#475569",
+                  "fontSize": 14,
+                }
+              }
+            >
+              Get personalized promotions from partner vendors.
+            </Text>
+          </View>
+          <RCTSwitch
+            accessibilityLabel="Marketing push alerts"
+            accessibilityRole="switch"
+            onChange={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
+            style={
+              {
+                "alignSelf": "flex-start",
+              }
+            }
+            value={true}
+          />
+        </View>
+        <View
+          style={
+            {
+              "alignItems": "center",
+              "flexDirection": "row",
+              "gap": 16,
+              "justifyContent": "space-between",
+            }
+          }
+        >
+          <View
+            style={
+              {
+                "flex": 1,
+                "gap": 4,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#0F172A",
+                  "fontSize": 16,
+                  "fontWeight": "600",
+                }
+              }
+            >
+              Renewal reminders
+            </Text>
+            <Text
+              style={
+                {
+                  "color": "#475569",
+                  "fontSize": 14,
+                }
+              }
+            >
+              Receive reminders before your membership expires.
+            </Text>
+          </View>
+          <RCTSwitch
+            accessibilityLabel="Renewal reminders"
+            accessibilityRole="switch"
+            onChange={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
+            style={
+              {
+                "alignSelf": "flex-start",
+              }
+            }
+            value={true}
+          />
+        </View>
+      </View>
+      <View
+        style={
+          {
             "gap": 12,
           }
         }

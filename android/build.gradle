@@ -10,11 +10,14 @@ buildscript {
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://plugins.gradle.org/m2/' }
+        maven { url 'https://android-sdk.onesignal.com' }
     }
     dependencies {
         classpath("com.android.tools.build:gradle")
         classpath("com.facebook.react:react-native-gradle-plugin")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin")
+        classpath("gradle.plugin.com.onesignal:onesignal-gradle-plugin:[0.15.0,0.99.99]")
     }
 }
 

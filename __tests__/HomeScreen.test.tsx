@@ -72,6 +72,18 @@ jest.mock('../src/contexts/LocalizationContext', () => {
   };
 });
 
+jest.mock('../src/notifications/OneSignalProvider', () => ({
+  useOneSignalNotifications: () => ({
+    preferences: { marketing: true, reminders: true },
+    updatePreference: jest.fn(),
+    activeNotification: null,
+    activeNotificationOrigin: null,
+    clearActiveNotification: jest.fn(),
+    pendingNavigationTarget: null,
+    consumeNavigationTarget: jest.fn(),
+  }),
+}));
+
 describe('HomeScreen', () => {
   it('renders the membership overview', () => {
     let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
