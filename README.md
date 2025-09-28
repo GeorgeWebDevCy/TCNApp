@@ -11,6 +11,7 @@ Here's the current README.md for the project.
 - [📈 Membership Network Program](#-membership-network-program)
 - [🔁 Discount Summary Table](#-discount-summary-table)
 - [📱 React Native Boilerplate Setup](#-react-native-boilerplate-setup)
+- [🔔 Push Notification Setup](#-push-notification-setup)
 - [Mobile App Authentication](#mobile-app-authentication)
 - [🧭 Application Structure](#-application-structure)
 - [🔐 Authentication Flow Details](#-authentication-flow-details)
@@ -88,7 +89,7 @@ The network operates on a tiered membership and vendor model, providing varying 
 
 ## 📱 React Native Boilerplate Setup
 
-This repository now includes the starter code for a React Native application that can integrate with [OneSignal](https://onesignal.com/) for push notifications.
+This repository now includes the starter code for a React Native application that integrates with [OneSignal](https://onesignal.com/) for push notifications out of the box.
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) 18 LTS or newer
@@ -103,7 +104,7 @@ This repository now includes the starter code for a React Native application tha
    # or
    npm install
    ```
-2. If you scaffold the optional notification provider, update the placeholder app ID in `src/notifications/OneSignalProvider.ts` (create this file when you wire up OneSignal) with your OneSignal credentials.
+2. Update the placeholder values in `src/config/notificationsConfig.ts` with your OneSignal application ID and any tag names you prefer.
 3. Run the Metro bundler
    ```bash
    yarn start
@@ -115,7 +116,23 @@ This repository now includes the starter code for a React Native application tha
    yarn ios
    ```
 
-When a `OneSignalProvider` is added, initialize OneSignal on start, request notification permissions, and ensure foreground notifications display by default. Customize the UI in `App.tsx` and expand notification handling in your notification provider as you build out the project.
+The application bootstraps the `OneSignalProvider`, initializes the SDK during startup, requests notification permissions, and listens for foreground/background events so promotions and renewal reminders surface consistently.
+
+## 🔔 Push Notification Setup
+
+1. **Configure the SDK**
+   - Replace the placeholder app ID in `src/config/notificationsConfig.ts` with your OneSignal application ID.
+   - Optionally adjust the tag keys if you need to align with an existing messaging strategy.
+2. **Android**
+   - The project applies the OneSignal Gradle plugin and dependency; after updating the config, run `./gradlew clean` from the `android/` directory or simply build the app with `npm run android` to regenerate resources.
+   - Ensure the `POST_NOTIFICATIONS` permission remains in `android/app/src/main/AndroidManifest.xml` for Android 13+.
+3. **iOS**
+   - Run `npx pod-install` (or open the workspace in Xcode and install pods) after changing dependencies to pull in the OneSignal XCFramework.
+   - Update the push notification usage description in `Info.plist` if your compliance requirements call for a custom message.
+4. **In-app wiring**
+   - Authenticated members are automatically logged into OneSignal and tagged with their membership tier, preferred language, and marketing/reminder opt-in preferences.
+   - Foreground notifications surface in-app banners while background taps deep-link into the vendor or membership experiences.
+   - The dashboard exposes toggles that persist to AsyncStorage so users can mute marketing pushes without leaving the app.
 
 ---
 
@@ -139,6 +156,7 @@ After pulling these changes run `npm install` (or `yarn install`) to add the new
 - `@react-native-async-storage/async-storage`
 - `crypto-js`
 - `react-native-biometrics`
+- `react-native-onesignal`
 
 Remember to run the native linking steps required by React Native for any newly added native modules.
 
@@ -174,7 +192,11 @@ These flows are orchestrated in `LoginScreen.tsx`, which coordinates UI state (a
 
 ## 🧪 Testing
 
-- Unit tests are located in `__tests__/`. Run `npm test` (or `yarn test`) to execute the Jest test suite, which currently verifies that the main `App` component renders without crashing.
+- Unit tests are located in `__tests__/`.
+- Run `npm test` (or `yarn test`) to execute the Jest suite. Coverage now includes:
+  - Rendering smoke tests for the root `App` component.
+  - Snapshot coverage for `HomeScreen`, including notification preferences.
+  - Behavioural tests for the `OneSignalProvider` to confirm initialization, listener registration, and preference-driven suppression of marketing pushes.
 
 ---
 
@@ -194,7 +216,7 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 ## 📲 Key Screens & Components
 
 - **`LoginScreen.tsx`** (under `src/screens/`): hosts the tabbed password/PIN login experience, surfaces recent auth errors, and links to WordPress for registration and password resets. It also wires in biometric shortcuts so users with an existing session can authenticate quickly.【F:src/screens/LoginScreen.tsx†L1-L206】
-- **`HomeScreen.tsx`** (under `src/screens/`): simple authenticated landing screen that confirms the session is active and exposes a logout control to lock the session again.【F:src/screens/HomeScreen.tsx†L1-L69】
+- **`HomeScreen.tsx`** (under `src/screens/`): authenticated dashboard that now surfaces in-app notification banners, exposes notification preference toggles backed by AsyncStorage, and still offers quick access to membership benefits and logout controls.【F:src/screens/HomeScreen.tsx†L1-L236】
 - **`WordPressLoginForm.tsx`** and **`PinLoginForm.tsx`** (under `src/components/`): reusable forms that emit submit events to the context. The PIN form supports creation/reset flows with 4+ digit enforcement and inline validation feedback.【F:src/components/WordPressLoginForm.tsx†L1-L161】【F:src/components/PinLoginForm.tsx†L1-L170】
 - **`BiometricLoginButton.tsx`** and **`LoginHeader.tsx`**: presentation components that encapsulate native biometric triggers and shared branding for the login experience.【F:src/components/BiometricLoginButton.tsx†L1-L118】【F:src/components/LoginHeader.tsx†L1-L73】
 
