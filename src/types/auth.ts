@@ -22,11 +22,13 @@ export interface AuthUser {
 }
 
 export interface WordPressTokenResponse {
-  token: string;
+  access_token: string;
   refresh_token?: string;
-  user_display_name?: string;
-  user_email?: string;
-  user_nicename?: string;
+  expires_in?: number;
+  token_type?: string;
+  scope?: string;
+  error?: string;
+  error_description?: string;
 }
 
 export interface AuthState {

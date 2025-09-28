@@ -163,19 +163,8 @@ const parseMembershipInfo = (payload: Record<string, unknown> | null | undefined
 };
 
 const parseUserFromToken = (
-  tokenResponse: WordPressTokenResponse,
-): AuthUser | null => {
-  if (!tokenResponse.user_email) {
-    return null;
-  }
-
-  return {
-    id: -1,
-    email: tokenResponse.user_email,
-    name: tokenResponse.user_display_name ?? tokenResponse.user_email,
-    membership: null,
-  };
-};
+  _tokenResponse: WordPressTokenResponse,
+): AuthUser | null => null;
 
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
@@ -295,11 +284,10 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
 
 export const validateToken = async (token: string): Promise<boolean> => {
   try {
-    const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.validate, {
-      method: 'POST',
+    const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.profile, {
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
         Accept: 'application/json',
       },
     });
@@ -349,31 +337,39 @@ export const loginWithPassword = async ({
   username,
   password,
 }: LoginOptions): Promise<PersistedSession> => {
+  const params = new URLSearchParams({
+    grant_type: 'password',
+    username,
+    password,
+    client_id: WORDPRESS_CONFIG.oauth.clientId,
+    client_secret: WORDPRESS_CONFIG.oauth.clientSecret,
+  });
+
   const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.token, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'application/json',
     },
-    body: JSON.stringify({ username, password }),
+    body: params.toString(),
   });
 
-  const json = (await response.json()) as WordPressTokenResponse & {
-    message?: string;
-    data?: { status?: number };
-  };
+  const json = (await response.json()) as WordPressTokenResponse;
 
-  if (!response.ok) {
-    const message = json?.message ?? 'Unable to log in with WordPress credentials.';
+  if (!response.ok || !json.access_token) {
+    const message =
+      json?.error_description ??
+      json?.error ??
+      'Unable to log in with WordPress credentials.';
     throw new Error(message);
   }
 
   const userFromToken = parseUserFromToken(json);
-  const profile = await fetchUserProfile(json.token);
+  const profile = await fetchUserProfile(json.access_token);
   const user = profile ?? userFromToken;
 
   const session: PersistedSession = {
-    token: json.token,
+    token: json.access_token,
     refreshToken: json.refresh_token,
     user,
     locked: false,
