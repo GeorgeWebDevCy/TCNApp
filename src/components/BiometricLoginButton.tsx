@@ -26,14 +26,14 @@ export const BiometricLoginButton: React.FC<BiometricLoginButtonProps> = ({
 }) => {
   const { t } = useLocalization();
 
+  const label = useMemo(() => {
+    const key = biometryLabelKeyMap[biometryType] ?? 'biometrics.types.Biometrics';
+    return t(key);
+  }, [biometryType, t]);
+
   if (!available) {
     return null;
   }
-
-  const label = useMemo(() => {
-    const key = biometryLabelKeyMap[biometryType ?? 'Biometrics'] ?? 'biometrics.types.Biometrics';
-    return t(key);
-  }, [biometryType, t]);
 
   return (
     <View style={styles.container}>
