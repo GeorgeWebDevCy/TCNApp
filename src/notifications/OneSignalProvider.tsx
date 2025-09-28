@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import deviceLog from 'react-native-device-log';
+import deviceLog from '../utils/deviceLog';
 import { LogLevel, OneSignal } from 'react-native-onesignal';
 import { DEFAULT_NOTIFICATION_PREFERENCES, NOTIFICATIONS_CONFIG, NotificationPreferences } from '../config/notificationsConfig';
 import { useAuthContext } from '../contexts/AuthContext';
