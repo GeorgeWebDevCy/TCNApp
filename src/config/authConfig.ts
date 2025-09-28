@@ -3,13 +3,16 @@ const BASE_URL = 'http://dominicb72.sg-host.com';
 export const WORDPRESS_CONFIG = {
   baseUrl: BASE_URL,
   endpoints: {
-    token: '/wp-json/jwt-auth/v1/token',
-    validate: '/wp-json/jwt-auth/v1/token/validate',
+    token: '/oauth/token',
     profile: '/wp-json/wp/v2/users/me',
   },
   links: {
     register: `${BASE_URL}/register`,
     forgotPassword: `${BASE_URL}/wp-login.php?action=lostpassword`,
+  },
+  oauth: {
+    clientId: 'EyVkx1I7Wi16zoEgrBL9MG3isSRmKyQtTCIjnDPP',
+    clientSecret: '2NdKzEoo4VCzamjRySWjZmq92VUwxKEvdbOUmtDM',
   },
 };
 

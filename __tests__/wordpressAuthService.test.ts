@@ -23,10 +23,8 @@ describe('wordpressAuthService', () => {
 
   it('retries WordPress requests using rest_route when a route is missing', async () => {
     const tokenResponseBody = {
-      token: 'token-value',
+      access_token: 'token-value',
       refresh_token: 'refresh-value',
-      user_email: 'member@example.com',
-      user_display_name: 'Member Example',
     };
 
     const profileResponseBody = {
@@ -49,13 +47,13 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'http://dominicb72.sg-host.com/wp-json/jwt-auth/v1/token',
+      'http://dominicb72.sg-host.com/oauth/token',
       expect.objectContaining({ method: 'POST' }),
     );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'http://dominicb72.sg-host.com/?rest_route=/jwt-auth/v1/token',
+      'http://dominicb72.sg-host.com/?rest_route=/oauth/token',
       expect.objectContaining({ method: 'POST' }),
     );
 
