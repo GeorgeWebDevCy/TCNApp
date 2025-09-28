@@ -17,7 +17,7 @@ jest.mock('../src/notifications/OneSignalProvider', () => ({
 }));
 
 jest.mock(
-  'react-native-device-log',
+  '../src/utils/deviceLog',
   () => ({
     __esModule: true,
     default: {

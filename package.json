@@ -16,7 +16,6 @@
     "react": "19.1.0",
     "react-native": "0.81.4",
     "react-native-biometrics": "^3.0.1",
-    "react-native-device-log": "^1.0.2",
     "react-native-onesignal": "^5.2.13",
     "react-native-safe-area-context": "^5.5.2"
   },

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
-import deviceLog from 'react-native-device-log';
+import deviceLog from '../utils/deviceLog';
 import { authenticateWithBiometrics, isBiometricsAvailable } from '../services/biometricService';
 import { clearPin, registerPin as persistPin, verifyPin } from '../services/pinService';
 import {

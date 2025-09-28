@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import deviceLog, { LogView } from 'react-native-device-log';
+import deviceLog, { LogView } from './src/utils/deviceLog';
 import { AuthProvider, useAuthContext } from './src/contexts/AuthContext';
 import { LocalizationProvider } from './src/contexts/LocalizationContext';
 import { OneSignalProvider } from './src/notifications/OneSignalProvider';
