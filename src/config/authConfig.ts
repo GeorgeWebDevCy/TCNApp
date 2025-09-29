@@ -5,6 +5,8 @@ export const WORDPRESS_CONFIG = {
   endpoints: {
     passwordLogin: '/wp-json/gn/v1/login',
     profile: '/wp-json/wp/v2/users/me',
+    passwordReset: '/wp-json/wp/v2/users/lost-password',
+    register: '/wp-json/wp/v2/users/register',
   },
   links: {
     register: `${BASE_URL}/register`,

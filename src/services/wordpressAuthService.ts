@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
-import { AuthUser, LoginOptions, MembershipBenefit, MembershipInfo } from '../types/auth';
+import { AuthUser, LoginOptions, MembershipBenefit, MembershipInfo, RegisterOptions } from '../types/auth';
 
 export interface PersistedSession {
   token?: string;
@@ -80,6 +80,45 @@ const sanitizeErrorMessage = (value: string): string => {
   const normalized = decoded.replace(/\s+/g, ' ').trim();
 
   return normalized.length > 0 ? normalized : 'Unable to log in with WordPress credentials.';
+};
+
+const parseJsonResponse = async <T>(response: Response): Promise<T | null> => {
+  try {
+    return (await response.clone().json()) as T;
+  } catch (error) {
+    return null;
+  }
+};
+
+const parseTextResponse = async (response: Response): Promise<string | null> => {
+  try {
+    const text = await response.clone().text();
+    return text && text.trim().length > 0 ? sanitizeErrorMessage(text) : null;
+  } catch (error) {
+    return null;
+  }
+};
+
+const extractMessageFromResponse = async (
+  response: Response,
+  fallback: string,
+): Promise<string> => {
+  const json = await parseJsonResponse<Record<string, unknown> | null>(response);
+  const messageSource =
+    (json && typeof json === 'object' && typeof json.message === 'string' && json.message) ||
+    (json && typeof json === 'object' && typeof json.error === 'string' && json.error) ||
+    null;
+
+  if (messageSource) {
+    return sanitizeErrorMessage(messageSource);
+  }
+
+  const text = await parseTextResponse(response);
+  if (text) {
+    return text;
+  }
+
+  return fallback;
 };
 
 const fetchWithRouteFallback = async (
@@ -499,4 +538,104 @@ export const loginWithPassword = async ({
   await markPasswordAuthenticated();
 
   return session;
+};
+
+export const requestPasswordReset = async (identifier: string): Promise<string | undefined> => {
+  const trimmed = identifier.trim();
+  if (trimmed.length === 0) {
+    throw new Error('Unable to send password reset email.');
+  }
+
+  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.passwordReset, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      user_login: trimmed,
+      user_email: trimmed,
+      username: trimmed,
+      email: trimmed,
+    }),
+  });
+
+  const json = await parseJsonResponse<Record<string, unknown>>(response);
+  const successFlag =
+    json && typeof json === 'object' && typeof json.success === 'boolean' ? json.success : undefined;
+
+  if (!response.ok || successFlag === false) {
+    const message = await extractMessageFromResponse(
+      response,
+      'Unable to send password reset email.',
+    );
+    throw new Error(message);
+  }
+
+  const messageSource =
+    (json && typeof json?.message === 'string' && json.message) ||
+    (json && typeof json?.notice === 'string' && json.notice) ||
+    (json &&
+      typeof json?.data === 'object' &&
+      json.data !== null &&
+      typeof (json.data as Record<string, unknown>).message === 'string' &&
+      (json.data as Record<string, unknown>).message) ||
+    null;
+
+  return messageSource ? sanitizeErrorMessage(messageSource) : undefined;
+};
+
+export const registerAccount = async (
+  options: RegisterOptions,
+): Promise<string | undefined> => {
+  const payload: Record<string, string> = {
+    username: options.username.trim(),
+    email: options.email.trim(),
+    password: options.password,
+  };
+
+  if (!payload.username || !payload.email || !payload.password) {
+    throw new Error('Unable to register a new account.');
+  }
+
+  if (options.firstName) {
+    payload.first_name = options.firstName.trim();
+  }
+
+  if (options.lastName) {
+    payload.last_name = options.lastName.trim();
+  }
+
+  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.register, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await parseJsonResponse<Record<string, unknown>>(response);
+  const successFlag =
+    json && typeof json === 'object' && typeof json.success === 'boolean' ? json.success : undefined;
+
+  if (!response.ok || successFlag === false) {
+    const message = await extractMessageFromResponse(
+      response,
+      'Unable to register a new account.',
+    );
+    throw new Error(message);
+  }
+
+  const messageSource =
+    (json && typeof json?.message === 'string' && json.message) ||
+    (json && typeof json?.notice === 'string' && json.notice) ||
+    (json &&
+      typeof json?.data === 'object' &&
+      json.data !== null &&
+      typeof (json.data as Record<string, unknown>).message === 'string' &&
+      (json.data as Record<string, unknown>).message) ||
+    null;
+
+  return messageSource ? sanitizeErrorMessage(messageSource) : undefined;
 };

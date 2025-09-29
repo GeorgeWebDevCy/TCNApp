@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -10,15 +9,17 @@ import {
   Text,
   View,
 } from 'react-native';
-import { WORDPRESS_CONFIG } from '../config/authConfig';
 import { BiometricLoginButton } from '../components/BiometricLoginButton';
+import { ForgotPasswordModal } from '../components/ForgotPasswordModal';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { LoginHeader } from '../components/LoginHeader';
 import { PinLoginForm } from '../components/PinLoginForm';
+import { RegisterModal } from '../components/RegisterModal';
 import { WordPressLoginForm } from '../components/WordPressLoginForm';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
+import { RegisterOptions } from '../types/auth';
 
 type AuthTabId = 'password' | 'pin';
 
@@ -31,6 +32,8 @@ export const LoginScreen: React.FC = () => {
     registerPin,
     removePin,
     resetError,
+    requestPasswordReset,
+    registerAccount,
   } =
     useAuthContext();
   const { pin: hasStoredPin, biometrics, biometryType, loading: availabilityLoading, refresh } =
@@ -39,6 +42,8 @@ export const LoginScreen: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AuthTabId>('password');
   const [lastAttempt, setLastAttempt] = useState<'password' | 'pin' | 'biometric' | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [isForgotPasswordVisible, setForgotPasswordVisible] = useState(false);
+  const [isRegisterVisible, setRegisterVisible] = useState(false);
 
   const authTabs = useMemo(
     () =>
@@ -54,18 +59,6 @@ export const LoginScreen: React.FC = () => {
       setActiveTab('pin');
     }
   }, [hasStoredPin, state.isLocked]);
-
-  const handleOpenLink = useCallback(async (url: string) => {
-    const supported = await Linking.canOpenURL(url);
-    if (!supported) {
-      Alert.alert(
-        t('login.alerts.cannotOpenLink.title'),
-        t('login.alerts.cannotOpenLink.message', { replace: { url } }),
-      );
-      return;
-    }
-    await Linking.openURL(url);
-  }, [t]);
 
   const handlePasswordSubmit = useCallback(
     async ({ username, password }: { username: string; password: string }) => {
@@ -123,6 +116,16 @@ export const LoginScreen: React.FC = () => {
     resetError();
     await loginWithBiometrics(t('biometrics.prompt'));
   }, [loginWithBiometrics, resetError, t]);
+
+  const handleRequestPasswordReset = useCallback(
+    (identifier: string) => requestPasswordReset(identifier),
+    [requestPasswordReset],
+  );
+
+  const handleRegisterAccount = useCallback(
+    (options: RegisterOptions) => registerAccount(options),
+    [registerAccount],
+  );
 
   const changeTab = useCallback(
     (tabId: (typeof authTabs)[number]['id']) => {
@@ -189,8 +192,8 @@ export const LoginScreen: React.FC = () => {
               loading={isLoading && lastAttempt === 'password'}
               error={passwordError}
               onSubmit={handlePasswordSubmit}
-              onForgotPassword={() => handleOpenLink(WORDPRESS_CONFIG.links.forgotPassword)}
-              onRegister={() => handleOpenLink(WORDPRESS_CONFIG.links.register)}
+              onForgotPassword={() => setForgotPasswordVisible(true)}
+              onRegister={() => setRegisterVisible(true)}
             />
           ) : (
             <PinLoginForm
@@ -218,6 +221,16 @@ export const LoginScreen: React.FC = () => {
           />
         </View>
       </ScrollView>
+      <ForgotPasswordModal
+        visible={isForgotPasswordVisible}
+        onClose={() => setForgotPasswordVisible(false)}
+        onSubmit={handleRequestPasswordReset}
+      />
+      <RegisterModal
+        visible={isRegisterVisible}
+        onClose={() => setRegisterVisible(false)}
+        onSubmit={handleRegisterAccount}
+      />
     </SafeAreaView>
   );
 };
