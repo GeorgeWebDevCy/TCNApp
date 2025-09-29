@@ -21,16 +21,6 @@ export interface AuthUser {
   membership?: MembershipInfo | null;
 }
 
-export interface WordPressTokenResponse {
-  access_token: string;
-  refresh_token?: string;
-  expires_in?: number;
-  token_type?: string;
-  scope?: string;
-  error?: string;
-  error_description?: string;
-}
-
 export interface AuthState {
   isAuthenticated: boolean;
   isLocked: boolean;

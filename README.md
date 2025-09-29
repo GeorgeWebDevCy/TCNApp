@@ -140,7 +140,7 @@ The application bootstraps the `OneSignalProvider`, initializes the SDK during s
 
 The React Native app now ships with a modular login flow connected to WordPress:
 
-- **Password login**: Uses the WordPress JWT endpoint (`/wp-json/jwt-auth/v1/token`).
+- **Password login**: Uses the [GN Password Login API](https://github.com/GeorgeWebDevCy/gn-password-login-api) plugin (`POST /wp-json/gn/v1/login`) to validate credentials over REST.
 - **PIN login**: Stores a salted hash locally so returning users can unlock without credentials.
 - **Biometric login**: Leverages native biometrics (Face ID / Touch ID / etc.) as a fast path once a session exists.
 - **Account actions**: "Forgot password" and "Register" links point to the WordPress site and can be customised.
@@ -169,7 +169,7 @@ Key parts of the React Native application live under the `src/` directory:
 - `contexts/`: Contains the `AuthContext`, which bootstraps persisted sessions, exposes authentication actions, and keeps track of the current user and lock state.
 - `screens/`: Holds UI screens such as `LoginScreen` (tabbed password/PIN login with biometric quick actions) and `HomeScreen` (simple authenticated landing view).
 - `components/`: Shared presentation components like `WordPressLoginForm`, `PinLoginForm`, `BiometricLoginButton`, and `LoginHeader` used to compose the login experience.
-- `services/`: Business-logic utilities for WordPress JWT authentication, PIN hashing/storage, and biometric prompts.
+- `services/`: Business-logic utilities for WordPress authentication via the GN Password Login API plugin, PIN hashing/storage, and biometric prompts.
 - `hooks/`: Reusable hooks including `useAuthAvailability`, which reports whether PIN or biometric login options are available on the device.
 - `utils/`: Helper functions such as hashing utilities used by the PIN service.
 - `types/`: TypeScript interfaces and enums representing authentication state, users, and service contracts.
@@ -181,7 +181,7 @@ The top-level `App.tsx` wraps the UI with `SafeAreaProvider` and `AuthProvider`,
 ## 🔐 Authentication Flow Details
 
 - **Session Bootstrapping**: `AuthProvider` restores persisted tokens via `ensureValidSession` on launch, fetching fresh profile data if needed and respecting the session lock flag saved in AsyncStorage.
-- **Password Login**: `loginWithPassword` posts credentials to the WordPress JWT endpoint, stores tokens plus user profile data, and clears any existing session lock.
+- **Password Login**: `loginWithPassword` posts credentials to the GN Password Login API endpoint, persists the returned WordPress user profile, and clears any existing session lock.
 - **PIN Login**: `pinService` securely stores a salted PIN hash. Users can create, reset, and verify PINs directly from the login screen.
 - **Biometrics**: `biometricService` wraps `react-native-biometrics` to check sensor availability and trigger prompts. Errors surface in the login UI for graceful fallbacks.
 - **Session Locking**: Logging out sets a persisted lock flag instead of clearing tokens, allowing PIN or biometric re-entry without re-entering credentials. Full logout/expiry clears tokens via `clearSession`.
@@ -205,7 +205,7 @@ These flows are orchestrated in `LoginScreen.tsx`, which coordinates UI state (a
 Before building, update the placeholders in `src/config/authConfig.ts`:
 
 1. Replace `baseUrl` with your WordPress site's root URL.
-2. Confirm the JWT token, validation, and profile endpoint paths match your WordPress setup.
+2. Confirm the GN Password Login API (`/wp-json/gn/v1/login`) and profile endpoint paths match your WordPress setup.
 3. Update the registration and password reset links to match your deployment.
 4. Optionally customize the AsyncStorage keys if you need to namespace multiple environments.
 
@@ -225,7 +225,7 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 ## 🧠 Supporting Services & Hooks
 
 - **`AuthContext.tsx`** (under `src/contexts/`): centralizes authentication state with a reducer that handles bootstrapping, locking/unlocking, and success/error transitions. It exposes helpers to initiate password, PIN, and biometric login flows that are used throughout the UI.【F:src/contexts/AuthContext.tsx†L1-L246】
-- **`wordpressAuthService.ts`**: wraps the WordPress JWT endpoints for login, validation, profile hydration, and session persistence in AsyncStorage. It also manages session locking semantics so credentials stay cached while requiring a PIN/biometric unlock.【F:src/services/wordpressAuthService.ts†L1-L205】
+- **`wordpressAuthService.ts`**: integrates with the GN Password Login API plugin for password authentication, handles optional profile hydration, and manages session persistence plus session-lock semantics for PIN/biometric unlock flows.【F:src/services/wordpressAuthService.ts†L1-L220】
 - **`pinService.ts`**: stores salted hashes for device-level PIN unlocks, using utilities from `src/utils/hash.ts` to generate secure digests.【F:src/services/pinService.ts†L1-L149】【F:src/utils/hash.ts†L1-L64】
 - **`biometricService.ts`**: wraps `react-native-biometrics` to check sensor availability and request authentication, returning structured results consumed by the context and UI.【F:src/services/biometricService.ts†L1-L90】
 - **`useAuthAvailability.ts`**: reports which quick-login methods are currently enabled (existing PIN, biometric sensor availability) so the login screen can conditionally render shortcuts.【F:src/hooks/useAuthAvailability.ts†L1-L81】
@@ -234,14 +234,14 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 
 ## 🗄️ Persisted Storage Keys
 
-- Configure storage keys in `src/config/authConfig.ts` to match your environment or namespace requirements. Keys exist for JWT tokens, refresh tokens, cached user profiles, and the session lock flag, alongside PIN hash and salt entries.【F:src/config/authConfig.ts†L1-L22】
+- Configure storage keys in `src/config/authConfig.ts` to match your environment or namespace requirements. Keys exist for persisted WordPress credentials (token placeholders), cached user profiles, and the session lock flag, alongside PIN hash and salt entries.【F:src/config/authConfig.ts†L1-L22】
 - `wordpressAuthService.ts` and `pinService.ts` both rely on these constants when reading or writing to AsyncStorage, so keep them in sync if you change the keys.【F:src/services/wordpressAuthService.ts†L63-L111】【F:src/services/pinService.ts†L21-L66】
 
 ---
 
 ## 🛡️ WordPress Backend Requirements
 
-- Expose the JWT auth endpoints listed in `WORDPRESS_CONFIG` (`/wp-json/jwt-auth/v1/token`, `/validate`, and `/wp/v2/users/me`). Popular plugins such as "JWT Authentication for WP-API" can provide these routes.【F:src/config/authConfig.ts†L1-L11】【F:src/services/wordpressAuthService.ts†L126-L205】
+- Install and configure the GN Password Login API plugin so `/wp-json/gn/v1/login` is reachable for REST authentication, and ensure `/wp-json/wp/v2/users/me` remains accessible for profile hydration when tokens are available.【F:src/config/authConfig.ts†L1-L17】【F:src/services/wordpressAuthService.ts†L1-L220】
 - Ensure CORS and HTTPS are enabled so the React Native app can reach the WordPress API from devices and simulators.
 - Grant users permission to call the profile endpoint so their display name and avatar can be hydrated after login.【F:src/services/wordpressAuthService.ts†L29-L61】
 

@@ -1,18 +1,32 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
-import {
-  AuthUser,
-  LoginOptions,
-  MembershipBenefit,
-  MembershipInfo,
-  WordPressTokenResponse,
-} from '../types/auth';
+import { AuthUser, LoginOptions, MembershipBenefit, MembershipInfo } from '../types/auth';
 
 export interface PersistedSession {
-  token: string;
+  token?: string;
   refreshToken?: string;
   user: AuthUser | null;
   locked: boolean;
+}
+
+interface GnPasswordLoginUserPayload {
+  id?: number | string;
+  login?: string;
+  email?: string;
+  nicename?: string;
+  display?: string;
+}
+
+interface GnPasswordLoginResponse {
+  success?: boolean;
+  mode?: 'token' | 'cookie';
+  message?: string;
+  token?: string;
+  token_expires_in?: number;
+  token_login_url?: string;
+  user?: GnPasswordLoginUserPayload | null;
+  code?: string;
+  data?: { status?: number };
 }
 
 const normalizeBaseUrl = (baseUrl: string): string => baseUrl.replace(/\/+$/, '');
@@ -162,10 +176,6 @@ const parseMembershipInfo = (payload: Record<string, unknown> | null | undefined
   };
 };
 
-const parseUserFromToken = (
-  _tokenResponse: WordPressTokenResponse,
-): AuthUser | null => null;
-
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
     const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.profile, {
@@ -228,17 +238,35 @@ export const hasPasswordAuthenticated = async (): Promise<boolean> => {
 };
 
 const storeSession = async ({ token, refreshToken, user }: Omit<PersistedSession, 'locked'>) => {
-  const entries: [string, string][] = [[AUTH_STORAGE_KEYS.token, token]];
+  const entries: [string, string][] = [];
+  const removals: string[] = [];
+
+  if (token) {
+    entries.push([AUTH_STORAGE_KEYS.token, token]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.token);
+  }
 
   if (refreshToken) {
     entries.push([AUTH_STORAGE_KEYS.refreshToken, refreshToken]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.refreshToken);
   }
 
   if (user) {
     entries.push([AUTH_STORAGE_KEYS.userProfile, JSON.stringify(user)]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.userProfile);
   }
 
-  await AsyncStorage.multiSet(entries);
+  if (entries.length > 0) {
+    await AsyncStorage.multiSet(entries);
+  }
+
+  if (removals.length > 0) {
+    await AsyncStorage.multiRemove(removals);
+  }
+
   await setSessionLock(false);
 };
 
@@ -253,14 +281,19 @@ export const clearSession = async () => {
 };
 
 export const restoreSession = async (): Promise<PersistedSession | null> => {
-  const [[, token], [, refreshToken], [, userJson], [, lockValue]] = await AsyncStorage.multiGet([
-    AUTH_STORAGE_KEYS.token,
-    AUTH_STORAGE_KEYS.refreshToken,
-    AUTH_STORAGE_KEYS.userProfile,
-    AUTH_STORAGE_KEYS.sessionLock,
-  ]);
+  const [[, storedToken], [, storedRefreshToken], [, userJson], [, lockValue]] =
+    await AsyncStorage.multiGet([
+      AUTH_STORAGE_KEYS.token,
+      AUTH_STORAGE_KEYS.refreshToken,
+      AUTH_STORAGE_KEYS.userProfile,
+      AUTH_STORAGE_KEYS.sessionLock,
+    ]);
 
-  if (!token) {
+  const token = storedToken && storedToken.length > 0 ? storedToken : undefined;
+  const refreshToken =
+    storedRefreshToken && storedRefreshToken.length > 0 ? storedRefreshToken : undefined;
+
+  if (!token && !userJson) {
     return null;
   }
 
@@ -276,13 +309,17 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
 
   return {
     token,
-    refreshToken: refreshToken ?? undefined,
+    refreshToken,
     user,
     locked: lockValue === 'locked',
   };
 };
 
-export const validateToken = async (token: string): Promise<boolean> => {
+export const validateToken = async (token?: string): Promise<boolean> => {
+  if (!token) {
+    return true;
+  }
+
   try {
     const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.profile, {
       method: 'GET',
@@ -299,8 +336,12 @@ export const validateToken = async (token: string): Promise<boolean> => {
 };
 
 export const refreshPersistedUserProfile = async (
-  token: string,
+  token?: string,
 ): Promise<AuthUser | null> => {
+  if (!token) {
+    return null;
+  }
+
   const profile = await fetchUserProfile(token);
   if (!profile) {
     return null;
@@ -314,6 +355,15 @@ export const ensureValidSession = async (): Promise<PersistedSession | null> => 
   const session = await restoreSession();
   if (!session) {
     return null;
+  }
+
+  if (!session.token) {
+    if (!session.user) {
+      await clearSession();
+      return null;
+    }
+
+    return session;
   }
 
   const isValid = await validateToken(session.token);
@@ -337,40 +387,73 @@ export const loginWithPassword = async ({
   username,
   password,
 }: LoginOptions): Promise<PersistedSession> => {
-  const params = new URLSearchParams({
-    grant_type: 'password',
-    username,
-    password,
-    client_id: WORDPRESS_CONFIG.oauth.clientId,
-    client_secret: WORDPRESS_CONFIG.oauth.clientSecret,
-  });
-
-  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.token, {
+  // Authenticate against the GN Password Login API plugin endpoint so native clients can
+  // perform username/password logins over the WordPress REST API.
+  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.passwordLogin, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
+      'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: params.toString(),
+    body: JSON.stringify({
+      username,
+      password,
+      mode: 'token',
+    }),
   });
 
-  const json = (await response.json()) as WordPressTokenResponse;
+  let json: GnPasswordLoginResponse;
+  try {
+    json = (await response.json()) as GnPasswordLoginResponse;
+  } catch (error) {
+    throw new Error('Unable to log in with WordPress credentials.');
+  }
 
-  if (!response.ok || !json.access_token) {
+  if (!json || typeof json !== 'object') {
+    throw new Error('Unable to log in with WordPress credentials.');
+  }
+
+  if (!response.ok || json.success !== true) {
     const message =
-      json?.error_description ??
-      json?.error ??
-      'Unable to log in with WordPress credentials.';
+      typeof json?.message === 'string' && json.message.trim().length > 0
+        ? json.message
+        : 'Unable to log in with WordPress credentials.';
     throw new Error(message);
   }
 
-  const userFromToken = parseUserFromToken(json);
-  const profile = await fetchUserProfile(json.access_token);
-  const user = profile ?? userFromToken;
+  const payload = json.user ?? null;
+  let user: AuthUser | null = null;
+
+  if (payload) {
+    const idSource = payload.id;
+    const parsedId =
+      typeof idSource === 'number'
+        ? idSource
+        : typeof idSource === 'string'
+        ? Number.parseInt(idSource, 10)
+        : Number.NaN;
+
+    const email =
+      typeof payload.email === 'string' && payload.email.trim().length > 0
+        ? payload.email
+        : '';
+
+    const name =
+      (typeof payload.display === 'string' && payload.display.trim().length > 0 && payload.display) ||
+      (typeof payload.nicename === 'string' && payload.nicename.trim().length > 0 && payload.nicename) ||
+      (typeof payload.login === 'string' && payload.login.trim().length > 0 && payload.login) ||
+      email ||
+      username;
+
+    user = {
+      id: Number.isFinite(parsedId) ? parsedId : -1,
+      email,
+      name,
+      membership: null,
+    };
+  }
 
   const session: PersistedSession = {
-    token: json.access_token,
-    refreshToken: json.refresh_token,
     user,
     locked: false,
   };

@@ -198,7 +198,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       await setSessionLock(false);
 
       if (!session.user) {
-        const refreshedUser = await refreshPersistedUserProfile(session.token);
+        const refreshedUser = session.token
+          ? await refreshPersistedUserProfile(session.token)
+          : null;
+
+        if (!refreshedUser) {
+          throw new Error('No saved session. Please log in with your password first.');
+        }
+
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
@@ -250,7 +257,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       await setSessionLock(false);
 
       if (!session.user) {
-        const refreshedUser = await refreshPersistedUserProfile(session.token);
+        const refreshedUser = session.token
+          ? await refreshPersistedUserProfile(session.token)
+          : null;
+
+        if (!refreshedUser) {
+          throw new Error('No saved session. Please log in with your password first.');
+        }
+
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
