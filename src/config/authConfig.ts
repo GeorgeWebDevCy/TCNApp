@@ -1,4 +1,4 @@
-const BASE_URL = 'http://dominicb72.sg-host.com';
+const BASE_URL = 'https://dominicb72.sg-host.com';
 
 export const WORDPRESS_CONFIG = {
   baseUrl: BASE_URL,
