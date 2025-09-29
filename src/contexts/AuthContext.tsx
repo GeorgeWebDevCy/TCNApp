@@ -9,6 +9,8 @@ import {
   hasPasswordAuthenticated,
   loginWithPassword as loginWithWordPress,
   markPasswordAuthenticated,
+  registerAccount as registerWordPressAccount,
+  requestPasswordReset as requestWordpressPasswordReset,
   refreshPersistedUserProfile,
   setSessionLock,
 } from '../services/wordpressAuthService';
@@ -19,6 +21,7 @@ import {
   LoginOptions,
   MembershipInfo,
   PinLoginOptions,
+  RegisterOptions,
 } from '../types/auth';
 
 interface LoginSuccessPayload {
@@ -336,6 +339,38 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     dispatch({ type: 'RESET_ERROR' });
   }, []);
 
+  const requestPasswordReset = useCallback(
+    async (identifier: string) => {
+      try {
+        const message = await requestWordpressPasswordReset(identifier);
+        deviceLog.info('Password reset requested', { identifier });
+        return message;
+      } catch (error) {
+        deviceLog.error('Password reset request failed', error);
+        throw (error instanceof Error
+          ? error
+          : new Error('Unable to send password reset email.'));
+      }
+    },
+    [],
+  );
+
+  const registerAccount = useCallback(
+    async (options: RegisterOptions) => {
+      try {
+        const message = await registerWordPressAccount(options);
+        deviceLog.info('Account registration succeeded', { username: options.username });
+        return message;
+      } catch (error) {
+        deviceLog.error('Account registration failed', error);
+        throw (error instanceof Error
+          ? error
+          : new Error('Unable to register a new account.'));
+      }
+    },
+    [],
+  );
+
   const refreshSession = useCallback(async () => {
     const session = await ensureValidSession();
     if (!session) {
@@ -382,6 +417,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       logout,
       resetError,
       refreshSession,
+      requestPasswordReset,
+      registerAccount,
     }),
     [
       state,
@@ -393,6 +430,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       logout,
       resetError,
       refreshSession,
+      requestPasswordReset,
+      registerAccount,
     ],
   );
 

@@ -55,6 +55,9 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Unable to log in with WordPress credentials.': 'errors.wordpressCredentials',
   'Something went wrong while saving your PIN.': 'errors.pinSaveGeneric',
   'Something went wrong while removing your PIN.': 'errors.pinRemoveGeneric',
+  'Unable to send password reset email.': 'errors.passwordReset',
+  'Unable to register a new account.': 'errors.registerAccount',
+  'Passwords do not match.': 'errors.passwordMismatch',
 };
 
 export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({ children }) => {

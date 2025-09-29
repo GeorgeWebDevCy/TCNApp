@@ -41,6 +41,14 @@ export interface PinLoginOptions {
   pin: string;
 }
 
+export interface RegisterOptions {
+  username: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+}
+
 export interface AuthContextValue {
   state: AuthState;
   loginWithPassword: (options: LoginOptions) => Promise<void>;
@@ -51,4 +59,6 @@ export interface AuthContextValue {
   logout: () => Promise<void>;
   resetError: () => void;
   refreshSession: () => Promise<void>;
+  requestPasswordReset: (identifier: string) => Promise<string | undefined>;
+  registerAccount: (options: RegisterOptions) => Promise<string | undefined>;
 }
