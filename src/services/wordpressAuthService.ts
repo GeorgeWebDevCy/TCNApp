@@ -45,6 +45,43 @@ const buildRestRouteUrl = (path: string) => {
   return `${normalizeBaseUrl(WORDPRESS_CONFIG.baseUrl)}/?rest_route=${restRoute}`;
 };
 
+const decodeNumericEntities = (value: string): string =>
+  value.replace(/&#(x?[0-9a-fA-F]+);/g, (match, entity) => {
+    const isHexEntity = entity.length > 0 && (entity[0] === 'x' || entity[0] === 'X');
+    const numericPortion = isHexEntity ? entity.slice(1) : entity;
+    const codePoint = Number.parseInt(numericPortion, isHexEntity ? 16 : 10);
+
+    if (!Number.isFinite(codePoint) || Number.isNaN(codePoint)) {
+      return match;
+    }
+
+    try {
+      return String.fromCodePoint(codePoint);
+    } catch (error) {
+      return match;
+    }
+  });
+
+const decodeBasicHtmlEntities = (value: string): string => {
+  const decoded = decodeNumericEntities(value)
+    .replace(/&nbsp;|&#160;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;|&#39;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>');
+
+  return decoded;
+};
+
+const sanitizeErrorMessage = (value: string): string => {
+  const withoutTags = value.replace(/<[^>]*>/g, ' ');
+  const decoded = decodeBasicHtmlEntities(withoutTags);
+  const normalized = decoded.replace(/\s+/g, ' ').trim();
+
+  return normalized.length > 0 ? normalized : 'Unable to log in with WordPress credentials.';
+};
+
 const fetchWithRouteFallback = async (
   path: string,
   init?: RequestInit,
@@ -416,7 +453,7 @@ export const loginWithPassword = async ({
   if (!response.ok || json.success !== true) {
     const message =
       typeof json?.message === 'string' && json.message.trim().length > 0
-        ? json.message
+        ? sanitizeErrorMessage(json.message)
         : 'Unable to log in with WordPress credentials.';
     throw new Error(message);
   }
