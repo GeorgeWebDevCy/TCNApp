@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
-import { AuthUser, LoginOptions, MembershipBenefit, MembershipInfo, RegisterOptions } from '../types/auth';
+import {
+  AuthUser,
+  LoginOptions,
+  MembershipBenefit,
+  MembershipInfo,
+  RegisterOptions,
+} from '../types/auth';
 
 export interface PersistedSession {
   token?: string;
@@ -29,9 +35,11 @@ interface GnPasswordLoginResponse {
   data?: { status?: number };
 }
 
-const normalizeBaseUrl = (baseUrl: string): string => baseUrl.replace(/\/+$/, '');
+const normalizeBaseUrl = (baseUrl: string): string =>
+  baseUrl.replace(/\/+$/, '');
 
-const ensureLeadingSlash = (path: string): string => (path.startsWith('/') ? path : `/${path}`);
+const ensureLeadingSlash = (path: string): string =>
+  path.startsWith('/') ? path : `/${path}`;
 
 const buildUrl = (path: string) =>
   `${normalizeBaseUrl(WORDPRESS_CONFIG.baseUrl)}${ensureLeadingSlash(path)}`;
@@ -42,12 +50,15 @@ const buildRestRouteUrl = (path: string) => {
     ? normalizedPath.slice('/wp-json'.length) || '/'
     : normalizedPath;
 
-  return `${normalizeBaseUrl(WORDPRESS_CONFIG.baseUrl)}/?rest_route=${restRoute}`;
+  return `${normalizeBaseUrl(
+    WORDPRESS_CONFIG.baseUrl,
+  )}/?rest_route=${restRoute}`;
 };
 
 const decodeNumericEntities = (value: string): string =>
   value.replace(/&#(x?[0-9a-fA-F]+);/g, (match, entity) => {
-    const isHexEntity = entity.length > 0 && (entity[0] === 'x' || entity[0] === 'X');
+    const isHexEntity =
+      entity.length > 0 && (entity[0] === 'x' || entity[0] === 'X');
     const numericPortion = isHexEntity ? entity.slice(1) : entity;
     const codePoint = Number.parseInt(numericPortion, isHexEntity ? 16 : 10);
 
@@ -79,7 +90,9 @@ const sanitizeErrorMessage = (value: string): string => {
   const decoded = decodeBasicHtmlEntities(withoutTags);
   const normalized = decoded.replace(/\s+/g, ' ').trim();
 
-  return normalized.length > 0 ? normalized : 'Unable to log in with WordPress credentials.';
+  return normalized.length > 0
+    ? normalized
+    : 'Unable to log in with WordPress credentials.';
 };
 
 const parseJsonResponse = async <T>(response: Response): Promise<T | null> => {
@@ -90,7 +103,9 @@ const parseJsonResponse = async <T>(response: Response): Promise<T | null> => {
   }
 };
 
-const parseTextResponse = async (response: Response): Promise<string | null> => {
+const parseTextResponse = async (
+  response: Response,
+): Promise<string | null> => {
   try {
     const text = await response.clone().text();
     return text && text.trim().length > 0 ? sanitizeErrorMessage(text) : null;
@@ -103,10 +118,18 @@ const extractMessageFromResponse = async (
   response: Response,
   fallback: string,
 ): Promise<string> => {
-  const json = await parseJsonResponse<Record<string, unknown> | null>(response);
+  const json = await parseJsonResponse<Record<string, unknown> | null>(
+    response,
+  );
   const messageSource =
-    (json && typeof json === 'object' && typeof json.message === 'string' && json.message) ||
-    (json && typeof json === 'object' && typeof json.error === 'string' && json.error) ||
+    (json &&
+      typeof json === 'object' &&
+      typeof json.message === 'string' &&
+      json.message) ||
+    (json &&
+      typeof json === 'object' &&
+      typeof json.error === 'string' &&
+      json.error) ||
     null;
 
   if (messageSource) {
@@ -136,7 +159,10 @@ const fetchWithRouteFallback = async (
   try {
     const payload = await primaryResponse.clone().json();
     shouldFallback =
-      payload && typeof payload === 'object' && 'code' in payload && payload.code === 'rest_no_route';
+      payload &&
+      typeof payload === 'object' &&
+      'code' in payload &&
+      payload.code === 'rest_no_route';
   } catch (error) {
     shouldFallback = false;
   }
@@ -179,7 +205,8 @@ const parseMembershipBenefits = (value: unknown): MembershipBenefit[] => {
         return null;
       }
 
-      const description = raw.description ?? raw.summary ?? raw.details ?? raw.text;
+      const description =
+        raw.description ?? raw.summary ?? raw.details ?? raw.text;
       const discount =
         parseDiscountValue(raw.discountPercentage) ??
         parseDiscountValue(raw.discount) ??
@@ -197,13 +224,17 @@ const parseMembershipBenefits = (value: unknown): MembershipBenefit[] => {
     .filter((benefit): benefit is MembershipBenefit => Boolean(benefit));
 };
 
-const parseMembershipInfo = (payload: Record<string, unknown> | null | undefined): MembershipInfo | null => {
+const parseMembershipInfo = (
+  payload: Record<string, unknown> | null | undefined,
+): MembershipInfo | null => {
   if (!payload) {
     return null;
   }
 
-  const meta = (payload.meta as Record<string, unknown> | undefined) ?? undefined;
-  const membershipSource = (payload.membership as Record<string, unknown> | undefined) ??
+  const meta =
+    (payload.meta as Record<string, unknown> | undefined) ?? undefined;
+  const membershipSource =
+    (payload.membership as Record<string, unknown> | undefined) ??
     (meta?.membership as Record<string, unknown> | undefined) ??
     (meta?.membership_info as Record<string, unknown> | undefined) ??
     undefined;
@@ -254,13 +285,16 @@ const parseMembershipInfo = (payload: Record<string, unknown> | null | undefined
 
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
-    const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.profile, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
+    const response = await fetchWithRouteFallback(
+      WORDPRESS_CONFIG.endpoints.profile,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
       },
-    });
+    );
 
     if (!response.ok) {
       return null;
@@ -277,13 +311,22 @@ const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
         ? Number.parseInt(idSource, 10)
         : Number.NaN;
     const emailSource = payload.email ?? payload.user_email ?? '';
-    const nameSource = payload.name ?? payload.user_display_name ?? payload.username ?? emailSource;
+    const nameSource =
+      payload.name ??
+      payload.user_display_name ??
+      payload.username ??
+      emailSource;
 
     return {
       id: Number.isFinite(parsedId) ? parsedId : -1,
-      email: typeof emailSource === 'string' ? emailSource : String(emailSource ?? ''),
-      name: typeof nameSource === 'string' ? nameSource : String(nameSource ?? ''),
-      avatarUrl: (payload.avatar_urls as Record<string, string> | undefined)?.['96'] ??
+      email:
+        typeof emailSource === 'string'
+          ? emailSource
+          : String(emailSource ?? ''),
+      name:
+        typeof nameSource === 'string' ? nameSource : String(nameSource ?? ''),
+      avatarUrl:
+        (payload.avatar_urls as Record<string, string> | undefined)?.['96'] ??
         (payload.avatar_urls as Record<string, string> | undefined)?.['48'],
       membership,
     };
@@ -309,11 +352,17 @@ export const clearPasswordAuthenticated = async () => {
 };
 
 export const hasPasswordAuthenticated = async (): Promise<boolean> => {
-  const value = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.passwordAuthenticated);
+  const value = await AsyncStorage.getItem(
+    AUTH_STORAGE_KEYS.passwordAuthenticated,
+  );
   return value === 'true';
 };
 
-const storeSession = async ({ token, refreshToken, user }: Omit<PersistedSession, 'locked'>) => {
+const storeSession = async ({
+  token,
+  refreshToken,
+  user,
+}: Omit<PersistedSession, 'locked'>) => {
   const entries: [string, string][] = [];
   const removals: string[] = [];
 
@@ -367,7 +416,9 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
 
   const token = storedToken && storedToken.length > 0 ? storedToken : undefined;
   const refreshToken =
-    storedRefreshToken && storedRefreshToken.length > 0 ? storedRefreshToken : undefined;
+    storedRefreshToken && storedRefreshToken.length > 0
+      ? storedRefreshToken
+      : undefined;
 
   if (!token && !userJson) {
     return null;
@@ -397,13 +448,16 @@ export const validateToken = async (token?: string): Promise<boolean> => {
   }
 
   try {
-    const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.profile, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
+    const response = await fetchWithRouteFallback(
+      WORDPRESS_CONFIG.endpoints.profile,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
       },
-    });
+    );
 
     return response.ok;
   } catch (error) {
@@ -423,41 +477,45 @@ export const refreshPersistedUserProfile = async (
     return null;
   }
 
-  await AsyncStorage.setItem(AUTH_STORAGE_KEYS.userProfile, JSON.stringify(profile));
+  await AsyncStorage.setItem(
+    AUTH_STORAGE_KEYS.userProfile,
+    JSON.stringify(profile),
+  );
   return profile;
 };
 
-export const ensureValidSession = async (): Promise<PersistedSession | null> => {
-  const session = await restoreSession();
-  if (!session) {
-    return null;
-  }
+export const ensureValidSession =
+  async (): Promise<PersistedSession | null> => {
+    const session = await restoreSession();
+    if (!session) {
+      return null;
+    }
 
-  if (!session.token) {
-    if (!session.user) {
+    if (!session.token) {
+      if (!session.user) {
+        await clearSession();
+        return null;
+      }
+
+      return session;
+    }
+
+    const isValid = await validateToken(session.token);
+    if (!isValid) {
       await clearSession();
       return null;
     }
 
+    if (!session.user) {
+      const refreshedUser = await refreshPersistedUserProfile(session.token);
+      return {
+        ...session,
+        user: refreshedUser,
+      };
+    }
+
     return session;
-  }
-
-  const isValid = await validateToken(session.token);
-  if (!isValid) {
-    await clearSession();
-    return null;
-  }
-
-  if (!session.user) {
-    const refreshedUser = await refreshPersistedUserProfile(session.token);
-    return {
-      ...session,
-      user: refreshedUser,
-    };
-  }
-
-  return session;
-};
+  };
 
 export const loginWithPassword = async ({
   username,
@@ -465,18 +523,21 @@ export const loginWithPassword = async ({
 }: LoginOptions): Promise<PersistedSession> => {
   // Authenticate against the GN Password Login API plugin endpoint so native clients can
   // perform username/password logins over the WordPress REST API.
-  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.passwordLogin, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+  const response = await fetchWithRouteFallback(
+    WORDPRESS_CONFIG.endpoints.passwordLogin,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        username,
+        password,
+        mode: 'token',
+      }),
     },
-    body: JSON.stringify({
-      username,
-      password,
-      mode: 'token',
-    }),
-  });
+  );
 
   let json: GnPasswordLoginResponse;
   try {
@@ -515,9 +576,15 @@ export const loginWithPassword = async ({
         : '';
 
     const name =
-      (typeof payload.display === 'string' && payload.display.trim().length > 0 && payload.display) ||
-      (typeof payload.nicename === 'string' && payload.nicename.trim().length > 0 && payload.nicename) ||
-      (typeof payload.login === 'string' && payload.login.trim().length > 0 && payload.login) ||
+      (typeof payload.display === 'string' &&
+        payload.display.trim().length > 0 &&
+        payload.display) ||
+      (typeof payload.nicename === 'string' &&
+        payload.nicename.trim().length > 0 &&
+        payload.nicename) ||
+      (typeof payload.login === 'string' &&
+        payload.login.trim().length > 0 &&
+        payload.login) ||
       email ||
       username;
 
@@ -529,7 +596,13 @@ export const loginWithPassword = async ({
     };
   }
 
+  const token =
+    typeof json.token === 'string' && json.token.trim().length > 0
+      ? json.token
+      : undefined;
+
   const session: PersistedSession = {
+    token,
     user,
     locked: false,
   };
@@ -540,29 +613,72 @@ export const loginWithPassword = async ({
   return session;
 };
 
-export const requestPasswordReset = async (identifier: string): Promise<string | undefined> => {
+export const updatePassword = async ({
+  token,
+  newPassword,
+}: {
+  token: string;
+  newPassword: string;
+}): Promise<void> => {
+  const trimmedPassword = newPassword.trim();
+  if (trimmedPassword.length === 0) {
+    throw new Error('Unable to change password.');
+  }
+
+  const response = await fetchWithRouteFallback(
+    WORDPRESS_CONFIG.endpoints.profile,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password: trimmedPassword }),
+    },
+  );
+
+  if (!response.ok) {
+    const message = await extractMessageFromResponse(
+      response,
+      'Unable to change password.',
+    );
+    throw new Error(message);
+  }
+
+  await refreshPersistedUserProfile(token);
+};
+
+export const requestPasswordReset = async (
+  identifier: string,
+): Promise<string | undefined> => {
   const trimmed = identifier.trim();
   if (trimmed.length === 0) {
     throw new Error('Unable to send password reset email.');
   }
 
-  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.passwordReset, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+  const response = await fetchWithRouteFallback(
+    WORDPRESS_CONFIG.endpoints.passwordReset,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        user_login: trimmed,
+        user_email: trimmed,
+        username: trimmed,
+        email: trimmed,
+      }),
     },
-    body: JSON.stringify({
-      user_login: trimmed,
-      user_email: trimmed,
-      username: trimmed,
-      email: trimmed,
-    }),
-  });
+  );
 
   const json = await parseJsonResponse<Record<string, unknown>>(response);
   const successFlag =
-    json && typeof json === 'object' && typeof json.success === 'boolean' ? json.success : undefined;
+    json && typeof json === 'object' && typeof json.success === 'boolean'
+      ? json.success
+      : undefined;
 
   if (!response.ok || successFlag === false) {
     const message = await extractMessageFromResponse(
@@ -606,18 +722,23 @@ export const registerAccount = async (
     payload.last_name = options.lastName.trim();
   }
 
-  const response = await fetchWithRouteFallback(WORDPRESS_CONFIG.endpoints.register, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
+  const response = await fetchWithRouteFallback(
+    WORDPRESS_CONFIG.endpoints.register,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
     },
-    body: JSON.stringify(payload),
-  });
+  );
 
   const json = await parseJsonResponse<Record<string, unknown>>(response);
   const successFlag =
-    json && typeof json === 'object' && typeof json.success === 'boolean' ? json.success : undefined;
+    json && typeof json === 'object' && typeof json.success === 'boolean'
+      ? json.success
+      : undefined;
 
   if (!response.ok || successFlag === false) {
     const message = await extractMessageFromResponse(
