@@ -52,7 +52,9 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
           value={username}
           onChangeText={setUsername}
           autoCapitalize="none"
-          keyboardType="email-address"
+          autoCorrect={false}
+          textContentType="username"
+          autoComplete="username"
           style={styles.input}
           placeholder={t('auth.forms.usernamePlaceholder')}
         />

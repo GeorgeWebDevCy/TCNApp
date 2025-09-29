@@ -50,7 +50,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     auth: {
       forms: {
         usernameLabel: 'Email / Username',
-        usernamePlaceholder: 'you@example.com',
+        usernamePlaceholder: 'Username or email',
         passwordLabel: 'Password',
         passwordPlaceholder: 'Your WordPress password',
         submit: 'Sign in',
@@ -189,7 +189,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     auth: {
       forms: {
         usernameLabel: 'อีเมล / ชื่อผู้ใช้',
-        usernamePlaceholder: 'you@example.com',
+        usernamePlaceholder: 'ชื่อผู้ใช้หรืออีเมล',
         passwordLabel: 'รหัสผ่าน',
         passwordPlaceholder: 'รหัสผ่าน WordPress ของคุณ',
         submit: 'เข้าสู่ระบบ',
