@@ -64,4 +64,22 @@ describe('wordpressAuthService', () => {
       ]),
     );
   });
+
+  it('sanitizes HTML error responses from WordPress before surfacing them to the user', async () => {
+    const fetchMock = jest.fn().mockResolvedValue(
+      createJsonResponse(500, {
+        success: false,
+        message:
+          '<p>There has been a critical error on this website.</p><p><a href="https://wordpress.org/documentation/article/faq-troubleshooting/">Learn more about troubleshooting WordPress.</a></p>',
+      }),
+    );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      loginWithPassword({ username: 'member', password: 'bad-password' }),
+    ).rejects.toThrow(
+      'There has been a critical error on this website. Learn more about troubleshooting WordPress.',
+    );
+  });
 });
