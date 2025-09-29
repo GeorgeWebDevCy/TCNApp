@@ -216,6 +216,62 @@ exports[`HomeScreen renders the membership overview 1`] = `
         jane@example.com
       </Text>
       <View
+        accessibilityRole="button"
+        accessibilityState={
+          {
+            "busy": undefined,
+            "checked": undefined,
+            "disabled": undefined,
+            "expanded": undefined,
+            "selected": undefined,
+          }
+        }
+        accessibilityValue={
+          {
+            "max": undefined,
+            "min": undefined,
+            "now": undefined,
+            "text": undefined,
+          }
+        }
+        accessible={true}
+        collapsable={false}
+        focusable={true}
+        onBlur={[Function]}
+        onClick={[Function]}
+        onFocus={[Function]}
+        onResponderGrant={[Function]}
+        onResponderMove={[Function]}
+        onResponderRelease={[Function]}
+        onResponderTerminate={[Function]}
+        onResponderTerminationRequest={[Function]}
+        onStartShouldSetResponder={[Function]}
+        style={
+          {
+            "alignSelf": "flex-start",
+            "backgroundColor": "#E0F2FE",
+            "borderColor": "#38BDF8",
+            "borderRadius": 999,
+            "borderWidth": 1,
+            "marginTop": 12,
+            "paddingHorizontal": 18,
+            "paddingVertical": 10,
+          }
+        }
+      >
+        <Text
+          style={
+            {
+              "color": "#0369A1",
+              "fontSize": 14,
+              "fontWeight": "600",
+            }
+          }
+        >
+          Manage profile
+        </Text>
+      </View>
+      <View
         style={
           {
             "backgroundColor": "#EEF2FF",

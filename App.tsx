@@ -14,11 +14,19 @@ import { LocalizationProvider } from './src/contexts/LocalizationContext';
 import { OneSignalProvider } from './src/notifications/OneSignalProvider';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
+import { UserProfileScreen } from './src/screens/UserProfileScreen';
 
 const AppContent: React.FC = () => {
   const {
     state: { isAuthenticated, isLoading },
   } = useAuthContext();
+  const [activeScreen, setActiveScreen] = useState<'home' | 'profile'>('home');
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setActiveScreen('home');
+    }
+  }, [isAuthenticated]);
 
   if (isLoading) {
     return (
@@ -28,7 +36,15 @@ const AppContent: React.FC = () => {
     );
   }
 
-  return isAuthenticated ? <HomeScreen /> : <LoginScreen />;
+  if (!isAuthenticated) {
+    return <LoginScreen />;
+  }
+
+  if (activeScreen === 'profile') {
+    return <UserProfileScreen onBack={() => setActiveScreen('home')} />;
+  }
+
+  return <HomeScreen onManageProfile={() => setActiveScreen('profile')} />;
 };
 
 function App(): JSX.Element {
@@ -45,7 +61,7 @@ function App(): JSX.Element {
       .then(() => {
         deviceLog.info('Device log initialized');
       })
-      .catch((error) => {
+      .catch(error => {
         console.warn('Failed to initialize device log', error);
       });
   }, []);

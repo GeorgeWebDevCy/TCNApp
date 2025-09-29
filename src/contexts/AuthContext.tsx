@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
 import deviceLog from '../utils/deviceLog';
-import { authenticateWithBiometrics, isBiometricsAvailable } from '../services/biometricService';
-import { clearPin, registerPin as persistPin, verifyPin } from '../services/pinService';
+import {
+  authenticateWithBiometrics,
+  isBiometricsAvailable,
+} from '../services/biometricService';
+import {
+  clearPin,
+  registerPin as persistPin,
+  verifyPin,
+} from '../services/pinService';
 import {
   clearPasswordAuthenticated,
   clearSession,
@@ -12,6 +19,7 @@ import {
   registerAccount as registerWordPressAccount,
   requestPasswordReset as requestWordpressPasswordReset,
   refreshPersistedUserProfile,
+  updatePassword as updateWordPressPassword,
   setSessionLock,
 } from '../services/wordpressAuthService';
 import {
@@ -135,16 +143,23 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   }
 };
 
-export const AuthContext = React.createContext<AuthContextValue | undefined>(undefined);
+export const AuthContext = React.createContext<AuthContextValue | undefined>(
+  undefined,
+);
 
-export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export const AuthProvider: React.FC<React.PropsWithChildren> = ({
+  children,
+}) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
   const bootstrap = useCallback(async () => {
     dispatch({ type: 'BOOTSTRAP_START' });
 
     const session = await ensureValidSession();
-    const passwordAuthenticated = (await hasPasswordAuthenticated()) && Boolean(session) && !session?.locked;
+    const passwordAuthenticated =
+      (await hasPasswordAuthenticated()) &&
+      Boolean(session) &&
+      !session?.locked;
 
     dispatch({
       type: 'BOOTSTRAP_COMPLETE',
@@ -179,142 +194,174 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       deviceLog.success('Password login succeeded');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Unable to complete password login.';
+        error instanceof Error
+          ? error.message
+          : 'Unable to complete password login.';
       deviceLog.error('Password login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
   }, []);
 
-  const loginWithPin = useCallback(async ({ pin }: PinLoginOptions) => {
-    dispatch({ type: 'LOGIN_START' });
-    try {
-      const isValidPin = await verifyPin(pin);
-      if (!isValidPin) {
-        throw new Error('Incorrect PIN.');
-      }
+  const loginWithPin = useCallback(
+    async ({ pin }: PinLoginOptions) => {
+      dispatch({ type: 'LOGIN_START' });
+      try {
+        const isValidPin = await verifyPin(pin);
+        if (!isValidPin) {
+          throw new Error('Incorrect PIN.');
+        }
 
-      const session = await ensureValidSession();
-      if (!session) {
-        throw new Error('No saved session. Please log in with your password first.');
-      }
+        const session = await ensureValidSession();
+        if (!session) {
+          throw new Error(
+            'No saved session. Please log in with your password first.',
+          );
+        }
 
-      await setSessionLock(false);
+        await setSessionLock(false);
 
-      if (!session.user) {
-        const refreshedUser = session.token
-          ? await refreshPersistedUserProfile(session.token)
-          : null;
+        if (!session.user) {
+          const refreshedUser = session.token
+            ? await refreshPersistedUserProfile(session.token)
+            : null;
 
-        if (!refreshedUser) {
-          throw new Error('No saved session. Please log in with your password first.');
+          if (!refreshedUser) {
+            throw new Error(
+              'No saved session. Please log in with your password first.',
+            );
+          }
+
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: {
+              user: refreshedUser,
+              method: 'pin',
+              membership: refreshedUser?.membership ?? null,
+              passwordAuthenticated: state.hasPasswordAuthenticated,
+            },
+          });
+          deviceLog.success('PIN login succeeded for refreshed user');
+          return;
         }
 
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: refreshedUser,
+            user: session.user,
             method: 'pin',
-            membership: refreshedUser?.membership ?? null,
+            membership: session.user?.membership ?? state.membership,
             passwordAuthenticated: state.hasPasswordAuthenticated,
           },
         });
-        deviceLog.success('PIN login succeeded for refreshed user');
-        return;
+        deviceLog.success('PIN login succeeded');
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Unable to sign in with PIN.';
+        deviceLog.error('PIN login failed', error);
+        dispatch({ type: 'LOGIN_ERROR', payload: message });
       }
+    },
+    [state.hasPasswordAuthenticated, state.membership],
+  );
 
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: session.user,
-          method: 'pin',
-          membership: session.user?.membership ?? state.membership,
-          passwordAuthenticated: state.hasPasswordAuthenticated,
-        },
-      });
-      deviceLog.success('PIN login succeeded');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to sign in with PIN.';
-      deviceLog.error('PIN login failed', error);
-      dispatch({ type: 'LOGIN_ERROR', payload: message });
-    }
-  }, [state.hasPasswordAuthenticated, state.membership]);
+  const loginWithBiometrics = useCallback(
+    async (promptMessage?: string) => {
+      dispatch({ type: 'LOGIN_START' });
+      try {
+        const { available } = await isBiometricsAvailable();
+        if (!available) {
+          throw new Error(
+            'Biometric authentication is not available on this device.',
+          );
+        }
 
-  const loginWithBiometrics = useCallback(async (promptMessage?: string) => {
-    dispatch({ type: 'LOGIN_START' });
-    try {
-      const { available } = await isBiometricsAvailable();
-      if (!available) {
-        throw new Error('Biometric authentication is not available on this device.');
-      }
+        const success = await authenticateWithBiometrics(promptMessage);
+        if (!success) {
+          throw new Error('Biometric authentication was cancelled.');
+        }
 
-      const success = await authenticateWithBiometrics(promptMessage);
-      if (!success) {
-        throw new Error('Biometric authentication was cancelled.');
-      }
+        const session = await ensureValidSession();
+        if (!session) {
+          throw new Error(
+            'No saved session. Please log in with your password first.',
+          );
+        }
 
-      const session = await ensureValidSession();
-      if (!session) {
-        throw new Error('No saved session. Please log in with your password first.');
-      }
+        await setSessionLock(false);
 
-      await setSessionLock(false);
+        if (!session.user) {
+          const refreshedUser = session.token
+            ? await refreshPersistedUserProfile(session.token)
+            : null;
 
-      if (!session.user) {
-        const refreshedUser = session.token
-          ? await refreshPersistedUserProfile(session.token)
-          : null;
+          if (!refreshedUser) {
+            throw new Error(
+              'No saved session. Please log in with your password first.',
+            );
+          }
 
-        if (!refreshedUser) {
-          throw new Error('No saved session. Please log in with your password first.');
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: {
+              user: refreshedUser,
+              method: 'biometric',
+              membership: refreshedUser?.membership ?? null,
+              passwordAuthenticated: state.hasPasswordAuthenticated,
+            },
+          });
+          deviceLog.success('Biometric login succeeded for refreshed user');
+          return;
         }
 
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: refreshedUser,
+            user: session.user,
             method: 'biometric',
-            membership: refreshedUser?.membership ?? null,
+            membership: session.user?.membership ?? state.membership,
             passwordAuthenticated: state.hasPasswordAuthenticated,
           },
         });
-        deviceLog.success('Biometric login succeeded for refreshed user');
-        return;
+        deviceLog.success('Biometric login succeeded');
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : 'Unable to complete biometric login.';
+        deviceLog.error('Biometric login failed', error);
+        dispatch({ type: 'LOGIN_ERROR', payload: message });
+      }
+    },
+    [state.hasPasswordAuthenticated, state.membership],
+  );
+
+  const registerPin = useCallback(
+    async (pin: string) => {
+      if (!state.hasPasswordAuthenticated) {
+        throw new Error(
+          'Please log in with your username and password before creating a PIN.',
+        );
       }
 
-      dispatch({
-        type: 'LOGIN_SUCCESS',
-        payload: {
-          user: session.user,
-          method: 'biometric',
-          membership: session.user?.membership ?? state.membership,
-          passwordAuthenticated: state.hasPasswordAuthenticated,
-        },
-      });
-      deviceLog.success('Biometric login succeeded');
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Unable to complete biometric login.';
-      deviceLog.error('Biometric login failed', error);
-      dispatch({ type: 'LOGIN_ERROR', payload: message });
-    }
-  }, [state.hasPasswordAuthenticated, state.membership]);
+      const session = await ensureValidSession();
+      if (!session) {
+        throw new Error(
+          'You must log in with your password before setting a PIN.',
+        );
+      }
 
-  const registerPin = useCallback(async (pin: string) => {
-    if (!state.hasPasswordAuthenticated) {
-      throw new Error('Please log in with your username and password before creating a PIN.');
-    }
-
-    const session = await ensureValidSession();
-    if (!session) {
-      throw new Error('You must log in with your password before setting a PIN.');
-    }
-
-    await persistPin(pin);
-  }, [state.hasPasswordAuthenticated]);
+      await persistPin(pin);
+    },
+    [state.hasPasswordAuthenticated],
+  );
 
   const removePin = useCallback(async () => {
     if (!state.hasPasswordAuthenticated) {
-      throw new Error('Please log in with your username and password before changing your PIN.');
+      throw new Error(
+        'Please log in with your username and password before changing your PIN.',
+      );
     }
 
     await clearPin();
@@ -339,37 +386,18 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     dispatch({ type: 'RESET_ERROR' });
   }, []);
 
-  const requestPasswordReset = useCallback(
-    async (identifier: string) => {
-      try {
-        const message = await requestWordpressPasswordReset(identifier);
-        deviceLog.info('Password reset requested', { identifier });
-        return message;
-      } catch (error) {
-        deviceLog.error('Password reset request failed', error);
-        throw (error instanceof Error
-          ? error
-          : new Error('Unable to send password reset email.'));
-      }
-    },
-    [],
-  );
-
-  const registerAccount = useCallback(
-    async (options: RegisterOptions) => {
-      try {
-        const message = await registerWordPressAccount(options);
-        deviceLog.info('Account registration succeeded', { username: options.username });
-        return message;
-      } catch (error) {
-        deviceLog.error('Account registration failed', error);
-        throw (error instanceof Error
-          ? error
-          : new Error('Unable to register a new account.'));
-      }
-    },
-    [],
-  );
+  const requestPasswordReset = useCallback(async (identifier: string) => {
+    try {
+      const message = await requestWordpressPasswordReset(identifier);
+      deviceLog.info('Password reset requested', { identifier });
+      return message;
+    } catch (error) {
+      deviceLog.error('Password reset request failed', error);
+      throw error instanceof Error
+        ? error
+        : new Error('Unable to send password reset email.');
+    }
+  }, []);
 
   const refreshSession = useCallback(async () => {
     const session = await ensureValidSession();
@@ -380,7 +408,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       return;
     }
 
-    const passwordAuthenticated = (await hasPasswordAuthenticated()) && !session.locked;
+    const passwordAuthenticated =
+      (await hasPasswordAuthenticated()) && !session.locked;
 
     if (session.locked) {
       dispatch({
@@ -406,12 +435,77 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
     });
   }, [state.authMethod, state.membership, state.user]);
 
+  const registerAccount = useCallback(async (options: RegisterOptions) => {
+    try {
+      const message = await registerWordPressAccount(options);
+      deviceLog.info('Account registration succeeded', {
+        username: options.username,
+      });
+      return message;
+    } catch (error) {
+      deviceLog.error('Account registration failed', error);
+      throw error instanceof Error
+        ? error
+        : new Error('Unable to register a new account.');
+    }
+  }, []);
+
+  const changePassword = useCallback(
+    async ({
+      currentPassword,
+      newPassword,
+    }: {
+      currentPassword: string;
+      newPassword: string;
+    }) => {
+      if (!state.user?.email) {
+        throw new Error('Unable to change password.');
+      }
+
+      if (!state.hasPasswordAuthenticated) {
+        throw new Error(
+          'Please log in with your username and password before changing your password.',
+        );
+      }
+
+      const identifier = state.user.email.trim();
+      if (identifier.length === 0) {
+        throw new Error('Unable to change password.');
+      }
+
+      try {
+        const session = await loginWithWordPress({
+          username: identifier,
+          password: currentPassword,
+        });
+        if (!session.token) {
+          throw new Error('Unable to change password.');
+        }
+
+        await updateWordPressPassword({ token: session.token, newPassword });
+        await loginWithWordPress({
+          username: identifier,
+          password: newPassword,
+        });
+        await refreshSession();
+        deviceLog.success('Password updated successfully');
+      } catch (error) {
+        deviceLog.error('Password update failed', error);
+        throw error instanceof Error
+          ? error
+          : new Error('Unable to change password.');
+      }
+    },
+    [refreshSession, state.hasPasswordAuthenticated, state.user?.email],
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       state,
       loginWithPassword,
       loginWithPin,
       loginWithBiometrics,
+      changePassword,
       registerPin,
       removePin,
       logout,
@@ -425,6 +519,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({ children }) =>
       loginWithPassword,
       loginWithPin,
       loginWithBiometrics,
+      changePassword,
       registerPin,
       removePin,
       logout,

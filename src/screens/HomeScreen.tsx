@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { BenefitList } from '../components/BenefitList';
@@ -9,23 +17,32 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useOneSignalNotifications } from '../notifications/OneSignalProvider';
 import { MembershipBenefit } from '../types/auth';
 
-export const getMaxDiscount = (benefits: MembershipBenefit[]): number | null => {
+export const getMaxDiscount = (
+  benefits: MembershipBenefit[],
+): number | null => {
   if (!Array.isArray(benefits) || benefits.length === 0) {
     return null;
   }
 
   const values = benefits
-    .map((benefit) => benefit.discountPercentage)
-    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    .map(benefit => benefit.discountPercentage)
+    .filter(
+      (value): value is number =>
+        typeof value === 'number' && Number.isFinite(value),
+    );
 
   if (values.length === 0) {
     return null;
   }
 
-  return Math.max(...values.map((value) => Math.round(value * 100) / 100));
+  return Math.max(...values.map(value => Math.round(value * 100) / 100));
 };
 
-export const HomeScreen: React.FC = () => {
+type HomeScreenProps = {
+  onManageProfile?: () => void;
+};
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
   const { state, logout } = useAuthContext();
   const user = state.user;
   const membership = state.membership ?? state.user?.membership ?? null;
@@ -40,7 +57,10 @@ export const HomeScreen: React.FC = () => {
     consumeNavigationTarget,
   } = useOneSignalNotifications();
   const greeting = useMemo(
-    () => t('home.title', { replace: { name: user?.name ? `, ${user.name}` : '' } }),
+    () =>
+      t('home.title', {
+        replace: { name: user?.name ? `, ${user.name}` : '' },
+      }),
     [t, user?.name],
   );
 
@@ -56,12 +76,18 @@ export const HomeScreen: React.FC = () => {
     const parsedDate = new Date(membership.expiresAt);
     const locale = language === 'th' ? 'th-TH' : 'en-US';
     if (Number.isNaN(parsedDate.getTime())) {
-      return t('home.membership.renewsOn', { replace: { date: membership.expiresAt } });
+      return t('home.membership.renewsOn', {
+        replace: { date: membership.expiresAt },
+      });
     }
 
-    const formatted = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(parsedDate);
+    const formatted = new Intl.DateTimeFormat(locale, {
+      dateStyle: 'medium',
+    }).format(parsedDate);
     const isExpired = parsedDate.getTime() < Date.now();
-    const key = isExpired ? 'home.membership.expiredOn' : 'home.membership.renewsOn';
+    const key = isExpired
+      ? 'home.membership.expiredOn'
+      : 'home.membership.renewsOn';
     return t(key, { replace: { date: formatted } });
   }, [language, membership, t]);
 
@@ -75,7 +101,9 @@ export const HomeScreen: React.FC = () => {
       return t('home.membership.discountSummaryDefault');
     }
 
-    return t('home.membership.discountSummary', { replace: { percent: maxDiscount } });
+    return t('home.membership.discountSummary', {
+      replace: { percent: maxDiscount },
+    });
   }, [membership, t]);
 
   const quickActions = useMemo(
@@ -164,12 +192,27 @@ export const HomeScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.switcherWrapper}>
           <LanguageSwitcher />
         </View>
         <Text style={styles.title}>{greeting}</Text>
         {user?.email ? <Text style={styles.subtitle}>{user.email}</Text> : null}
+
+        {onManageProfile ? (
+          <Pressable
+            onPress={onManageProfile}
+            style={styles.manageProfileButton}
+            accessibilityRole="button"
+          >
+            <Text style={styles.manageProfileButtonText}>
+              {t('home.manageProfile')}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {activeNotification ? (
           <View
@@ -181,28 +224,46 @@ export const HomeScreen: React.FC = () => {
             ]}
           >
             <View style={styles.notificationBannerContent}>
-              {notificationTitle ? <Text style={styles.notificationBannerTitle}>{notificationTitle}</Text> : null}
-              <Text style={styles.notificationBannerBody}>{activeNotification.body}</Text>
+              {notificationTitle ? (
+                <Text style={styles.notificationBannerTitle}>
+                  {notificationTitle}
+                </Text>
+              ) : null}
+              <Text style={styles.notificationBannerBody}>
+                {activeNotification.body}
+              </Text>
               {activeNotificationOrigin === 'background' ? (
-                <Text style={styles.notificationBannerHint}>{t('home.notifications.backgroundHint')}</Text>
+                <Text style={styles.notificationBannerHint}>
+                  {t('home.notifications.backgroundHint')}
+                </Text>
               ) : null}
             </View>
             <View style={styles.notificationBannerActions}>
               {activeNotification.target ? (
                 <Pressable
                   onPress={handleNotificationNavigate}
-                  style={[styles.notificationAction, styles.notificationActionPrimary]}
+                  style={[
+                    styles.notificationAction,
+                    styles.notificationActionPrimary,
+                  ]}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.notificationActionText}>{t('home.notifications.viewDetails')}</Text>
+                  <Text style={styles.notificationActionText}>
+                    {t('home.notifications.viewDetails')}
+                  </Text>
                 </Pressable>
               ) : null}
               <Pressable
                 onPress={handleNotificationDismiss}
-                style={[styles.notificationAction, styles.notificationActionSecondary]}
+                style={[
+                  styles.notificationAction,
+                  styles.notificationActionSecondary,
+                ]}
                 accessibilityRole="button"
               >
-                <Text style={styles.notificationActionDismiss}>{t('home.notifications.dismiss')}</Text>
+                <Text style={styles.notificationActionDismiss}>
+                  {t('home.notifications.dismiss')}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -224,15 +285,21 @@ export const HomeScreen: React.FC = () => {
         />
 
         <View style={styles.notificationSettings}>
-          <Text style={styles.sectionTitle}>{t('home.notifications.heading')}</Text>
+          <Text style={styles.sectionTitle}>
+            {t('home.notifications.heading')}
+          </Text>
           <View style={styles.preferenceRow}>
             <View style={styles.preferenceText}>
-              <Text style={styles.preferenceTitle}>{t('home.notifications.marketingTitle')}</Text>
-              <Text style={styles.preferenceDescription}>{t('home.notifications.marketingDescription')}</Text>
+              <Text style={styles.preferenceTitle}>
+                {t('home.notifications.marketingTitle')}
+              </Text>
+              <Text style={styles.preferenceDescription}>
+                {t('home.notifications.marketingDescription')}
+              </Text>
             </View>
             <Switch
               value={preferences.marketing}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 void updatePreference('marketing', value);
               }}
               accessibilityRole="switch"
@@ -241,12 +308,16 @@ export const HomeScreen: React.FC = () => {
           </View>
           <View style={styles.preferenceRow}>
             <View style={styles.preferenceText}>
-              <Text style={styles.preferenceTitle}>{t('home.notifications.reminderToggleTitle')}</Text>
-              <Text style={styles.preferenceDescription}>{t('home.notifications.renewalDescription')}</Text>
+              <Text style={styles.preferenceTitle}>
+                {t('home.notifications.reminderToggleTitle')}
+              </Text>
+              <Text style={styles.preferenceDescription}>
+                {t('home.notifications.renewalDescription')}
+              </Text>
             </View>
             <Switch
               value={preferences.reminders}
-              onValueChange={(value) => {
+              onValueChange={value => {
                 void updatePreference('reminders', value);
               }}
               accessibilityRole="switch"
@@ -254,14 +325,18 @@ export const HomeScreen: React.FC = () => {
             />
           </View>
           {!preferences.marketing ? (
-            <Text style={styles.preferenceNote}>{t('home.notifications.marketingMuted')}</Text>
+            <Text style={styles.preferenceNote}>
+              {t('home.notifications.marketingMuted')}
+            </Text>
           ) : null}
         </View>
 
         <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionTitle}>{t('home.quickActions.heading')}</Text>
+          <Text style={styles.sectionTitle}>
+            {t('home.quickActions.heading')}
+          </Text>
           <View style={styles.quickActionsRow}>
-            {quickActions.map((action) => (
+            {quickActions.map(action => (
               <Pressable
                 key={action.key}
                 onPress={() => handleQuickAction(action.message)}
@@ -274,7 +349,11 @@ export const HomeScreen: React.FC = () => {
           </View>
         </View>
 
-        <Pressable onPress={logout} style={styles.button} accessibilityRole="button">
+        <Pressable
+          onPress={logout}
+          style={styles.button}
+          accessibilityRole="button"
+        >
           <Text style={styles.buttonText}>{t('home.logout')}</Text>
         </Pressable>
       </ScrollView>
@@ -392,6 +471,21 @@ const styles = StyleSheet.create({
   preferenceNote: {
     fontSize: 13,
     color: '#1D4ED8',
+  },
+  manageProfileButton: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+  },
+  manageProfileButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0369A1',
   },
   button: {
     marginTop: 24,

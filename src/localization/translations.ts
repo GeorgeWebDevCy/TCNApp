@@ -72,13 +72,15 @@ export const translations: Record<Language, TranslationDictionary> = {
       },
       forgotPasswordModal: {
         title: 'Reset password',
-        description: 'Enter your email or username to receive reset instructions.',
+        description:
+          'Enter your email or username to receive reset instructions.',
         identifierLabel: 'Email or username',
         identifierPlaceholder: 'name@example.com',
         submit: 'Send reset link',
         cancel: 'Cancel',
         closeAfterSuccess: 'Close',
-        success: 'If an account exists for that identifier, a reset email has been sent.',
+        success:
+          'If an account exists for that identifier, a reset email has been sent.',
       },
       registerModal: {
         title: 'Create account',
@@ -116,6 +118,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     home: {
       title: 'Welcome{{name}}!',
       logout: 'Log out',
+      manageProfile: 'Manage profile',
       membership: {
         heading: 'Membership status',
         tierLabel: 'Tier',
@@ -123,19 +126,22 @@ export const translations: Record<Language, TranslationDictionary> = {
         renewsOn: 'Renews on {{date}}',
         expiredOn: 'Expired on {{date}}',
         discountSummary: 'Save up to {{percent}}% with member perks',
-        discountSummaryDefault: 'Enjoy exclusive discounts with partner vendors.',
+        discountSummaryDefault:
+          'Enjoy exclusive discounts with partner vendors.',
         empty: 'No active membership yet. Upgrade to unlock more benefits.',
       },
       benefits: {
         heading: 'Your benefits',
-        empty: 'Benefits will appear here once they are available for your tier.',
+        empty:
+          'Benefits will appear here once they are available for your tier.',
       },
       quickActions: {
         heading: 'Quick actions',
         viewVendors: 'View vendors',
         viewVendorsMessage: 'Browse participating vendors in your area.',
         upgradeOptions: 'Upgrade options',
-        upgradeOptionsMessage: 'Contact support to explore higher membership tiers.',
+        upgradeOptionsMessage:
+          'Contact support to explore higher membership tiers.',
         comingSoonTitle: 'Coming soon',
       },
       notifications: {
@@ -147,8 +153,10 @@ export const translations: Record<Language, TranslationDictionary> = {
         dismiss: 'Dismiss',
         backgroundHint: 'Opened from a notification tap.',
         marketingTitle: 'Marketing push alerts',
-        marketingDescription: 'Get personalized promotions from partner vendors.',
-        marketingMuted: 'Marketing pushes are muted. Turn them back on to hear about new offers.',
+        marketingDescription:
+          'Get personalized promotions from partner vendors.',
+        marketingMuted:
+          'Marketing pushes are muted. Turn them back on to hear about new offers.',
         reminderToggleTitle: 'Renewal reminders',
         renewalDescription: 'Receive reminders before your membership expires.',
         vendorNavigationMessage: 'Taking you to the partner vendor directory.',
@@ -156,17 +164,63 @@ export const translations: Record<Language, TranslationDictionary> = {
         membershipNavigationMessage: 'Opening your membership details.',
       },
     },
+    profile: {
+      title: 'Your profile',
+      subtitle: 'Manage your account security preferences.',
+      password: {
+        heading: 'Change password',
+        description: 'Update the password you use to sign in.',
+        currentLabel: 'Current password',
+        currentPlaceholder: 'Enter your current password',
+        newLabel: 'New password',
+        newPlaceholder: 'Enter a new password',
+        confirmLabel: 'Confirm new password',
+        confirmPlaceholder: 'Re-enter the new password',
+        submit: 'Update password',
+        successTitle: 'Password updated',
+        successMessage: 'Your password has been updated successfully.',
+        errors: {
+          incomplete: 'Please complete all password fields.',
+        },
+      },
+      pin: {
+        heading: 'Manage PIN',
+        description: 'Create or reset your quick login PIN.',
+        newLabel: 'New PIN',
+        newPlaceholder: 'Enter at least 4 digits',
+        confirmLabel: 'Confirm PIN',
+        confirmPlaceholder: 'Re-enter your PIN',
+        submit: 'Save PIN',
+        successTitle: 'PIN updated',
+        successMessage: 'Your PIN has been saved.',
+        hasPin: 'A PIN is currently enabled for quick login.',
+        noPin: 'No PIN is currently saved.',
+        remove: 'Remove PIN',
+        removeConfirmTitle: 'Remove PIN',
+        removeConfirmMessage: 'Are you sure you want to remove your saved PIN?',
+        removeConfirmCancel: 'Cancel',
+        removeConfirmConfirm: 'Remove',
+        removedTitle: 'PIN removed',
+        removedMessage: 'Your saved PIN has been removed.',
+      },
+      actions: {
+        back: 'Back to home',
+      },
+    },
     errors: {
       passwordLogin: 'Unable to complete password login.',
       incorrectPin: 'Incorrect PIN.',
-      noSavedSession: 'No saved session. Please log in with your password first.',
+      noSavedSession:
+        'No saved session. Please log in with your password first.',
       pinLogin: 'Unable to sign in with PIN.',
-      biometricsUnavailable: 'Biometric authentication is not available on this device.',
+      biometricsUnavailable:
+        'Biometric authentication is not available on this device.',
       biometricsCancelled: 'Biometric authentication was cancelled.',
       biometricLogin: 'Unable to complete biometric login.',
       loginBeforePinCreation:
         'Please log in with your username and password before creating a PIN.',
-      loginBeforePinSetting: 'You must log in with your password before setting a PIN.',
+      loginBeforePinSetting:
+        'You must log in with your password before setting a PIN.',
       loginBeforePinChange:
         'Please log in with your username and password before changing your PIN.',
       pinLength: 'PIN must contain at least 4 digits.',
@@ -177,6 +231,8 @@ export const translations: Record<Language, TranslationDictionary> = {
       passwordReset: 'Unable to send password reset email.',
       registerAccount: 'Unable to register a new account.',
       passwordMismatch: 'Passwords do not match.',
+      changePassword: 'Unable to change password.',
+      pinMismatch: 'PIN entries do not match.',
     },
   },
   th: {
@@ -288,6 +344,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     home: {
       title: 'ยินดีต้อนรับ{{name}}!',
       logout: 'ออกจากระบบ',
+      manageProfile: 'จัดการโปรไฟล์',
       membership: {
         heading: 'สถานะสมาชิก',
         tierLabel: 'ระดับสมาชิก',
@@ -307,7 +364,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         viewVendors: 'ดูร้านค้าพันธมิตร',
         viewVendorsMessage: 'สำรวจร้านค้าที่เข้าร่วมในพื้นที่ของคุณ',
         upgradeOptions: 'ตัวเลือกการอัปเกรด',
-        upgradeOptionsMessage: 'ติดต่อทีมงานเพื่อดูตัวเลือกการอัปเกรดระดับสมาชิก',
+        upgradeOptionsMessage:
+          'ติดต่อทีมงานเพื่อดูตัวเลือกการอัปเกรดระดับสมาชิก',
         comingSoonTitle: 'เร็ว ๆ นี้',
       },
       notifications: {
@@ -320,7 +378,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         backgroundHint: 'เปิดจากการแตะการแจ้งเตือน',
         marketingTitle: 'การแจ้งเตือนโปรโมชั่น',
         marketingDescription: 'รับโปรโมชั่นเฉพาะบุคคลจากร้านค้าที่ร่วมรายการ',
-        marketingMuted: 'ปิดการแจ้งเตือนโปรโมชั่นไว้แล้ว เปิดอีกครั้งเพื่อไม่พลาดข้อเสนอใหม่ ๆ',
+        marketingMuted:
+          'ปิดการแจ้งเตือนโปรโมชั่นไว้แล้ว เปิดอีกครั้งเพื่อไม่พลาดข้อเสนอใหม่ ๆ',
         reminderToggleTitle: 'การแจ้งเตือนต่ออายุ',
         renewalDescription: 'รับการแจ้งเตือนก่อนที่สถานะสมาชิกของคุณจะหมดอายุ',
         vendorNavigationMessage: 'กำลังเปิดหน้าร้านค้าที่ร่วมรายการ',
@@ -328,25 +387,74 @@ export const translations: Record<Language, TranslationDictionary> = {
         membershipNavigationMessage: 'กำลังเปิดรายละเอียดสมาชิกของคุณ',
       },
     },
+    profile: {
+      title: 'โปรไฟล์ของคุณ',
+      subtitle: 'จัดการการตั้งค่าความปลอดภัยของบัญชีคุณ.',
+      password: {
+        heading: 'เปลี่ยนรหัสผ่าน',
+        description: 'อัปเดตรหัสผ่านที่คุณใช้ในการเข้าสู่ระบบ.',
+        currentLabel: 'รหัสผ่านปัจจุบัน',
+        currentPlaceholder: 'กรอกรหัสผ่านปัจจุบัน',
+        newLabel: 'รหัสผ่านใหม่',
+        newPlaceholder: 'กรอกรหัสผ่านใหม่',
+        confirmLabel: 'ยืนยันรหัสผ่านใหม่',
+        confirmPlaceholder: 'กรอกรหัสผ่านใหม่อีกครั้ง',
+        submit: 'อัปเดตรหัสผ่าน',
+        successTitle: 'เปลี่ยนรหัสผ่านแล้ว',
+        successMessage: 'รหัสผ่านของคุณได้รับการอัปเดตแล้ว.',
+        errors: {
+          incomplete: 'โปรดกรอกข้อมูลรหัสผ่านให้ครบทุกช่อง.',
+        },
+      },
+      pin: {
+        heading: 'จัดการพิน',
+        description: 'สร้างหรือรีเซ็ตพินสำหรับเข้าสู่ระบบอย่างรวดเร็ว.',
+        newLabel: 'พินใหม่',
+        newPlaceholder: 'กรอกพินอย่างน้อย 4 หลัก',
+        confirmLabel: 'ยืนยันพิน',
+        confirmPlaceholder: 'กรอกพินอีกครั้ง',
+        submit: 'บันทึกพิน',
+        successTitle: 'อัปเดตพินแล้ว',
+        successMessage: 'พินของคุณถูกบันทึกแล้ว.',
+        hasPin: 'มีการเปิดใช้งานพินสำหรับเข้าสู่ระบบอย่างรวดเร็ว.',
+        noPin: 'ยังไม่มีการบันทึกพิน.',
+        remove: 'ลบพิน',
+        removeConfirmTitle: 'ลบพิน',
+        removeConfirmMessage: 'คุณแน่ใจหรือไม่ว่าต้องการลบพินที่บันทึกไว้?',
+        removeConfirmCancel: 'ยกเลิก',
+        removeConfirmConfirm: 'ลบ',
+        removedTitle: 'ลบพินแล้ว',
+        removedMessage: 'พินของคุณถูกลบเรียบร้อยแล้ว.',
+      },
+      actions: {
+        back: 'กลับสู่หน้าหลัก',
+      },
+    },
     errors: {
       passwordLogin: 'ไม่สามารถเข้าสู่ระบบด้วยรหัสผ่านได้',
       incorrectPin: 'พินไม่ถูกต้อง',
       noSavedSession: 'ไม่มีเซสชันที่บันทึกไว้ โปรดเข้าสู่ระบบด้วยรหัสผ่านก่อน',
       pinLogin: 'ไม่สามารถเข้าสู่ระบบด้วยพินได้',
-      biometricsUnavailable: 'อุปกรณ์นี้ไม่รองรับการยืนยันตัวตนด้วยข้อมูลชีวมิติ',
+      biometricsUnavailable:
+        'อุปกรณ์นี้ไม่รองรับการยืนยันตัวตนด้วยข้อมูลชีวมิติ',
       biometricsCancelled: 'ยกเลิกการยืนยันตัวตนด้วยข้อมูลชีวมิติแล้ว',
       biometricLogin: 'ไม่สามารถเข้าสู่ระบบด้วยข้อมูลชีวมิติได้',
-      loginBeforePinCreation: 'โปรดเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านก่อนสร้างพิน',
+      loginBeforePinCreation:
+        'โปรดเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านก่อนสร้างพิน',
       loginBeforePinSetting: 'คุณต้องเข้าสู่ระบบด้วยรหัสผ่านก่อนตั้งค่าพิน',
-      loginBeforePinChange: 'โปรดเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านก่อนเปลี่ยนพินของคุณ',
+      loginBeforePinChange:
+        'โปรดเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่านก่อนเปลี่ยนพินของคุณ',
       pinLength: 'พินต้องมีอย่างน้อย 4 หลัก',
-      biometricsNotConfigured: 'ยังไม่ได้ตั้งค่าการยืนยันตัวตนด้วยข้อมูลชีวมิติ',
+      biometricsNotConfigured:
+        'ยังไม่ได้ตั้งค่าการยืนยันตัวตนด้วยข้อมูลชีวมิติ',
       wordpressCredentials: 'ไม่สามารถเข้าสู่ระบบด้วยบัญชี WordPress ได้',
       pinSaveGeneric: 'เกิดข้อผิดพลาดขณะบันทึกพินของคุณ',
       pinRemoveGeneric: 'เกิดข้อผิดพลาดขณะลบพินของคุณ',
       passwordReset: 'ไม่สามารถส่งอีเมลรีเซ็ตรหัสผ่านได้',
       registerAccount: 'ไม่สามารถสร้างบัญชีใหม่ได้',
       passwordMismatch: 'รหัสผ่านไม่ตรงกัน',
+      changePassword: 'ไม่สามารถเปลี่ยนรหัสผ่านได้',
+      pinMismatch: 'พินไม่ตรงกัน',
     },
   },
 };

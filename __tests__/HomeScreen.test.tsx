@@ -7,8 +7,18 @@ const membership: MembershipInfo = {
   tier: 'Gold',
   expiresAt: '2030-01-10T00:00:00.000Z',
   benefits: [
-    { id: 'travel', title: 'Travel deals', description: '10% off flights', discountPercentage: 10 },
-    { id: 'dining', title: 'Dining rewards', description: '15% off restaurants', discountPercentage: 15 },
+    {
+      id: 'travel',
+      title: 'Travel deals',
+      description: '10% off flights',
+      discountPercentage: 10,
+    },
+    {
+      id: 'dining',
+      title: 'Dining rewards',
+      description: '15% off restaurants',
+      discountPercentage: 15,
+    },
   ],
 };
 
@@ -34,7 +44,9 @@ jest.mock('../src/contexts/AuthContext', () => ({
 }));
 
 jest.mock('../src/contexts/LocalizationContext', () => {
-  const { translations } = jest.requireActual('../src/localization/translations');
+  const { translations } = jest.requireActual(
+    '../src/localization/translations',
+  );
 
   const resolve = (key: string): unknown => {
     return key.split('.').reduce<unknown>((current, segment) => {
@@ -45,7 +57,10 @@ jest.mock('../src/contexts/LocalizationContext', () => {
     }, translations.en);
   };
 
-  const format = (template: string, replacements?: Record<string, string | number>) => {
+  const format = (
+    template: string,
+    replacements?: Record<string, string | number>,
+  ) => {
     if (!replacements) {
       return template;
     }
@@ -61,7 +76,10 @@ jest.mock('../src/contexts/LocalizationContext', () => {
       language: 'en',
       setLanguage: jest.fn().mockResolvedValue(undefined),
       translateError: (value: string | null) => value,
-      t: (key: string, options?: { replace?: Record<string, string | number> }) => {
+      t: (
+        key: string,
+        options?: { replace?: Record<string, string | number> },
+      ) => {
         const value = resolve(key);
         if (typeof value === 'string') {
           return format(value, options?.replace);
@@ -87,8 +105,11 @@ jest.mock('../src/notifications/OneSignalProvider', () => ({
 describe('HomeScreen', () => {
   it('renders the membership overview', () => {
     let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
+    const onManageProfile = jest.fn();
     ReactTestRenderer.act(() => {
-      renderer = ReactTestRenderer.create(<HomeScreen />);
+      renderer = ReactTestRenderer.create(
+        <HomeScreen onManageProfile={onManageProfile} />,
+      );
     });
 
     expect(renderer?.toJSON()).toMatchSnapshot();
