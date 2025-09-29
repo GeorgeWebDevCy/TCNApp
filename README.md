@@ -140,7 +140,7 @@ The application bootstraps the `OneSignalProvider`, initializes the SDK during s
 
 The React Native app now ships with a modular login flow connected to WordPress:
 
-- **Password login**: Uses the [GN Password Login API](https://github.com/GeorgeWebDevCy/gn-password-login-api) plugin (`POST /wp-json/gn/v1/login`) to validate credentials over REST.
+- **Password login**: Uses the [GN Password Login API](https://github.com/GeorgeWebDevCy/gn-password-login-api) plugin (`POST /wp-json/gn/v1/login`) to validate credentials over REST. If you install plugin v1.0.1 make sure to [apply the bundled CORS hook fix](docs/wordpress/gn-password-login-api-cors.md) so WordPress passes all arguments to the plugin's custom filter.
 - **PIN login**: Stores a salted hash locally so returning users can unlock without credentials.
 - **Biometric login**: Leverages native biometrics (Face ID / Touch ID / etc.) as a fast path once a session exists.
 - **Account actions**: "Forgot password" and "Register" links point to the WordPress site and can be customised.
