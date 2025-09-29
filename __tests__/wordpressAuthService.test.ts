@@ -21,25 +21,23 @@ describe('wordpressAuthService', () => {
     jest.clearAllMocks();
   });
 
-  it('retries WordPress requests using rest_route when a route is missing', async () => {
-    const tokenResponseBody = {
-      access_token: 'token-value',
-      refresh_token: 'refresh-value',
-    };
-
-    const profileResponseBody = {
-      id: 42,
-      email: 'member@example.com',
-      name: 'Member Example',
+  it('retries WordPress requests using rest_route when the GN Password Login API route is missing', async () => {
+    const loginResponseBody = {
+      success: true,
+      mode: 'token',
+      token: 'token-value',
+      user: {
+        id: 42,
+        email: 'member@example.com',
+        display: 'Member Example',
+      },
     };
 
     const fetchMock = jest.fn().mockResolvedValue(createJsonResponse(500, {}));
 
     fetchMock
       .mockResolvedValueOnce(createJsonResponse(404, { code: 'rest_no_route' }))
-      .mockResolvedValueOnce(createJsonResponse(200, tokenResponseBody))
-      .mockResolvedValueOnce(createJsonResponse(404, { code: 'rest_no_route' }))
-      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody));
 
     global.fetch = fetchMock as unknown as typeof fetch;
 
@@ -47,22 +45,23 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'http://dominicb72.sg-host.com/oauth/token',
+      'http://dominicb72.sg-host.com/wp-json/gn/v1/login',
       expect.objectContaining({ method: 'POST' }),
     );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'http://dominicb72.sg-host.com/?rest_route=/oauth/token',
+      'http://dominicb72.sg-host.com/?rest_route=/gn/v1/login',
       expect.objectContaining({ method: 'POST' }),
     );
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      4,
-      'http://dominicb72.sg-host.com/?rest_route=/wp/v2/users/me',
-      expect.objectContaining({ method: 'GET' }),
+    expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        [
+          '@tcnapp/user-profile',
+          JSON.stringify({ id: 42, email: 'member@example.com', name: 'Member Example', membership: null }),
+        ],
+      ]),
     );
-
-    expect(AsyncStorage.multiSet).toHaveBeenCalled();
   });
 });
