@@ -753,6 +753,7 @@ export const requestPasswordReset = async (
     user_email: trimmed,
     username: trimmed,
     email: trimmed,
+    login: trimmed,
   };
 
   const response = await fetchWithRouteFallback(
@@ -881,6 +882,7 @@ export const resetPasswordWithCode = async ({
     user_email: trimmedIdentifier,
     username: trimmedIdentifier,
     email: trimmedIdentifier,
+    login: trimmedIdentifier,
     verification_code: trimmedCode,
     code: trimmedCode,
     password: trimmedPassword,
