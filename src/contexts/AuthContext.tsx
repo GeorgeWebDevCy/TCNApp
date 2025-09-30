@@ -504,8 +504,15 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   }, [state.authMethod, state.membership, state.user]);
 
   const getSessionToken = useCallback(async () => {
-    const session = sessionRef.current ?? (await ensureValidSession());
-    return session?.token ?? null;
+    const session = await ensureValidSession();
+
+    if (!session) {
+      sessionRef.current = null;
+      return null;
+    }
+
+    sessionRef.current = session;
+    return session.token ?? null;
   }, []);
 
   const registerAccount = useCallback(async (options: RegisterOptions) => {
