@@ -9,7 +9,9 @@ export interface TranslationDictionary {
 export const translations: Record<Language, TranslationDictionary> = {
   en: {
     common: {
-      appName: 'TCN',
+      appName: 'The Consumer Network',
+      appAbbreviation: 'TCN',
+      appTagline: 'Trusted as {{abbreviation}}',
       or: 'or',
     },
     languages: {
@@ -276,7 +278,9 @@ export const translations: Record<Language, TranslationDictionary> = {
   },
   th: {
     common: {
-      appName: 'TCN',
+      appName: 'เครือข่ายผู้บริโภค',
+      appAbbreviation: 'TCN',
+      appTagline: 'เชื่อมั่นใน {{abbreviation}}',
       or: 'หรือ',
     },
     languages: {

@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { BenefitList } from '../components/BenefitList';
 import { MembershipCard } from '../components/MembershipCard';
+import { BrandLogo } from '../components/BrandLogo';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useOneSignalNotifications } from '../notifications/OneSignalProvider';
@@ -240,6 +241,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.switcherWrapper}>
           <LanguageSwitcher />
         </View>
+        <View style={styles.brandHeader}>
+          <BrandLogo orientation="vertical" />
+        </View>
         <Text style={styles.title}>{greeting}</Text>
         {user?.email ? <Text style={styles.subtitle}>{user.email}</Text> : null}
 
@@ -414,6 +418,9 @@ const styles = StyleSheet.create({
   },
   switcherWrapper: {
     alignSelf: 'flex-end',
+  },
+  brandHeader: {
+    marginTop: 8,
   },
   title: {
     fontSize: 24,
