@@ -382,11 +382,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           };
           sessionRef.current = snapshot;
           await persistSessionSnapshot(snapshot);
+          session = snapshot;
         } else {
           throw new Error(
             'You must log in with your password before setting a PIN.',
           );
         }
+      }
+
+      if (session && !session.user && state.user) {
+        const snapshot: PersistedSession = {
+          token: session.token,
+          refreshToken: session.refreshToken,
+          user: state.user,
+          locked: session.locked,
+        };
+        sessionRef.current = snapshot;
+        await persistSessionSnapshot(snapshot);
       }
 
       await persistPin(pin);
