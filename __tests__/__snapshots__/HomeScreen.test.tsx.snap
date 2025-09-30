@@ -59,7 +59,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
             accessibilityRole="radiogroup"
             style={
               {
-                "backgroundColor": "#E2E8F0",
+                "backgroundColor": "#F8FAFC",
                 "borderRadius": 999,
                 "flexDirection": "row",
                 "gap": 8,
@@ -274,7 +274,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
       <View
         style={
           {
-            "backgroundColor": "#EEF2FF",
+            "backgroundColor": "#EFF6FF",
             "borderRadius": 16,
             "gap": 12,
             "padding": 20,
@@ -284,7 +284,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
         <Text
           style={
             {
-              "color": "#312E81",
+              "color": "#0F172A",
               "fontSize": 18,
               "fontWeight": "700",
             }
@@ -304,7 +304,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
           <Text
             style={
               {
-                "color": "#4338CA",
+                "color": "#1D4ED8",
                 "fontSize": 16,
                 "fontWeight": "600",
               }
@@ -315,7 +315,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
           <Text
             style={
               {
-                "color": "#1E1B4B",
+                "color": "#0F172A",
                 "fontSize": 20,
                 "fontWeight": "700",
               }
@@ -327,7 +327,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
         <Text
           style={
             {
-              "color": "#4C1D95",
+              "color": "#1D4ED8",
               "fontSize": 14,
             }
           }
@@ -337,7 +337,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
         <Text
           style={
             {
-              "color": "#312E81",
+              "color": "#475569",
               "fontSize": 14,
             }
           }
@@ -408,7 +408,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
             <Text
               style={
                 {
-                  "color": "#4B5563",
+                  "color": "#475569",
                   "fontSize": 14,
                 }
               }
@@ -418,7 +418,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
             <Text
               style={
                 {
-                  "color": "#059669",
+                  "color": "#22C55E",
                   "fontSize": 14,
                   "fontWeight": "600",
                 }
@@ -470,7 +470,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
             <Text
               style={
                 {
-                  "color": "#4B5563",
+                  "color": "#475569",
                   "fontSize": 14,
                 }
               }
@@ -480,7 +480,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
             <Text
               style={
                 {
-                  "color": "#059669",
+                  "color": "#22C55E",
                   "fontSize": 14,
                   "fontWeight": "600",
                 }
@@ -495,7 +495,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
         style={
           {
             "backgroundColor": "#F8FAFC",
-            "borderColor": "#E2E8F0",
+            "borderColor": "#CBD5F5",
             "borderRadius": 16,
             "borderWidth": 1,
             "gap": 16,
@@ -506,7 +506,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
         <Text
           style={
             {
-              "color": "#1E293B",
+              "color": "#0F172A",
               "fontSize": 18,
               "fontWeight": "600",
               "marginBottom": 12,
@@ -634,7 +634,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
         <Text
           style={
             {
-              "color": "#1E293B",
+              "color": "#0F172A",
               "fontSize": 18,
               "fontWeight": "600",
               "marginBottom": 12,

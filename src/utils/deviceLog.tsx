@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, ViewProps } from 'react-native';
+import { COLORS } from '../config/theme';
 
 export interface StorageAdapter {
   getItem(key: string): Promise<string | null> | string | null;
@@ -28,7 +29,9 @@ type ConsoleMethod = 'log' | 'info' | 'debug' | 'warn' | 'error';
 type Subscriber = (entries: LogEntry[]) => void;
 
 const LOG_STORAGE_KEY = '@device-log';
-const defaultOptions: Required<Pick<DeviceLogOptions, 'logToConsole' | 'logRNErrors'>> &
+const defaultOptions: Required<
+  Pick<DeviceLogOptions, 'logToConsole' | 'logRNErrors'>
+> &
   Omit<DeviceLogOptions, 'logToConsole' | 'logRNErrors'> = {
   logToConsole: true,
   logRNErrors: true,
@@ -41,7 +44,9 @@ let entries: LogEntry[] = [];
 let activeOptions: DeviceLogOptions = { ...defaultOptions };
 let storageAdapter: StorageAdapter | null = null;
 let consolePatched = false;
-const originalConsole: Partial<Record<ConsoleMethod, (...args: unknown[]) => void>> = {};
+const originalConsole: Partial<
+  Record<ConsoleMethod, (...args: unknown[]) => void>
+> = {};
 const timers = new Map<string, number>();
 
 const consoleToLogLevel: Record<ConsoleMethod, LogLevel> = {
@@ -64,7 +69,7 @@ const getRenderableEntries = (): LogEntry[] => {
 
 const notifySubscribers = () => {
   const snapshot = getRenderableEntries();
-  subscribers.forEach((callback) => {
+  subscribers.forEach(callback => {
     callback(snapshot);
   });
 };
@@ -81,16 +86,22 @@ const persistEntries = async () => {
       : entries;
 
   try {
-    await ensurePromise(storageAdapter.setItem(LOG_STORAGE_KEY, JSON.stringify(data)));
+    await ensurePromise(
+      storageAdapter.setItem(LOG_STORAGE_KEY, JSON.stringify(data)),
+    );
   } catch (error) {
     const logger = originalConsole.warn ?? console.warn;
     logger('DeviceLog failed to persist entries', error);
   }
 };
 
-const handleNewEntry = (level: LogLevel, params: unknown[], skipConsoleOutput = false) => {
+const handleNewEntry = (
+  level: LogLevel,
+  params: unknown[],
+  skipConsoleOutput = false,
+) => {
   const formattedMessage = params
-    .map((item) => {
+    .map(item => {
       if (typeof item === 'string') {
         return item;
       }
@@ -129,7 +140,7 @@ const installConsoleCapture = () => {
     return;
   }
 
-  (Object.keys(consoleToLogLevel) as ConsoleMethod[]).forEach((method) => {
+  (Object.keys(consoleToLogLevel) as ConsoleMethod[]).forEach(method => {
     const original = console[method]?.bind(console);
     originalConsole[method] = original ?? (() => undefined);
 
@@ -147,7 +158,7 @@ const clearConsoleCapture = () => {
     return;
   }
 
-  (Object.keys(consoleToLogLevel) as ConsoleMethod[]).forEach((method) => {
+  (Object.keys(consoleToLogLevel) as ConsoleMethod[]).forEach(method => {
     const original = originalConsole[method];
     if (original) {
       console[method] = original as Console[ConsoleMethod];
@@ -164,7 +175,9 @@ const deviceLog = {
 
     if (storageAdapter?.getItem) {
       try {
-        const storedValue = await ensurePromise(storageAdapter.getItem(LOG_STORAGE_KEY));
+        const storedValue = await ensurePromise(
+          storageAdapter.getItem(LOG_STORAGE_KEY),
+        );
         if (storedValue) {
           const parsed: LogEntry[] = JSON.parse(storedValue);
           if (Array.isArray(parsed)) {
@@ -253,7 +266,9 @@ const formatTimestamp = (timestamp: number, format?: string) => {
   const date = new Date(timestamp);
   if (format === 'HH:mm:ss') {
     const pad = (value: number) => value.toString().padStart(2, '0');
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+      date.getSeconds(),
+    )}`;
   }
   return date.toLocaleTimeString();
 };
@@ -266,7 +281,7 @@ export const LogView: React.FC<LogViewProps> = ({
   const [logs, setLogs] = useState<LogEntry[]>(() => getRenderableEntries());
 
   useEffect(() => {
-    const subscriber: Subscriber = (nextEntries) => {
+    const subscriber: Subscriber = nextEntries => {
       setLogs(nextEntries);
     };
 
@@ -284,14 +299,18 @@ export const LogView: React.FC<LogViewProps> = ({
   }, [logs, inverted]);
 
   return (
-    <ScrollView style={[styles.container, style]} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={[styles.container, style]}
+      contentContainerStyle={styles.content}
+    >
       {data.length === 0 ? (
         <Text style={styles.emptyText}>No logs recorded yet.</Text>
       ) : (
-        data.map((entry) => (
+        data.map(entry => (
           <View key={entry.id} style={[styles.item, levelStyles[entry.level]]}>
             <Text style={styles.meta}>
-              {formatTimestamp(entry.timestamp, timeStampFormat)} · {entry.level.toUpperCase()}
+              {formatTimestamp(entry.timestamp, timeStampFormat)} ·{' '}
+              {entry.level.toUpperCase()}
             </Text>
             <Text style={styles.message}>{entry.message}</Text>
           </View>
@@ -313,37 +332,37 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(148, 163, 184, 0.3)',
+    borderColor: COLORS.overlaySubtle,
   },
   meta: {
     fontSize: 12,
-    color: 'rgba(148, 163, 184, 0.9)',
+    color: COLORS.overlayText,
     marginBottom: 4,
   },
   message: {
     fontSize: 14,
-    color: '#E2E8F0',
+    color: COLORS.surface,
   },
   emptyText: {
-    color: 'rgba(148, 163, 184, 0.7)',
+    color: COLORS.overlayTextMuted,
     fontSize: 14,
     textAlign: 'center',
     marginTop: 16,
   },
   info: {
-    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    backgroundColor: COLORS.infoSurface,
   },
   debug: {
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    backgroundColor: COLORS.accentSurface,
   },
   warn: {
-    backgroundColor: 'rgba(251, 191, 36, 0.12)',
+    backgroundColor: COLORS.warningSurface,
   },
   error: {
-    backgroundColor: 'rgba(248, 113, 113, 0.12)',
+    backgroundColor: COLORS.errorSurface,
   },
   success: {
-    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    backgroundColor: COLORS.successSurface,
   },
 });
 

@@ -21,6 +21,7 @@ import {
   DEFAULT_MEMBERSHIP_PLANS,
 } from '../services/membershipService';
 import { MembershipPlan } from '../types/auth';
+import { COLORS } from '../config/theme';
 
 type MembershipScreenProps = {
   onBack?: () => void;
@@ -275,7 +276,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
 
         {loading ? (
           <View style={styles.loadingState}>
-            <ActivityIndicator color="#2563EB" />
+            <ActivityIndicator color={COLORS.primary} />
             <Text style={styles.loadingText}>
               {t('membership.screen.loading')}
             </Text>
@@ -321,7 +322,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           accessibilityRole="button"
         >
           {processing ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={COLORS.textOnPrimary} />
           ) : (
             <Text style={styles.primaryButtonText}>
               {selectedPlan
@@ -340,7 +341,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
   },
   container: {
     padding: 24,
@@ -355,53 +356,53 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 14,
-    backgroundColor: '#E0E7FF',
+    backgroundColor: COLORS.infoBackground,
   },
   backButtonText: {
-    color: '#4338CA',
+    color: COLORS.infoText,
     fontWeight: '600',
   },
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#1E1B4B',
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 16,
-    color: '#4338CA',
+    color: COLORS.infoText,
   },
   loadingState: {
     alignItems: 'center',
     gap: 12,
   },
   loadingText: {
-    color: '#4C1D95',
+    color: COLORS.infoText,
   },
   errorState: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: COLORS.errorBackground,
     borderRadius: 12,
     padding: 16,
     gap: 12,
   },
   errorText: {
-    color: '#B91C1C',
+    color: COLORS.errorText,
   },
   emptyState: {
     fontSize: 16,
-    color: '#4338CA',
+    color: COLORS.infoText,
   },
   planCard: {
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: COLORS.primaryMuted,
     borderRadius: 16,
     padding: 20,
-    backgroundColor: '#F8FAFF',
+    backgroundColor: COLORS.background,
     gap: 12,
   },
   planCardSelected: {
-    borderColor: '#6366F1',
-    backgroundColor: '#EEF2FF',
-    shadowColor: '#1E1B4B',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.infoBackground,
+    shadowColor: COLORS.textPrimary,
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -415,31 +416,31 @@ const styles = StyleSheet.create({
   planName: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1E1B4B',
+    color: COLORS.textPrimary,
   },
   planPrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#4338CA',
+    color: COLORS.infoText,
   },
   planDescription: {
-    color: '#312E81',
+    color: COLORS.textSecondary,
   },
   planFeatureList: {
     gap: 6,
   },
   planFeatureHeading: {
     fontWeight: '600',
-    color: '#4338CA',
+    color: COLORS.infoText,
   },
   planFeatureItem: {
-    color: '#312E81',
+    color: COLORS.textSecondary,
   },
   listSeparator: {
     height: 16,
   },
   primaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     borderRadius: 16,
     paddingVertical: 16,
     alignItems: 'center',
@@ -448,19 +449,19 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
   secondaryButton: {
-    backgroundColor: '#E0E7FF',
+    backgroundColor: COLORS.infoBackground,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 16,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#4338CA',
+    color: COLORS.infoText,
     fontWeight: '600',
   },
 });

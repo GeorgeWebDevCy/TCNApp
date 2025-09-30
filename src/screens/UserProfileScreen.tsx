@@ -13,6 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
+import { COLORS } from '../config/theme';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -271,7 +272,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             accessibilityRole="button"
           >
             {passwordSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={COLORS.textOnPrimary} />
             ) : (
               <Text style={styles.primaryButtonText}>
                 {t('profile.password.submit')}
@@ -322,7 +323,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             accessibilityRole="button"
           >
             {pinSubmitting ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={COLORS.textOnPrimary} />
             ) : (
               <Text style={styles.primaryButtonText}>
                 {t('profile.pin.submit')}
@@ -332,7 +333,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
 
           <View style={styles.pinStatusRow}>
             {pinLoading ? (
-              <ActivityIndicator color="#2563EB" />
+              <ActivityIndicator color={COLORS.primary} />
             ) : (
               <Text style={styles.pinStatusText}>
                 {hasPin ? t('profile.pin.hasPin') : t('profile.pin.noPin')}
@@ -354,13 +355,15 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.biometric.heading')}</Text>
+          <Text style={styles.sectionTitle}>
+            {t('profile.biometric.heading')}
+          </Text>
           <Text style={styles.sectionDescription}>
             {t('profile.biometric.description')}
           </Text>
 
           {pinLoading ? (
-            <ActivityIndicator color="#2563EB" />
+            <ActivityIndicator color={COLORS.primary} />
           ) : (
             <>
               <View style={styles.statusChipsRow}>
@@ -390,7 +393,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                 <View
                   style={[
                     styles.statusChip,
-                    hasPin ? styles.statusChipSuccess : styles.statusChipWarning,
+                    hasPin
+                      ? styles.statusChipSuccess
+                      : styles.statusChipWarning,
                   ]}
                 >
                   <Text
@@ -433,7 +438,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.background,
   },
   container: {
     flexGrow: 1,
@@ -446,37 +451,37 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 15,
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   userName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: COLORS.textPrimary,
   },
   userEmail: {
     fontSize: 14,
-    color: '#1F2937',
+    color: COLORS.textOnMuted,
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
     gap: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: COLORS.border,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   sectionDescription: {
     fontSize: 14,
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   statusChipsRow: {
     flexDirection: 'row',
@@ -490,32 +495,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusChipSuccess: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#34D399',
+    backgroundColor: COLORS.successBackground,
+    borderColor: COLORS.successBorder,
   },
   statusChipWarning: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
+    backgroundColor: COLORS.warningBackground,
+    borderColor: COLORS.warningBorder,
   },
   statusChipMuted: {
-    backgroundColor: '#F1F5F9',
-    borderColor: '#CBD5E1',
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.mutedBorder,
   },
   statusChipTextSuccess: {
-    color: '#047857',
+    color: COLORS.successText,
     fontWeight: '600',
   },
   statusChipTextWarning: {
-    color: '#B45309',
+    color: COLORS.warningText,
     fontWeight: '600',
   },
   statusChipTextMuted: {
-    color: '#475569',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   sectionFootnote: {
     fontSize: 12,
-    color: '#64748B',
+    color: COLORS.textTertiary,
     marginTop: 4,
   },
   fieldGroup: {
@@ -524,19 +529,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#F8FAFC',
-    color: '#0F172A',
+    backgroundColor: COLORS.background,
+    color: COLORS.textPrimary,
   },
   errorText: {
-    color: '#DC2626',
+    color: COLORS.error,
     fontSize: 13,
   },
   primaryButton: {
@@ -544,10 +549,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -559,11 +564,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#E11D48',
-    backgroundColor: '#FEF2F2',
+    borderColor: COLORS.errorBorder,
+    backgroundColor: COLORS.errorBackground,
   },
   secondaryButtonText: {
-    color: '#BE123C',
+    color: COLORS.errorText,
     fontWeight: '600',
   },
   pinStatusRow: {
@@ -574,7 +579,7 @@ const styles = StyleSheet.create({
   },
   pinStatusText: {
     fontSize: 13,
-    color: '#1F2937',
+    color: COLORS.textOnMuted,
   },
   backButton: {
     alignSelf: 'center',
@@ -582,12 +587,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#2563EB',
-    backgroundColor: '#EFF6FF',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.infoBackground,
     marginBottom: 12,
   },
   backButtonText: {
-    color: '#1D4ED8',
+    color: COLORS.infoText,
     fontWeight: '600',
     fontSize: 15,
   },

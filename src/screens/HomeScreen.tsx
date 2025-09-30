@@ -16,6 +16,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useOneSignalNotifications } from '../notifications/OneSignalProvider';
 import { MembershipBenefit } from '../types/auth';
+import { COLORS } from '../config/theme';
 
 export const getMaxDiscount = (
   benefits: MembershipBenefit[],
@@ -404,7 +405,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
   },
   container: {
     flexGrow: 1,
@@ -417,11 +418,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   subtitle: {
     fontSize: 16,
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   notificationBanner: {
     borderRadius: 16,
@@ -431,12 +432,12 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   notificationBannerPromotion: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#F59E0B',
+    backgroundColor: COLORS.warningBackground,
+    borderColor: COLORS.warningBorder,
   },
   notificationBannerReminder: {
-    backgroundColor: '#E0F2FE',
-    borderColor: '#0EA5E9',
+    backgroundColor: COLORS.highlightBackground,
+    borderColor: COLORS.highlightBorder,
   },
   notificationBannerContent: {
     gap: 6,
@@ -444,15 +445,15 @@ const styles = StyleSheet.create({
   notificationBannerTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   notificationBannerBody: {
     fontSize: 14,
-    color: '#1F2937',
+    color: COLORS.textOnMuted,
   },
   notificationBannerHint: {
     fontSize: 12,
-    color: '#1D4ED8',
+    color: COLORS.infoText,
   },
   notificationBannerActions: {
     flexDirection: 'row',
@@ -463,31 +464,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
-    backgroundColor: '#FFFFFF',
+    borderColor: COLORS.primaryMuted,
+    backgroundColor: COLORS.surface,
   },
   notificationActionPrimary: {
-    backgroundColor: '#2563EB',
-    borderColor: '#1D4ED8',
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primaryDark,
   },
   notificationActionSecondary: {
     backgroundColor: 'transparent',
   },
   notificationActionText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontWeight: '600',
   },
   notificationActionDismiss: {
-    color: '#1D4ED8',
+    color: COLORS.infoText,
     fontWeight: '600',
   },
   notificationSettings: {
     gap: 16,
     padding: 20,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: COLORS.border,
   },
   preferenceRow: {
     flexDirection: 'row',
@@ -502,15 +503,15 @@ const styles = StyleSheet.create({
   preferenceTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   preferenceDescription: {
     fontSize: 14,
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   preferenceNote: {
     fontSize: 13,
-    color: '#1D4ED8',
+    color: COLORS.infoText,
   },
   manageProfileButton: {
     alignSelf: 'flex-start',
@@ -518,32 +519,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 999,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: COLORS.highlightBackground,
     borderWidth: 1,
-    borderColor: '#38BDF8',
+    borderColor: COLORS.highlightBorder,
   },
   manageProfileButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0369A1',
+    color: COLORS.highlightText,
   },
   button: {
     marginTop: 24,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     borderRadius: 12,
     alignSelf: 'center',
   },
   buttonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontWeight: '600',
     fontSize: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1E293B',
+    color: COLORS.textPrimary,
     marginBottom: 12,
   },
   quickActionsContainer: {
@@ -555,15 +556,15 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   quickActionButton: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: COLORS.surfaceMuted,
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.border,
   },
   quickActionLabel: {
-    color: '#1D4ED8',
+    color: COLORS.infoText,
     fontWeight: '600',
   },
 });

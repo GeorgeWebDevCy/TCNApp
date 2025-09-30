@@ -1,0 +1,53 @@
+export const theme = {
+  colors: {
+    primary: '#2563EB',
+    primaryDark: '#1E3A8A',
+    primaryLight: '#60A5FA',
+    primaryLighter: '#93C5FD',
+    primaryMuted: '#DBEAFE',
+    background: '#F8FAFC',
+    surface: '#FFFFFF',
+    surfaceMuted: '#F1F5F9',
+    textPrimary: '#0F172A',
+    textSecondary: '#475569',
+    textTertiary: '#64748B',
+    textOnPrimary: '#FFFFFF',
+    textOnMuted: '#1F2937',
+    border: '#CBD5F5',
+    mutedBorder: '#CBD5E1',
+    overlay: 'rgba(15, 23, 42, 0.96)',
+    overlayMuted: 'rgba(148, 163, 184, 0.2)',
+    overlaySoft: 'rgba(15, 23, 42, 0.6)',
+    overlaySubtle: 'rgba(148, 163, 184, 0.3)',
+    overlayText: 'rgba(148, 163, 184, 0.9)',
+    overlayTextMuted: 'rgba(148, 163, 184, 0.7)',
+    success: '#22C55E',
+    successBackground: '#ECFDF5',
+    successBorder: '#34D399',
+    successText: '#047857',
+    successSurface: 'rgba(34, 197, 94, 0.12)',
+    warning: '#F59E0B',
+    warningBackground: '#FEF3C7',
+    warningBorder: '#F59E0B',
+    warningText: '#B45309',
+    warningSurface: 'rgba(251, 191, 36, 0.12)',
+    error: '#DC2626',
+    errorBackground: '#FEF2F2',
+    errorBorder: '#E11D48',
+    errorText: '#BE123C',
+    errorSurface: 'rgba(248, 113, 113, 0.12)',
+    infoBackground: '#EFF6FF',
+    infoText: '#1D4ED8',
+    highlightBackground: '#E0F2FE',
+    highlightBorder: '#38BDF8',
+    highlightText: '#0369A1',
+    infoSurface: 'rgba(37, 99, 235, 0.12)',
+    accentSurface: 'rgba(16, 185, 129, 0.12)',
+  },
+} as const;
+
+export const COLORS = theme.colors;
+
+export type Theme = typeof theme;
+
+export type ThemeColors = Theme['colors'];
