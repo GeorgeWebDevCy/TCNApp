@@ -11,6 +11,7 @@ import {
 export interface PersistedSession {
   token?: string;
   refreshToken?: string;
+  tokenLoginUrl?: string | null;
   user: AuthUser | null;
   locked: boolean;
 }
@@ -220,8 +221,12 @@ const fetchWithRouteFallback = async (
   path: string,
   init?: RequestInit,
 ): Promise<Response> => {
+  const requestInit: RequestInit = {
+    ...(init ?? {}),
+    credentials: init?.credentials ?? 'include',
+  };
   const primaryUrl = buildUrl(path);
-  const primaryResponse = await fetch(primaryUrl, init);
+  const primaryResponse = await fetch(primaryUrl, requestInit);
 
   if (primaryResponse.status !== 404) {
     return primaryResponse;
@@ -244,7 +249,35 @@ const fetchWithRouteFallback = async (
   }
 
   const fallbackUrl = buildRestRouteUrl(path);
-  return fetch(fallbackUrl, init);
+  return fetch(fallbackUrl, requestInit);
+};
+
+const hydrateWordPressCookieSession = async (
+  tokenLoginUrl?: string | null,
+  token?: string,
+): Promise<void> => {
+  const resolvedUrl =
+    typeof tokenLoginUrl === 'string' ? tokenLoginUrl.trim() : '';
+
+  if (!resolvedUrl) {
+    return;
+  }
+
+  const headers: Record<string, string> | undefined = token
+    ? {
+        Authorization: `Bearer ${token}`,
+      }
+    : undefined;
+
+  try {
+    await fetch(resolvedUrl, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+  } catch (error) {
+    // Best-effort: lack of a cookie should not block password changes outright.
+  }
 };
 
 const parseDiscountValue = (value: unknown): number | undefined => {
@@ -433,6 +466,7 @@ export const hasPasswordAuthenticated = async (): Promise<boolean> => {
 const storeSession = async ({
   token,
   refreshToken,
+  tokenLoginUrl,
   user,
 }: Omit<PersistedSession, 'locked'>) => {
   const entries: [string, string][] = [];
@@ -456,6 +490,12 @@ const storeSession = async ({
     removals.push(AUTH_STORAGE_KEYS.userProfile);
   }
 
+  if (tokenLoginUrl) {
+    entries.push([AUTH_STORAGE_KEYS.tokenLoginUrl, tokenLoginUrl]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.tokenLoginUrl);
+  }
+
   if (entries.length > 0) {
     await AsyncStorage.multiSet(entries);
   }
@@ -477,6 +517,7 @@ export const persistSessionSnapshot = async (
   await storeSession({
     token: session.token,
     refreshToken: session.refreshToken,
+    tokenLoginUrl: session.tokenLoginUrl ?? undefined,
     user: session.user,
   });
 
@@ -492,17 +533,24 @@ export const clearSession = async () => {
     AUTH_STORAGE_KEYS.userProfile,
     AUTH_STORAGE_KEYS.sessionLock,
     AUTH_STORAGE_KEYS.passwordAuthenticated,
+    AUTH_STORAGE_KEYS.tokenLoginUrl,
   ]);
 };
 
 export const restoreSession = async (): Promise<PersistedSession | null> => {
-  const [[, storedToken], [, storedRefreshToken], [, userJson], [, lockValue]] =
-    await AsyncStorage.multiGet([
-      AUTH_STORAGE_KEYS.token,
-      AUTH_STORAGE_KEYS.refreshToken,
-      AUTH_STORAGE_KEYS.userProfile,
-      AUTH_STORAGE_KEYS.sessionLock,
-    ]);
+  const [
+    [, storedToken],
+    [, storedRefreshToken],
+    [, userJson],
+    [, lockValue],
+    [, storedTokenLoginUrl],
+  ] = await AsyncStorage.multiGet([
+    AUTH_STORAGE_KEYS.token,
+    AUTH_STORAGE_KEYS.refreshToken,
+    AUTH_STORAGE_KEYS.userProfile,
+    AUTH_STORAGE_KEYS.sessionLock,
+    AUTH_STORAGE_KEYS.tokenLoginUrl,
+  ]);
 
   const token = storedToken && storedToken.length > 0 ? storedToken : undefined;
   const refreshToken =
@@ -527,6 +575,10 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
   return {
     token,
     refreshToken,
+    tokenLoginUrl:
+      storedTokenLoginUrl && storedTokenLoginUrl.length > 0
+        ? storedTokenLoginUrl
+        : undefined,
     user,
     locked: lockValue === 'locked',
   };
@@ -691,14 +743,22 @@ export const loginWithPassword = async ({
       ? json.token
       : undefined;
 
+  const tokenLoginUrl =
+    typeof json.token_login_url === 'string' &&
+    json.token_login_url.trim().length > 0
+      ? json.token_login_url
+      : undefined;
+
   const session: PersistedSession = {
     token,
     user,
+    tokenLoginUrl,
     locked: false,
   };
 
   await storeSession(session);
   await markPasswordAuthenticated();
+  await hydrateWordPressCookieSession(tokenLoginUrl, token);
 
   return session;
 };
@@ -708,11 +768,13 @@ export const updatePassword = async ({
   currentPassword,
   newPassword,
   confirmPassword,
+  tokenLoginUrl,
 }: {
   token: string;
   currentPassword: string;
   newPassword: string;
   confirmPassword?: string;
+  tokenLoginUrl?: string | null;
 }): Promise<void> => {
   const trimmedCurrent = currentPassword.trim();
   const trimmedNew = newPassword.trim();
@@ -721,6 +783,8 @@ export const updatePassword = async ({
   if (!trimmedCurrent || !trimmedNew) {
     throw new Error('Unable to change password.');
   }
+
+  await hydrateWordPressCookieSession(tokenLoginUrl, token);
 
   const response = await fetchWithRouteFallback(
     WORDPRESS_CONFIG.endpoints.changePassword,

@@ -533,9 +533,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       }
 
       try {
-        const session = sessionRef.current ?? (await ensureValidSession());
+        let session = sessionRef.current ?? (await ensureValidSession());
         if (!session || !session.token) {
           throw new Error('Unable to change password.');
+        }
+
+        const identifier = state.user?.email?.trim();
+        if (identifier) {
+          const reauthenticatedSession = await loginWithWordPress({
+            username: identifier,
+            password: currentPassword,
+          });
+
+          if (!reauthenticatedSession.token) {
+            throw new Error('Unable to change password.');
+          }
+
+          session = reauthenticatedSession;
         }
 
         sessionRef.current = session;
@@ -544,6 +558,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           token: session.token,
           currentPassword,
           newPassword,
+          tokenLoginUrl: session.tokenLoginUrl,
         });
         await refreshSession();
         deviceLog.success('Password updated successfully');
@@ -554,7 +569,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           : new Error('Unable to change password.');
       }
     },
-    [ensureValidSession, refreshSession, state.hasPasswordAuthenticated],
+    [
+      ensureValidSession,
+      loginWithWordPress,
+      refreshSession,
+      state.hasPasswordAuthenticated,
+      state.user?.email,
+    ],
   );
 
   const value = useMemo<AuthContextValue>(

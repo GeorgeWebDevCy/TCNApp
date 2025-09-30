@@ -27,4 +27,5 @@ export const AUTH_STORAGE_KEYS = {
   userProfile: '@tcnapp/user-profile',
   sessionLock: '@tcnapp/session-locked',
   passwordAuthenticated: '@tcnapp/password-authenticated',
+  tokenLoginUrl: '@tcnapp/wp-token-login-url',
 };
