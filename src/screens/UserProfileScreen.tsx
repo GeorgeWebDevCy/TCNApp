@@ -14,6 +14,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
 import { COLORS } from '../config/theme';
+import { BrandLogo } from '../components/BrandLogo';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -196,6 +197,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.brandWrapper}>
+          <BrandLogo orientation="horizontal" />
+        </View>
         <View style={styles.header}>
           <Text style={styles.title}>{t('profile.title')}</Text>
           <Text style={styles.subtitle}>{t('profile.subtitle')}</Text>
@@ -444,6 +448,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: 24,
     gap: 24,
+  },
+  brandWrapper: {
+    alignItems: 'center',
   },
   header: {
     gap: 6,

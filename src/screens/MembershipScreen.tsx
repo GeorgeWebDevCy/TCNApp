@@ -22,6 +22,7 @@ import {
 } from '../services/membershipService';
 import { MembershipPlan } from '../types/auth';
 import { COLORS } from '../config/theme';
+import { BrandLogo } from '../components/BrandLogo';
 
 type MembershipScreenProps = {
   onBack?: () => void;
@@ -261,6 +262,9 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         contentContainerStyle={styles.container}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.brandWrapper}>
+          <BrandLogo orientation="horizontal" />
+        </View>
         <View style={styles.header}>
           <Pressable
             onPress={onBack}
@@ -347,6 +351,9 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 40,
     gap: 20,
+  },
+  brandWrapper: {
+    alignItems: 'center',
   },
   header: {
     gap: 8,

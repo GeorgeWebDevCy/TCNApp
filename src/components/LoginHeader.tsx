@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { COLORS } from '../config/theme';
+import { BrandLogo } from './BrandLogo';
 
 interface LoginHeaderProps {
   title?: string;
@@ -28,7 +29,9 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
     <View style={styles.container}>
       {logoSource ? (
         <Image source={logoSource} style={styles.logo} resizeMode="contain" />
-      ) : null}
+      ) : (
+        <BrandLogo size={96} orientation="vertical" />
+      )}
       <Text style={styles.title}>{resolvedTitle}</Text>
       <Text style={styles.subtitle}>{resolvedSubtitle}</Text>
     </View>

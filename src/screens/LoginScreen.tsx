@@ -180,10 +180,7 @@ export const LoginScreen: React.FC = () => {
           <LanguageSwitcher />
         </View>
         <View style={styles.card}>
-          <LoginHeader
-            title={t('common.appName')}
-            subtitle={greeting ?? t('login.subtitle')}
-          />
+          <LoginHeader subtitle={greeting ?? t('login.subtitle')} />
 
           {lockMessage ? (
             <Text style={styles.lockMessage}>{lockMessage}</Text>
