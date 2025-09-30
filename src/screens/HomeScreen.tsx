@@ -38,11 +38,21 @@ export const getMaxDiscount = (
   return Math.max(...values.map(value => Math.round(value * 100) / 100));
 };
 
-type HomeScreenProps = {
-  onManageProfile?: () => void;
+type QuickAction = {
+  key: 'vendors' | 'upgrade';
+  label: string;
+  message: string;
 };
 
-export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
+type HomeScreenProps = {
+  onManageProfile?: () => void;
+  onUpgradeMembership?: () => void;
+};
+
+export const HomeScreen: React.FC<HomeScreenProps> = ({
+  onManageProfile,
+  onUpgradeMembership,
+}) => {
   const { state, logout } = useAuthContext();
   const user = state.user;
   const membership = state.membership ?? state.user?.membership ?? null;
@@ -106,7 +116,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
     });
   }, [membership, t]);
 
-  const quickActions = useMemo(
+  const quickActions: QuickAction[] = useMemo(
     () => [
       {
         key: 'vendors',
@@ -123,10 +133,17 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
   );
 
   const handleQuickAction = useCallback(
-    (message: string) => {
-      Alert.alert(t('home.quickActions.comingSoonTitle'), message);
+    (action: QuickAction) => {
+      if (action.key === 'upgrade') {
+        if (onUpgradeMembership) {
+          onUpgradeMembership();
+          return;
+        }
+      }
+
+      Alert.alert(t('home.quickActions.comingSoonTitle'), action.message);
     },
-    [t],
+    [onUpgradeMembership, t],
   );
 
   const notificationTitle = useMemo(() => {
@@ -151,16 +168,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
     }
 
     if (activeNotification.target === 'vendors') {
-      handleQuickAction(t('home.notifications.vendorNavigationMessage'));
+      handleQuickAction({
+        key: 'vendors',
+        label: t('home.quickActions.viewVendors'),
+        message: t('home.notifications.vendorNavigationMessage'),
+      });
     } else if (activeNotification.target === 'membership') {
-      Alert.alert(
-        t('home.notifications.membershipNavigationTitle'),
-        t('home.notifications.membershipNavigationMessage'),
-      );
+      if (onUpgradeMembership) {
+        onUpgradeMembership();
+      } else {
+        Alert.alert(
+          t('home.notifications.membershipNavigationTitle'),
+          t('home.notifications.membershipNavigationMessage'),
+        );
+      }
     }
 
     clearActiveNotification();
-  }, [activeNotification, clearActiveNotification, handleQuickAction, t]);
+  }, [
+    activeNotification,
+    clearActiveNotification,
+    handleQuickAction,
+    onUpgradeMembership,
+    t,
+  ]);
 
   const handleNotificationDismiss = useCallback(() => {
     clearActiveNotification();
@@ -172,12 +203,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
     }
 
     if (pendingNavigationTarget === 'vendors') {
-      handleQuickAction(t('home.notifications.vendorNavigationMessage'));
+      handleQuickAction({
+        key: 'vendors',
+        label: t('home.quickActions.viewVendors'),
+        message: t('home.notifications.vendorNavigationMessage'),
+      });
     } else if (pendingNavigationTarget === 'membership') {
-      Alert.alert(
-        t('home.notifications.membershipNavigationTitle'),
-        t('home.notifications.membershipNavigationMessage'),
-      );
+      if (onUpgradeMembership) {
+        onUpgradeMembership();
+      } else {
+        Alert.alert(
+          t('home.notifications.membershipNavigationTitle'),
+          t('home.notifications.membershipNavigationMessage'),
+        );
+      }
     }
 
     consumeNavigationTarget();
@@ -187,6 +226,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
     consumeNavigationTarget,
     handleQuickAction,
     pendingNavigationTarget,
+    onUpgradeMembership,
     t,
   ]);
 
@@ -339,7 +379,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ onManageProfile }) => {
             {quickActions.map(action => (
               <Pressable
                 key={action.key}
-                onPress={() => handleQuickAction(action.message)}
+                onPress={() => handleQuickAction(action)}
                 style={styles.quickActionButton}
                 accessibilityRole="button"
               >
