@@ -203,6 +203,17 @@ export const translations: Record<Language, TranslationDictionary> = {
         removedTitle: 'PIN removed',
         removedMessage: 'Your saved PIN has been removed.',
       },
+      biometric: {
+        heading: 'Biometric login',
+        description:
+          'Use biometrics for quicker access from the login screen.',
+        available: '{{method}} is available on this device.',
+        unavailable: 'Biometric login is not available on this device.',
+        pinReady: 'PIN ready for quick login.',
+        pinRequired: 'Set a PIN to enable quick login.',
+        instructions:
+          'After saving a PIN, open the login screen and choose biometrics to sign in with your fingerprint.',
+      },
       actions: {
         back: 'Back to home',
       },
@@ -425,6 +436,17 @@ export const translations: Record<Language, TranslationDictionary> = {
         removeConfirmConfirm: 'ลบ',
         removedTitle: 'ลบพินแล้ว',
         removedMessage: 'พินของคุณถูกลบเรียบร้อยแล้ว.',
+      },
+      biometric: {
+        heading: 'เข้าสู่ระบบด้วยข้อมูลชีวภาพ',
+        description:
+          'ใช้ลายนิ้วมือหรือ Face ID เพื่อเข้าสู่ระบบได้รวดเร็วยิ่งขึ้นจากหน้าล็อกอิน.',
+        available: '{{method}} สามารถใช้งานได้บนอุปกรณ์นี้',
+        unavailable: 'อุปกรณ์นี้ไม่รองรับการเข้าสู่ระบบด้วยข้อมูลชีวภาพ',
+        pinReady: 'มีพินพร้อมสำหรับการเข้าสู่ระบบแบบด่วนแล้ว',
+        pinRequired: 'ต้องตั้งค่าพินเพื่อเปิดใช้การเข้าสู่ระบบแบบด่วน',
+        instructions:
+          'เมื่อบันทึกพินแล้ว ให้ไปที่หน้าล็อกอินและเลือกใช้งานข้อมูลชีวภาพเพื่อลงชื่อเข้าใช้ด้วยลายนิ้วมือของคุณ.',
       },
       actions: {
         back: 'กลับสู่หน้าหลัก',

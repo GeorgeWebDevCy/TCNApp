@@ -337,9 +337,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     [state.hasPasswordAuthenticated, state.membership],
   );
 
+  const canManagePin = useMemo(
+    () => state.hasPasswordAuthenticated || (state.isAuthenticated && !!state.user),
+    [state.hasPasswordAuthenticated, state.isAuthenticated, state.user],
+  );
+
   const registerPin = useCallback(
     async (pin: string) => {
-      if (!state.hasPasswordAuthenticated) {
+      if (!canManagePin) {
         throw new Error(
           'Please log in with your username and password before creating a PIN.',
         );
@@ -354,18 +359,18 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 
       await persistPin(pin);
     },
-    [state.hasPasswordAuthenticated],
+    [canManagePin],
   );
 
   const removePin = useCallback(async () => {
-    if (!state.hasPasswordAuthenticated) {
+    if (!canManagePin) {
       throw new Error(
         'Please log in with your username and password before changing your PIN.',
       );
     }
 
     await clearPin();
-  }, [state.hasPasswordAuthenticated]);
+  }, [canManagePin]);
 
   const logout = useCallback(async () => {
     await setSessionLock(true);
