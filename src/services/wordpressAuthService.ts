@@ -395,6 +395,24 @@ const storeSession = async ({
   await setSessionLock(false);
 };
 
+export const persistSessionSnapshot = async (
+  session: PersistedSession | null,
+): Promise<void> => {
+  if (!session) {
+    return;
+  }
+
+  await storeSession({
+    token: session.token,
+    refreshToken: session.refreshToken,
+    user: session.user,
+  });
+
+  if (session.locked) {
+    await setSessionLock(true);
+  }
+};
+
 export const clearSession = async () => {
   await AsyncStorage.multiRemove([
     AUTH_STORAGE_KEYS.token,
