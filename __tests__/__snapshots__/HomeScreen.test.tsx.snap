@@ -194,6 +194,121 @@ exports[`HomeScreen renders the membership overview 1`] = `
           </View>
         </View>
       </View>
+      <View
+        style={
+          {
+            "marginTop": 8,
+          }
+        }
+      >
+        <View
+          accessibilityRole="header"
+          style={
+            [
+              {
+                "alignItems": "center",
+                "gap": 12,
+              },
+              {
+                "alignSelf": "center",
+              },
+              undefined,
+            ]
+          }
+        >
+          <View
+            style={
+              [
+                {
+                  "alignItems": "center",
+                  "backgroundColor": "#2563EB",
+                  "elevation": 3,
+                  "justifyContent": "center",
+                  "paddingHorizontal": 12,
+                  "shadowColor": "#00000033",
+                  "shadowOffset": {
+                    "height": 4,
+                    "width": 0,
+                  },
+                  "shadowOpacity": 0.24,
+                  "shadowRadius": 8,
+                },
+                {
+                  "borderRadius": 32,
+                  "height": 64,
+                  "width": 64,
+                },
+              ]
+            }
+          >
+            <Text
+              style={
+                [
+                  {
+                    "color": "#FFFFFF",
+                    "fontWeight": "700",
+                    "letterSpacing": 2,
+                  },
+                  {
+                    "fontSize": 24.32,
+                  },
+                ]
+              }
+            >
+              TCN
+            </Text>
+          </View>
+          <View
+            style={
+              [
+                {
+                  "gap": 4,
+                },
+                {
+                  "alignItems": "center",
+                },
+              ]
+            }
+          >
+            <Text
+              accessibilityRole="text"
+              style={
+                [
+                  {
+                    "color": "#0F172A",
+                    "fontSize": 20,
+                    "fontWeight": "700",
+                    "textAlign": "center",
+                  },
+                  {
+                    "textAlign": "center",
+                  },
+                ]
+              }
+            >
+              The Consumer Network
+            </Text>
+            <Text
+              accessibilityRole="text"
+              style={
+                [
+                  {
+                    "color": "#475569",
+                    "fontSize": 14,
+                    "fontWeight": "600",
+                    "textAlign": "center",
+                  },
+                  {
+                    "textAlign": "center",
+                  },
+                ]
+              }
+            >
+              Trusted as TCN
+            </Text>
+          </View>
+        </View>
+      </View>
       <Text
         style={
           {
