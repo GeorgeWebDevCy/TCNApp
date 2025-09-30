@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { WORDPRESS_CONFIG } from '../src/config/authConfig';
 import { loginWithPassword } from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -45,13 +46,13 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      'http://dominicb72.sg-host.com/wp-json/gn/v1/login',
+      `${WORDPRESS_CONFIG.baseUrl}/wp-json/gn/v1/login`,
       expect.objectContaining({ method: 'POST' }),
     );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      'http://dominicb72.sg-host.com/?rest_route=/gn/v1/login',
+      `${WORDPRESS_CONFIG.baseUrl}/?rest_route=/gn/v1/login`,
       expect.objectContaining({ method: 'POST' }),
     );
 
@@ -59,7 +60,12 @@ describe('wordpressAuthService', () => {
       expect.arrayContaining([
         [
           '@tcnapp/user-profile',
-          JSON.stringify({ id: 42, email: 'member@example.com', name: 'Member Example', membership: null }),
+          JSON.stringify({
+            id: 42,
+            email: 'member@example.com',
+            name: 'Member Example',
+            membership: null,
+          }),
         ],
       ]),
     );

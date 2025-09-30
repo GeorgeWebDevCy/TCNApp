@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useReducer } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import deviceLog from '../utils/deviceLog';
 import {
   authenticateWithBiometrics,
@@ -21,7 +27,9 @@ import {
   refreshPersistedUserProfile,
   updatePassword as updateWordPressPassword,
   setSessionLock,
+  persistSessionSnapshot,
 } from '../services/wordpressAuthService';
+import type { PersistedSession } from '../services/wordpressAuthService';
 import {
   AuthContextValue,
   AuthState,
@@ -151,11 +159,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
+  const sessionRef = useRef<PersistedSession | null>(null);
 
   const bootstrap = useCallback(async () => {
     dispatch({ type: 'BOOTSTRAP_START' });
 
     const session = await ensureValidSession();
+    sessionRef.current = session;
     const passwordAuthenticated =
       (await hasPasswordAuthenticated()) &&
       Boolean(session) &&
@@ -180,6 +190,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     dispatch({ type: 'LOGIN_START' });
     try {
       const session = await loginWithWordPress(options);
+      sessionRef.current = session;
       await setSessionLock(false);
       await markPasswordAuthenticated();
       dispatch({
@@ -218,6 +229,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           );
         }
 
+        sessionRef.current = session;
         await setSessionLock(false);
 
         if (!session.user) {
@@ -231,6 +243,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             );
           }
 
+          sessionRef.current = { ...session, user: refreshedUser };
           dispatch({
             type: 'LOGIN_SUCCESS',
             payload: {
@@ -289,6 +302,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           );
         }
 
+        sessionRef.current = session;
         await setSessionLock(false);
 
         if (!session.user) {
@@ -302,6 +316,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             );
           }
 
+          sessionRef.current = { ...session, user: refreshedUser };
           dispatch({
             type: 'LOGIN_SUCCESS',
             payload: {
@@ -338,7 +353,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   );
 
   const canManagePin = useMemo(
-    () => state.hasPasswordAuthenticated || (state.isAuthenticated && !!state.user),
+    () =>
+      state.hasPasswordAuthenticated || (state.isAuthenticated && !!state.user),
     [state.hasPasswordAuthenticated, state.isAuthenticated, state.user],
   );
 
@@ -350,7 +366,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         );
       }
 
-      const session = await ensureValidSession();
+      let session = await ensureValidSession();
+      if (!session && sessionRef.current) {
+        await persistSessionSnapshot(sessionRef.current);
+        session = await ensureValidSession();
+      }
       if (!session) {
         throw new Error(
           'You must log in with your password before setting a PIN.',
@@ -376,6 +396,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     await setSessionLock(true);
     await clearPasswordAuthenticated();
     deviceLog.info('Session locked. User logged out.');
+    sessionRef.current = null;
     dispatch({
       type: 'SET_LOCKED',
       payload: {
@@ -409,10 +430,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     if (!session) {
       await clearSession();
       await clearPin();
+      sessionRef.current = null;
       dispatch({ type: 'LOGOUT' });
       return;
     }
 
+    sessionRef.current = session;
     const passwordAuthenticated =
       (await hasPasswordAuthenticated()) && !session.locked;
 
