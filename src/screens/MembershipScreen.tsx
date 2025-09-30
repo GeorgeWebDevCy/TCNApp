@@ -18,6 +18,7 @@ import {
   confirmMembershipUpgrade,
   createMembershipPaymentSession,
   fetchMembershipPlans,
+  DEFAULT_MEMBERSHIP_PLANS,
 } from '../services/membershipService';
 import { MembershipPlan } from '../types/auth';
 
@@ -126,6 +127,18 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
     [plans, selectedPlanId],
   );
 
+  const applyPlans = useCallback((availablePlans: MembershipPlan[]) => {
+    const normalizedPlans =
+      availablePlans.length > 0 ? availablePlans : DEFAULT_MEMBERSHIP_PLANS;
+
+    setPlans(normalizedPlans);
+    setSelectedPlanId(
+      normalizedPlans.find(plan => plan.highlight)?.id ??
+        normalizedPlans[0]?.id ??
+        null,
+    );
+  }, []);
+
   const renderPlan = useCallback(
     ({ item }: { item: MembershipPlan }) => (
       <PlanCard
@@ -156,22 +169,18 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       setError(null);
       const token = await getSessionToken();
       const fetchedPlans = await fetchMembershipPlans(token ?? undefined);
-      setPlans(fetchedPlans);
-      setSelectedPlanId(
-        fetchedPlans.find(plan => plan.highlight)?.id ??
-          fetchedPlans[0]?.id ??
-          null,
-      );
+      applyPlans(fetchedPlans);
     } catch (loadError) {
       const message =
         loadError instanceof Error
           ? loadError.message
           : t('membership.screen.loadError');
       setError(message);
+      applyPlans([]);
     } finally {
       setLoading(false);
     }
-  }, [getSessionToken, t]);
+  }, [applyPlans, getSessionToken, t]);
 
   useEffect(() => {
     loadPlans();
@@ -292,7 +301,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           <Text style={styles.emptyState}>{t('membership.screen.empty')}</Text>
         ) : null}
 
-        {!loading && !error && plans.length > 0 ? (
+        {!loading && plans.length > 0 ? (
           <FlatList
             data={plans}
             keyExtractor={plan => plan.id}

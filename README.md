@@ -1,4 +1,5 @@
-Here's the current README.md for the project. 
+Here's the current README.md for the project.
+
 # Consumer Network Program Overview
 
 ## 📚 Table of Contents
@@ -24,6 +25,7 @@ Here's the current README.md for the project.
 - [⚙️ Development Scripts & Tooling](#-development-scripts--tooling)
 
 ## 🎯 Overview
+
 A membership-based consumer discount network that connects consumers (members) with local vendors.  
 The network operates on a tiered membership and vendor model, providing varying discounts and promotional opportunities.
 
@@ -32,58 +34,62 @@ The network operates on a tiered membership and vendor model, providing varying 
 ## 🪪 Membership Types (Annual Fee)
 
 | Membership Tier | Fee (THB/year) | Upgradeable via Network Program? | Discount Access |
-|-----------------|----------------|----------------------------------|-----------------|
-| Gold            | 1,000          | ✅ Yes                           | Entry-level     |
-| Platinum        | —              | ✅ Yes (via network program)      | Mid-tier        |
-| Black           | 4,000          | ✅ Yes or purchase directly       | Highest         |
+| --------------- | -------------- | -------------------------------- | --------------- |
+| Blue            | Free           | ✅ Base tier                     | App entry       |
+| Gold            | 500            | ✅ Yes                           | Entry-level     |
+| Platinum        | 1,200          | ✅ Yes (via network program)     | Mid-tier        |
+| Black           | 2,000          | ✅ Yes or purchase directly      | Highest         |
 
-- Membership progression: **Gold → Platinum → Black** via the Membership Network Program.  
+- Membership progression: **Blue → Gold → Platinum → Black** via the Membership Network Program.
 - Direct purchase of **Black membership** is available for those not interested in progressing through the network.
+- **Blue membership** is free—download the app to get started and explore vendors.
 
 ---
 
 ## 🏪 Vendor Types
 
-| Vendor Tier | Discounts Offered (Gold / Platinum / Black) | Promotions Allowed        | Fees to Join |
-|-------------|---------------------------------------------|---------------------------|--------------|
-| Sapphire    | 2.5% / 5% / 10%                             | 1 per quarter (free)      | None         |
-| Diamond     | 5% / 10% / 20%                              | 1 per month (free)        | None         |
+| Vendor Tier | Discounts Offered (Gold / Platinum / Black) | Promotions Allowed   | Fees to Join |
+| ----------- | ------------------------------------------- | -------------------- | ------------ |
+| Sapphire    | 2.5% / 5% / 10%                             | 1 per quarter (free) | None         |
+| Diamond     | 5% / 10% / 20%                              | 1 per month (free)   | None         |
 
-- Vendors do **not** pay to join the network.  
-- All discounts are passed **directly to members** — no commission or cut taken by the network.  
+- Vendors do **not** pay to join the network.
+- All discounts are passed **directly to members** — no commission or cut taken by the network.
 - Vendors can submit artwork for promotions; extra promotions available at cost price.
 
 ---
 
 ## 📢 Promotions Summary
 
-| Vendor Tier | Free Promotion Frequency | Channels Used                        | Optional Extra Promotions |
-|-------------|---------------------------|--------------------------------------|---------------------------|
-| Sapphire    | Quarterly (every 3 months)| Email to members, social media       | Available at cost         |
-| Diamond     | Monthly                   | Email + social media (greater reach) | Available at cost         |
+| Vendor Tier | Free Promotion Frequency   | Channels Used                        | Optional Extra Promotions |
+| ----------- | -------------------------- | ------------------------------------ | ------------------------- |
+| Sapphire    | Quarterly (every 3 months) | Email to members, social media       | Available at cost         |
+| Diamond     | Monthly                    | Email + social media (greater reach) | Available at cost         |
 
 ---
 
 ## 🤝 Vendor Network Program (B2B)
-- Vendors can sell **wholesale products** to other vendors within the network.  
-- Allows for **B2B transactions and promotions** to be managed by the network team.  
-- The network assists with setting up these internal wholesale offers.  
+
+- Vendors can sell **wholesale products** to other vendors within the network.
+- Allows for **B2B transactions and promotions** to be managed by the network team.
+- The network assists with setting up these internal wholesale offers.
 
 ---
 
 ## 📈 Membership Network Program
-- Pathway for **Gold members** to upgrade to **Platinum or Black** without purchasing higher tiers directly.  
-- Involves **activities or achievements** (details TBD) that promote community engagement and growth.  
-- Designed to incentivize **loyalty and participation** in the ecosystem.  
+
+- Pathway for **Gold members** to upgrade to **Platinum or Black** without purchasing higher tiers directly.
+- Involves **activities or achievements** (details TBD) that promote community engagement and growth.
+- Designed to incentivize **loyalty and participation** in the ecosystem.
 
 ---
 
 ## 🔁 Discount Summary Table
 
 | Vendor Type | Gold Discount | Platinum Discount | Black Discount |
-|-------------|--------------|-------------------|----------------|
-| Sapphire    | 2.5%         | 5%                | 10%            |
-| Diamond     | 5%           | 10%               | 20%            |
+| ----------- | ------------- | ----------------- | -------------- |
+| Sapphire    | 2.5%          | 5%                | 10%            |
+| Diamond     | 5%            | 10%               | 20%            |
 
 ---
 
@@ -92,12 +98,14 @@ The network operates on a tiered membership and vendor model, providing varying 
 This repository now includes the starter code for a React Native application that integrates with [OneSignal](https://onesignal.com/) for push notifications out of the box.
 
 ### Prerequisites
+
 - [Node.js](https://nodejs.org/) 18 LTS or newer
 - [Yarn](https://classic.yarnpkg.com/) or npm
 - Android Studio and/or Xcode for native builds
 - A OneSignal account with an application ID
 
 ### Getting started
+
 1. Install dependencies
    ```bash
    yarn install
@@ -251,4 +259,4 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 
 - **Node version**: The project expects Node.js 20 or newer as declared in `package.json`.
 - **Scripts**: use `npm run android` / `ios` for native builds, `npm run start` for Metro, `npm run test` for Jest, and `npm run lint` for ESLint checks.【F:package.json†L1-L28】
-- **Testing**: Jest is configured in `__tests__/App.test.tsx` to validate the root `App` component renders; expand this directory with additional coverage as needed.【F:__tests__/App.test.tsx†L1-L24】
+- **Testing**: Jest is configured in `__tests__/App.test.tsx` to validate the root `App` component renders; expand this directory with additional coverage as needed.【F:**tests**/App.test.tsx†L1-L24】

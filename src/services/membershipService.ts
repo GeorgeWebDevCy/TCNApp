@@ -2,6 +2,58 @@ import { MEMBERSHIP_CONFIG } from '../config/membershipConfig';
 import { StripePaymentSession } from '../config/stripeConfig';
 import { MembershipPlan } from '../types/auth';
 
+export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
+  {
+    id: 'blue-membership',
+    name: 'Blue Membership',
+    price: 0,
+    currency: 'THB',
+    interval: 'year',
+    description: 'Free access when you download the app.',
+    features: [
+      'Discover participating vendors and network news.',
+      'Receive general promotions inside the app.',
+    ],
+  },
+  {
+    id: 'gold-membership',
+    name: 'Gold Membership',
+    price: 50000,
+    currency: 'THB',
+    interval: 'year',
+    description: 'Entry-level membership with annual perks.',
+    features: [
+      'Unlock standard member discounts across the network.',
+      'Eligible for Membership Network Program progression.',
+    ],
+    highlight: true,
+  },
+  {
+    id: 'platinum-membership',
+    name: 'Platinum Membership',
+    price: 120000,
+    currency: 'THB',
+    interval: 'year',
+    description: 'Enhanced benefits for engaged members.',
+    features: [
+      'Higher-tier discounts with premium vendors.',
+      'Priority invitations to member events and drops.',
+    ],
+  },
+  {
+    id: 'black-membership',
+    name: 'Black Membership',
+    price: 200000,
+    currency: 'THB',
+    interval: 'year',
+    description: 'Top-tier access for the most dedicated members.',
+    features: [
+      'Maximum partner discounts and VIP perks.',
+      'Exclusive campaigns and concierge support.',
+    ],
+  },
+];
+
 type MembershipPlansResponse = {
   plans?: MembershipPlan[];
 } & Record<string, unknown>;

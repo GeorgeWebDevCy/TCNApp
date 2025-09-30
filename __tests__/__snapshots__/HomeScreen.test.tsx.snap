@@ -755,7 +755,7 @@ exports[`HomeScreen renders the membership overview 1`] = `
                 }
               }
             >
-              Upgrade options
+              Upgrade membership
             </Text>
           </View>
         </View>
