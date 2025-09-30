@@ -719,32 +719,107 @@ export const updatePassword = async ({
 
   const hasValidUserId =
     typeof userId === 'number' && Number.isFinite(userId) && userId > 0;
-  const updateEndpoint = hasValidUserId
-    ? `/wp-json/wp/v2/users/${userId}`
-    : WORDPRESS_CONFIG.endpoints.profile;
+  const baseHeaders = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    Authorization: `Bearer ${token}`,
+  } as const;
 
-  const response = await fetchWithRouteFallback(
-    updateEndpoint,
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ password: trimmedPassword }),
-    },
-  );
+  const buildPayload = () => {
+    const payload: Record<string, unknown> = {
+      password: trimmedPassword,
+    };
 
-  if (!response.ok) {
+    if (hasValidUserId) {
+      payload.id = userId;
+      payload.user_id = userId;
+    }
+
+    return payload;
+  };
+
+  const attemptUpdate = async (
+    path: string,
+    method: 'POST' | 'PUT' | 'PATCH',
+  ): Promise<{ success: true } | { success: false; message: string; status: number }> => {
+    const response = await fetchWithRouteFallback(path, {
+      method,
+      headers: baseHeaders,
+      body: JSON.stringify(buildPayload()),
+    });
+
+    if (response.ok) {
+      return { success: true };
+    }
+
     const message = await extractMessageFromResponse(
       response,
       'Unable to change password.',
     );
-    throw new Error(message);
+
+    return { success: false, message, status: response.status };
+  };
+
+  const profileEndpoint = WORDPRESS_CONFIG.endpoints.profile;
+
+  // WordPress REST setups differ on whether the `users/me` route accepts PUT or POST,
+  // and some installations expect the numeric ID route instead. Try the common cases
+  // in order, only surfacing the final error if every variant fails.
+  const primaryResult = await attemptUpdate(profileEndpoint, 'PUT');
+  if (primaryResult.success) {
+    await refreshPersistedUserProfile(token);
+    return;
   }
 
-  await refreshPersistedUserProfile(token);
+  const primaryMessage = primaryResult.message;
+  const lowerPrimary = primaryMessage.toLowerCase();
+  const shouldRetryProfilePost =
+    primaryResult.status === 405 ||
+    primaryResult.status === 400 ||
+    lowerPrimary.includes('invalid user id') ||
+    lowerPrimary.includes('invalid id');
+
+  if (shouldRetryProfilePost) {
+    const secondaryResult = await attemptUpdate(profileEndpoint, 'POST');
+    if (secondaryResult.success) {
+      await refreshPersistedUserProfile(token);
+      return;
+    }
+
+    const secondaryMessage = secondaryResult.message;
+    const lowerSecondary = secondaryMessage.toLowerCase();
+    const shouldRetryWithUserId =
+      hasValidUserId &&
+      (secondaryResult.status === 400 ||
+        lowerSecondary.includes('invalid user id') ||
+        lowerSecondary.includes('invalid id'));
+
+    if (shouldRetryWithUserId) {
+      const userEndpoint = `/wp-json/wp/v2/users/${userId}`;
+      const userResult = await attemptUpdate(userEndpoint, 'POST');
+      if (userResult.success) {
+        await refreshPersistedUserProfile(token);
+        return;
+      }
+
+      throw new Error(userResult.message);
+    }
+
+    throw new Error(secondaryMessage);
+  }
+
+  if (hasValidUserId) {
+    const userEndpoint = `/wp-json/wp/v2/users/${userId}`;
+    const userResult = await attemptUpdate(userEndpoint, 'POST');
+    if (userResult.success) {
+      await refreshPersistedUserProfile(token);
+      return;
+    }
+
+    throw new Error(userResult.message);
+  }
+
+  throw new Error(primaryMessage);
 };
 
 export const requestPasswordReset = async (
