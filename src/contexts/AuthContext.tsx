@@ -503,6 +503,11 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     });
   }, [state.authMethod, state.membership, state.user]);
 
+  const getSessionToken = useCallback(async () => {
+    const session = sessionRef.current ?? (await ensureValidSession());
+    return session?.token ?? null;
+  }, []);
+
   const registerAccount = useCallback(async (options: RegisterOptions) => {
     try {
       const message = await registerWordPressAccount(options);
@@ -569,13 +574,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           : new Error('Unable to change password.');
       }
     },
-    [
-      ensureValidSession,
-      loginWithWordPress,
-      refreshSession,
-      state.hasPasswordAuthenticated,
-      state.user?.email,
-    ],
+    [refreshSession, state.hasPasswordAuthenticated, state.user?.email],
   );
 
   const value = useMemo<AuthContextValue>(
@@ -590,6 +589,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       logout,
       resetError,
       refreshSession,
+      getSessionToken,
       requestPasswordReset,
       registerAccount,
       resetPasswordWithCode,
@@ -605,6 +605,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       logout,
       resetError,
       refreshSession,
+      getSessionToken,
       requestPasswordReset,
       registerAccount,
       resetPasswordWithCode,

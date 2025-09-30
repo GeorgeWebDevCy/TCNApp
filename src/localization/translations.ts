@@ -139,9 +139,9 @@ export const translations: Record<Language, TranslationDictionary> = {
         heading: 'Quick actions',
         viewVendors: 'View vendors',
         viewVendorsMessage: 'Browse participating vendors in your area.',
-        upgradeOptions: 'Upgrade options',
+        upgradeOptions: 'Upgrade membership',
         upgradeOptionsMessage:
-          'Contact support to explore higher membership tiers.',
+          'Securely upgrade your membership without leaving the app.',
         comingSoonTitle: 'Coming soon',
       },
       notifications: {
@@ -161,7 +161,35 @@ export const translations: Record<Language, TranslationDictionary> = {
         renewalDescription: 'Receive reminders before your membership expires.',
         vendorNavigationMessage: 'Taking you to the partner vendor directory.',
         membershipNavigationTitle: 'Membership',
-        membershipNavigationMessage: 'Opening your membership details.',
+        membershipNavigationMessage: 'Opening the membership upgrade screen.',
+      },
+    },
+    membership: {
+      screen: {
+        title: 'Upgrade membership',
+        subtitle: 'Select a plan and complete your purchase with Stripe.',
+        loading: 'Loading membership plans…',
+        loadError: 'Unable to load membership plans. Please try again.',
+        retry: 'Try again',
+        empty: 'No membership plans are available right now.',
+        planDescription: 'About this plan',
+        planFeatures: 'What’s included',
+        intervals: {
+          day: 'day',
+          week: 'week',
+          month: 'month',
+          year: 'year',
+        },
+        checkoutCta: 'Continue with {{plan}}',
+        selectPlan: 'Select a plan to continue',
+        successTitle: 'Payment successful',
+        successMessage:
+          'Your membership upgrade is processing. New benefits will appear shortly.',
+        successAction: 'Back to home',
+        checkoutErrorTitle: 'Payment interrupted',
+        checkoutError:
+          'Something went wrong while processing your payment. Please try again.',
+        back: 'Back',
       },
     },
     profile: {
@@ -205,8 +233,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       },
       biometric: {
         heading: 'Biometric login',
-        description:
-          'Use biometrics for quicker access from the login screen.',
+        description: 'Use biometrics for quicker access from the login screen.',
         available: '{{method}} is available on this device.',
         unavailable: 'Biometric login is not available on this device.',
         pinReady: 'PIN ready for quick login.',
@@ -375,9 +402,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         heading: 'เมนูลัด',
         viewVendors: 'ดูร้านค้าพันธมิตร',
         viewVendorsMessage: 'สำรวจร้านค้าที่เข้าร่วมในพื้นที่ของคุณ',
-        upgradeOptions: 'ตัวเลือกการอัปเกรด',
-        upgradeOptionsMessage:
-          'ติดต่อทีมงานเพื่อดูตัวเลือกการอัปเกรดระดับสมาชิก',
+        upgradeOptions: 'อัปเกรดสมาชิก',
+        upgradeOptionsMessage: 'อัปเกรดสถานะสมาชิกของคุณได้ทันทีภายในแอป.',
         comingSoonTitle: 'เร็ว ๆ นี้',
       },
       notifications: {
@@ -396,7 +422,34 @@ export const translations: Record<Language, TranslationDictionary> = {
         renewalDescription: 'รับการแจ้งเตือนก่อนที่สถานะสมาชิกของคุณจะหมดอายุ',
         vendorNavigationMessage: 'กำลังเปิดหน้าร้านค้าที่ร่วมรายการ',
         membershipNavigationTitle: 'สมาชิก',
-        membershipNavigationMessage: 'กำลังเปิดรายละเอียดสมาชิกของคุณ',
+        membershipNavigationMessage: 'กำลังเปิดหน้าการอัปเกรดสมาชิก',
+      },
+    },
+    membership: {
+      screen: {
+        title: 'อัปเกรดสมาชิก',
+        subtitle: 'เลือกแผนและชำระเงินผ่าน Stripe ได้อย่างปลอดภัย.',
+        loading: 'กำลังโหลดแผนสมาชิก…',
+        loadError: 'ไม่สามารถโหลดแผนสมาชิกได้ โปรดลองอีกครั้ง.',
+        retry: 'ลองอีกครั้ง',
+        empty: 'ขณะนี้ยังไม่มีแผนสมาชิกให้เลือก.',
+        planDescription: 'รายละเอียดแผน',
+        planFeatures: 'สิ่งที่คุณจะได้รับ',
+        intervals: {
+          day: 'วัน',
+          week: 'สัปดาห์',
+          month: 'เดือน',
+          year: 'ปี',
+        },
+        checkoutCta: 'ดำเนินการต่อกับ {{plan}}',
+        selectPlan: 'โปรดเลือกแผนเพื่อดำเนินการต่อ',
+        successTitle: 'ชำระเงินสำเร็จ',
+        successMessage:
+          'ระบบกำลังอัปเดตสถานะสมาชิกของคุณ สิทธิประโยชน์ใหม่จะปรากฏในไม่ช้า.',
+        successAction: 'กลับสู่หน้าหลัก',
+        checkoutErrorTitle: 'การชำระเงินถูกขัดจังหวะ',
+        checkoutError: 'เกิดข้อผิดพลาดระหว่างการชำระเงิน โปรดลองใหม่อีกครั้ง.',
+        back: 'ย้อนกลับ',
       },
     },
     profile: {
