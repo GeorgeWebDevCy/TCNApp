@@ -30,6 +30,8 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const { t, translateError } = useLocalization();
   const {
     pin: hasPin,
+    biometrics: biometricsAvailable,
+    biometryType,
     loading: pinLoading,
     refresh: refreshAuthAvailability,
   } = useAuthAvailability();
@@ -44,6 +46,15 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSubmitting, setPinSubmitting] = useState(false);
+
+  const biometricLabel = useMemo(() => {
+    if (!biometryType) {
+      return t('biometrics.types.Biometrics');
+    }
+
+    const key = `biometrics.types.${biometryType}`;
+    return t(key);
+  }, [biometryType, t]);
 
   const displayName = useMemo(() => {
     if (!user) {
@@ -342,6 +353,67 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t('profile.biometric.heading')}</Text>
+          <Text style={styles.sectionDescription}>
+            {t('profile.biometric.description')}
+          </Text>
+
+          {pinLoading ? (
+            <ActivityIndicator color="#2563EB" />
+          ) : (
+            <>
+              <View style={styles.statusChipsRow}>
+                <View
+                  style={[
+                    styles.statusChip,
+                    biometricsAvailable
+                      ? styles.statusChipSuccess
+                      : styles.statusChipMuted,
+                  ]}
+                >
+                  <Text
+                    style={
+                      biometricsAvailable
+                        ? styles.statusChipTextSuccess
+                        : styles.statusChipTextMuted
+                    }
+                  >
+                    {biometricsAvailable
+                      ? t('profile.biometric.available', {
+                          replace: { method: biometricLabel },
+                        })
+                      : t('profile.biometric.unavailable')}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.statusChip,
+                    hasPin ? styles.statusChipSuccess : styles.statusChipWarning,
+                  ]}
+                >
+                  <Text
+                    style={
+                      hasPin
+                        ? styles.statusChipTextSuccess
+                        : styles.statusChipTextWarning
+                    }
+                  >
+                    {hasPin
+                      ? t('profile.biometric.pinReady')
+                      : t('profile.biometric.pinRequired')}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.sectionFootnote}>
+                {t('profile.biometric.instructions')}
+              </Text>
+            </>
+          )}
+        </View>
+
         {onBack ? (
           <Pressable
             onPress={onBack}
@@ -405,6 +477,46 @@ const styles = StyleSheet.create({
   sectionDescription: {
     fontSize: 14,
     color: '#475569',
+  },
+  statusChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  statusChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  statusChipSuccess: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#34D399',
+  },
+  statusChipWarning: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F59E0B',
+  },
+  statusChipMuted: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  statusChipTextSuccess: {
+    color: '#047857',
+    fontWeight: '600',
+  },
+  statusChipTextWarning: {
+    color: '#B45309',
+    fontWeight: '600',
+  },
+  statusChipTextMuted: {
+    color: '#475569',
+    fontWeight: '600',
+  },
+  sectionFootnote: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 4,
   },
   fieldGroup: {
     gap: 6,
