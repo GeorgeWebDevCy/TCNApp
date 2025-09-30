@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { COLORS } from '../config/theme';
 
 interface LoginHeaderProps {
   title?: string;
@@ -14,12 +15,20 @@ export const LoginHeader: React.FC<LoginHeaderProps> = ({
   logoSource,
 }) => {
   const { t } = useLocalization();
-  const resolvedTitle = useMemo(() => title ?? t('login.header.title'), [title, t]);
-  const resolvedSubtitle = useMemo(() => subtitle ?? t('login.header.subtitle'), [subtitle, t]);
+  const resolvedTitle = useMemo(
+    () => title ?? t('login.header.title'),
+    [title, t],
+  );
+  const resolvedSubtitle = useMemo(
+    () => subtitle ?? t('login.header.subtitle'),
+    [subtitle, t],
+  );
 
   return (
     <View style={styles.container}>
-      {logoSource ? <Image source={logoSource} style={styles.logo} resizeMode="contain" /> : null}
+      {logoSource ? (
+        <Image source={logoSource} style={styles.logo} resizeMode="contain" />
+      ) : null}
       <Text style={styles.title}>{resolvedTitle}</Text>
       <Text style={styles.subtitle}>{resolvedSubtitle}</Text>
     </View>
@@ -39,10 +48,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#475569',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });

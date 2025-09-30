@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { MembershipInfo } from '../types/auth';
+import { COLORS } from '../config/theme';
 
 interface MembershipCardProps {
   membership: MembershipInfo | null;
@@ -28,19 +29,23 @@ export const MembershipCard: React.FC<MembershipCardProps> = ({
             <Text style={styles.label}>{tierLabel}</Text>
             <Text style={styles.tier}>{membership.tier}</Text>
           </View>
-          {renewalLabel ? <Text style={styles.meta}>{renewalLabel}</Text> : null}
+          {renewalLabel ? (
+            <Text style={styles.meta}>{renewalLabel}</Text>
+          ) : null}
         </>
       ) : (
         <Text style={styles.empty}>{emptyState}</Text>
       )}
-      {discountSummary ? <Text style={styles.summary}>{discountSummary}</Text> : null}
+      {discountSummary ? (
+        <Text style={styles.summary}>{discountSummary}</Text>
+      ) : null}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: COLORS.infoBackground,
     padding: 20,
     borderRadius: 16,
     gap: 12,
@@ -48,7 +53,7 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#312E81',
+    color: COLORS.textPrimary,
   },
   row: {
     flexDirection: 'row',
@@ -57,24 +62,24 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    color: '#4338CA',
+    color: COLORS.infoText,
     fontWeight: '600',
   },
   tier: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1E1B4B',
+    color: COLORS.textPrimary,
   },
   meta: {
     fontSize: 14,
-    color: '#4C1D95',
+    color: COLORS.infoText,
   },
   empty: {
     fontSize: 16,
-    color: '#4338CA',
+    color: COLORS.infoText,
   },
   summary: {
     fontSize: 14,
-    color: '#312E81',
+    color: COLORS.textSecondary,
   },
 });

@@ -1,7 +1,14 @@
 import React, { useMemo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import type { BiometryType } from '../services/biometricService';
+import { COLORS } from '../config/theme';
 
 interface BiometricLoginButtonProps {
   available: boolean;
@@ -27,7 +34,8 @@ export const BiometricLoginButton: React.FC<BiometricLoginButtonProps> = ({
   const { t } = useLocalization();
 
   const label = useMemo(() => {
-    const key = biometryLabelKeyMap[biometryType] ?? 'biometrics.types.Biometrics';
+    const key =
+      biometryLabelKeyMap[biometryType] ?? 'biometrics.types.Biometrics';
     return t(key);
   }, [biometryType, t]);
 
@@ -45,9 +53,11 @@ export const BiometricLoginButton: React.FC<BiometricLoginButtonProps> = ({
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#0EA5E9" />
+          <ActivityIndicator color={COLORS.primary} />
         ) : (
-          <Text style={styles.buttonText}>{t('biometrics.useLabel', { replace: { method: label } })}</Text>
+          <Text style={styles.buttonText}>
+            {t('biometrics.useLabel', { replace: { method: label } })}
+          </Text>
         )}
       </Pressable>
     </View>
@@ -60,7 +70,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   subtitle: {
-    color: '#475569',
+    color: COLORS.textSecondary,
     fontWeight: '500',
   },
   button: {
@@ -68,14 +78,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#0EA5E9',
-    backgroundColor: '#ECFEFF',
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.infoBackground,
   },
   buttonDisabled: {
     opacity: 0.7,
   },
   buttonText: {
-    color: '#0EA5E9',
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '600',
   },

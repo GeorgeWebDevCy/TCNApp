@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { COLORS } from '../config/theme';
 
 interface WordPressLoginFormProps {
   loading?: boolean;
@@ -79,14 +80,18 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
         disabled={disabled}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={COLORS.textOnPrimary} />
         ) : (
           <Text style={styles.primaryButtonText}>{t('auth.forms.submit')}</Text>
         )}
       </Pressable>
 
       <View style={styles.secondaryActions}>
-        <Pressable onPress={onForgotPassword} hitSlop={8} accessibilityRole="link">
+        <Pressable
+          onPress={onForgotPassword}
+          hitSlop={8}
+          accessibilityRole="link"
+        >
           <Text style={styles.linkText}>{t('auth.forms.forgotPassword')}</Text>
         </Pressable>
         <Pressable onPress={onRegister} hitSlop={8} accessibilityRole="link">
@@ -107,27 +112,27 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#1E293B',
+    color: COLORS.textOnMuted,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.surface,
   },
   error: {
-    color: '#DC2626',
+    color: COLORS.error,
     fontSize: 14,
   },
   primaryButton: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -135,7 +140,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -145,7 +150,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   linkText: {
-    color: '#2563EB',
+    color: COLORS.primary,
     fontWeight: '500',
   },
 });

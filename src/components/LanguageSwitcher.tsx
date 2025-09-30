@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Language } from '../localization/translations';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { COLORS } from '../config/theme';
 
 const languageFlags: Record<Language, string> = {
   en: '🇺🇸',
@@ -16,7 +17,7 @@ export const LanguageSwitcher: React.FC = () => {
       { code: 'en', flag: languageFlags.en },
       { code: 'th', flag: languageFlags.th },
     ] as const
-  ).map((option) => ({
+  ).map(option => ({
     ...option,
     label: t(`languages.${option.code}`),
   }));
@@ -24,8 +25,12 @@ export const LanguageSwitcher: React.FC = () => {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.label}>{t('languageSwitcher.label')}</Text>
-      <View style={styles.container} accessibilityRole="radiogroup" accessibilityLabel={t('languageSwitcher.label')}>
-        {options.map((option) => {
+      <View
+        style={styles.container}
+        accessibilityRole="radiogroup"
+        accessibilityLabel={t('languageSwitcher.label')}
+      >
+        {options.map(option => {
           const isActive = option.code === language;
           return (
             <Pressable
@@ -36,7 +41,9 @@ export const LanguageSwitcher: React.FC = () => {
               }}
               accessibilityRole="radio"
               accessibilityState={{ selected: isActive }}
-              accessibilityLabel={t('languageSwitcher.switchTo', { replace: { language: option.label } })}
+              accessibilityLabel={t('languageSwitcher.switchTo', {
+                replace: { language: option.label },
+              })}
               hitSlop={8}
             >
               <Text style={styles.flag}>{option.flag}</Text>
@@ -55,12 +62,12 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: '#475569',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   container: {
     flexDirection: 'row',
-    backgroundColor: '#E2E8F0',
+    backgroundColor: COLORS.background,
     padding: 4,
     borderRadius: 999,
     gap: 8,
@@ -74,8 +81,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   optionActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    backgroundColor: COLORS.surface,
+    shadowColor: COLORS.textPrimary,
     shadowOpacity: 0.1,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },

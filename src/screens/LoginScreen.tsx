@@ -20,6 +20,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
 import { RegisterOptions } from '../types/auth';
+import { COLORS } from '../config/theme';
 
 type AuthTabId = 'password' | 'pin';
 
@@ -34,23 +35,29 @@ export const LoginScreen: React.FC = () => {
     resetError,
     requestPasswordReset,
     registerAccount,
-  } =
-    useAuthContext();
-  const { pin: hasStoredPin, biometrics, biometryType, loading: availabilityLoading, refresh } =
-    useAuthAvailability();
+  } = useAuthContext();
+  const {
+    pin: hasStoredPin,
+    biometrics,
+    biometryType,
+    loading: availabilityLoading,
+    refresh,
+  } = useAuthAvailability();
   const { t, translateError } = useLocalization();
   const [activeTab, setActiveTab] = useState<AuthTabId>('password');
-  const [lastAttempt, setLastAttempt] = useState<'password' | 'pin' | 'biometric' | null>(null);
+  const [lastAttempt, setLastAttempt] = useState<
+    'password' | 'pin' | 'biometric' | null
+  >(null);
   const [pinError, setPinError] = useState<string | null>(null);
   const [isForgotPasswordVisible, setForgotPasswordVisible] = useState(false);
   const [isRegisterVisible, setRegisterVisible] = useState(false);
 
   const authTabs = useMemo(
     () =>
-      ([
+      [
         { id: 'password' as const, label: t('login.tabs.password') },
         { id: 'pin' as const, label: t('login.tabs.pin') },
-      ] satisfies Array<{ id: AuthTabId; label: string }>),
+      ] satisfies Array<{ id: AuthTabId; label: string }>,
     [t],
   );
 
@@ -90,7 +97,8 @@ export const LoginScreen: React.FC = () => {
           t('login.alerts.pinSaved.message'),
         );
       } catch (error) {
-        const message = error instanceof Error ? error.message : 'errors.pinSaveGeneric';
+        const message =
+          error instanceof Error ? error.message : 'errors.pinSaveGeneric';
         setPinError(message);
       }
     },
@@ -106,7 +114,8 @@ export const LoginScreen: React.FC = () => {
         t('login.alerts.pinRemoved.message'),
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'errors.pinRemoveGeneric';
+      const message =
+        error instanceof Error ? error.message : 'errors.pinRemoveGeneric';
       setPinError(message);
     }
   }, [refresh, removePin, t]);
@@ -157,22 +166,31 @@ export const LoginScreen: React.FC = () => {
       : undefined;
   const lockMessage = state.isLocked ? t('login.lockMessage') : undefined;
   const translatedError = translateError(activeError);
-  const passwordError = lastAttempt === 'password' ? translateError(state.error) : null;
+  const passwordError =
+    lastAttempt === 'password' ? translateError(state.error) : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.switcherContainer}>
           <LanguageSwitcher />
         </View>
         <View style={styles.card}>
-          <LoginHeader title={t('common.appName')} subtitle={greeting ?? t('login.subtitle')} />
+          <LoginHeader
+            title={t('common.appName')}
+            subtitle={greeting ?? t('login.subtitle')}
+          />
 
-          {lockMessage ? <Text style={styles.lockMessage}>{lockMessage}</Text> : null}
+          {lockMessage ? (
+            <Text style={styles.lockMessage}>{lockMessage}</Text>
+          ) : null}
 
           <View style={styles.tabRow}>
-            {authTabs.map((tab) => {
+            {authTabs.map(tab => {
               const isActive = tab.id === activeTab;
               return (
                 <Pressable
@@ -181,7 +199,15 @@ export const LoginScreen: React.FC = () => {
                   accessibilityRole="button"
                   style={[styles.tabButton, isActive && styles.tabButtonActive]}
                 >
-                  <Text style={isActive ? styles.tabButtonTextActive : styles.tabButtonText}>{tab.label}</Text>
+                  <Text
+                    style={
+                      isActive
+                        ? styles.tabButtonTextActive
+                        : styles.tabButtonText
+                    }
+                  >
+                    {tab.label}
+                  </Text>
                 </Pressable>
               );
             })}
@@ -238,14 +264,14 @@ export const LoginScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
   },
   scrollContainer: {
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: COLORS.surfaceMuted,
   },
   switcherContainer: {
     width: '100%',
@@ -258,8 +284,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     padding: 24,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
+    backgroundColor: COLORS.surface,
+    shadowColor: COLORS.textPrimary,
     shadowOpacity: 0.08,
     shadowOffset: { width: 0, height: 12 },
     shadowRadius: 24,
@@ -269,7 +295,7 @@ const styles = StyleSheet.create({
   tabRow: {
     flexDirection: 'row',
     gap: 12,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: COLORS.background,
     padding: 4,
     borderRadius: 999,
   },
@@ -279,7 +305,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabButtonActive: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     shadowOpacity: 0.09,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
@@ -289,13 +315,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 10,
     fontWeight: '600',
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   tabButtonTextActive: {
     textAlign: 'center',
     paddingVertical: 10,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   dividerSection: {
     flexDirection: 'row',
@@ -305,15 +331,15 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: COLORS.border,
   },
   dividerText: {
-    color: '#94A3B8',
+    color: COLORS.textSecondary,
     fontWeight: '600',
   },
   lockMessage: {
     textAlign: 'center',
-    color: '#1D4ED8',
+    color: COLORS.infoText,
     fontWeight: '600',
   },
 });

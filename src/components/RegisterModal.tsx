@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { RegisterOptions } from '../types/auth';
+import { COLORS } from '../config/theme';
 
 interface RegisterModalProps {
   visible: boolean;
@@ -18,7 +19,11 @@ interface RegisterModalProps {
   onSubmit: (options: RegisterOptions) => Promise<string | undefined>;
 }
 
-export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, onSubmit }) => {
+export const RegisterModal: React.FC<RegisterModalProps> = ({
+  visible,
+  onClose,
+  onSubmit,
+}) => {
   const { t, translateError } = useLocalization();
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -85,20 +90,37 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
     }
   };
 
-  const translatedError = useMemo(() => (error ? translateError(error) ?? error : null), [error, translateError]);
+  const translatedError = useMemo(
+    () => (error ? translateError(error) ?? error : null),
+    [error, translateError],
+  );
   const isSubmitDisabled =
-    loading || !username.trim() || !email.trim() || !password || !confirmPassword || successMessage !== null;
+    loading ||
+    !username.trim() ||
+    !email.trim() ||
+    !password ||
+    !confirmPassword ||
+    successMessage !== null;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.card}>
           <ScrollView contentContainerStyle={styles.scrollContent}>
             <Text style={styles.title}>{t('auth.registerModal.title')}</Text>
-            <Text style={styles.description}>{t('auth.registerModal.description')}</Text>
+            <Text style={styles.description}>
+              {t('auth.registerModal.description')}
+            </Text>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('auth.registerModal.usernameLabel')}</Text>
+              <Text style={styles.label}>
+                {t('auth.registerModal.usernameLabel')}
+              </Text>
               <TextInput
                 value={username}
                 onChangeText={setUsername}
@@ -111,7 +133,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('auth.registerModal.emailLabel')}</Text>
+              <Text style={styles.label}>
+                {t('auth.registerModal.emailLabel')}
+              </Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
@@ -125,7 +149,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('auth.registerModal.passwordLabel')}</Text>
+              <Text style={styles.label}>
+                {t('auth.registerModal.passwordLabel')}
+              </Text>
               <TextInput
                 value={password}
                 onChangeText={setPassword}
@@ -137,7 +163,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>{t('auth.registerModal.confirmPasswordLabel')}</Text>
+              <Text style={styles.label}>
+                {t('auth.registerModal.confirmPasswordLabel')}
+              </Text>
               <TextInput
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -150,7 +178,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
 
             <View style={styles.row}>
               <View style={styles.halfFormGroup}>
-                <Text style={styles.label}>{t('auth.registerModal.firstNameLabel')}</Text>
+                <Text style={styles.label}>
+                  {t('auth.registerModal.firstNameLabel')}
+                </Text>
                 <TextInput
                   value={firstName}
                   onChangeText={setFirstName}
@@ -160,7 +190,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
                 />
               </View>
               <View style={styles.halfFormGroup}>
-                <Text style={styles.label}>{t('auth.registerModal.lastNameLabel')}</Text>
+                <Text style={styles.label}>
+                  {t('auth.registerModal.lastNameLabel')}
+                </Text>
                 <TextInput
                   value={lastName}
                   onChangeText={setLastName}
@@ -171,25 +203,38 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
               </View>
             </View>
 
-            {translatedError ? <Text style={styles.error}>{translatedError}</Text> : null}
-            {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+            {translatedError ? (
+              <Text style={styles.error}>{translatedError}</Text>
+            ) : null}
+            {successMessage ? (
+              <Text style={styles.success}>{successMessage}</Text>
+            ) : null}
 
             {successMessage === null ? (
               <Pressable
-                style={[styles.primaryButton, isSubmitDisabled && styles.primaryButtonDisabled]}
+                style={[
+                  styles.primaryButton,
+                  isSubmitDisabled && styles.primaryButtonDisabled,
+                ]}
                 onPress={handleSubmit}
                 disabled={isSubmitDisabled}
                 accessibilityRole="button"
               >
                 {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={COLORS.textOnPrimary} />
                 ) : (
-                  <Text style={styles.primaryButtonText}>{t('auth.registerModal.submit')}</Text>
+                  <Text style={styles.primaryButtonText}>
+                    {t('auth.registerModal.submit')}
+                  </Text>
                 )}
               </Pressable>
             ) : null}
 
-            <Pressable onPress={onClose} accessibilityRole="button" style={styles.secondaryButton}>
+            <Pressable
+              onPress={onClose}
+              accessibilityRole="button"
+              style={styles.secondaryButton}
+            >
               <Text style={styles.secondaryButtonText}>
                 {successMessage
                   ? t('auth.registerModal.closeAfterSuccess')
@@ -206,7 +251,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({ visible, onClose, 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: COLORS.overlaySoft,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -215,7 +260,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     maxHeight: '90%',
   },
   scrollContent: {
@@ -225,11 +270,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   description: {
     fontSize: 14,
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   formGroup: {
     gap: 8,
@@ -244,23 +289,23 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    color: '#1E293B',
+    color: COLORS.textOnMuted,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.surface,
   },
   primaryButton: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -268,7 +313,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -278,15 +323,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   secondaryButtonText: {
-    color: '#2563EB',
+    color: COLORS.primary,
     fontWeight: '600',
   },
   error: {
-    color: '#DC2626',
+    color: COLORS.error,
     fontSize: 14,
   },
   success: {
-    color: '#15803D',
+    color: COLORS.success,
     fontSize: 14,
     fontWeight: '500',
   },

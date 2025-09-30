@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { COLORS } from '../config/theme';
 
 interface ForgotPasswordModalProps {
   visible: boolean;
@@ -58,19 +59,33 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
     }
   };
 
-  const translatedError = useMemo(() => (error ? translateError(error) ?? error : null), [error, translateError]);
+  const translatedError = useMemo(
+    () => (error ? translateError(error) ?? error : null),
+    [error, translateError],
+  );
   const isSubmitDisabled = loading || identifier.trim().length === 0;
   const hasSuccess = Boolean(successMessage);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <View style={styles.card}>
-          <Text style={styles.title}>{t('auth.forgotPasswordModal.title')}</Text>
-          <Text style={styles.description}>{t('auth.forgotPasswordModal.description')}</Text>
+          <Text style={styles.title}>
+            {t('auth.forgotPasswordModal.title')}
+          </Text>
+          <Text style={styles.description}>
+            {t('auth.forgotPasswordModal.description')}
+          </Text>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>{t('auth.forgotPasswordModal.identifierLabel')}</Text>
+            <Text style={styles.label}>
+              {t('auth.forgotPasswordModal.identifierLabel')}
+            </Text>
             <TextInput
               value={identifier}
               onChangeText={setIdentifier}
@@ -82,20 +97,29 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
             />
           </View>
 
-          {translatedError ? <Text style={styles.error}>{translatedError}</Text> : null}
-          {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
+          {translatedError ? (
+            <Text style={styles.error}>{translatedError}</Text>
+          ) : null}
+          {successMessage ? (
+            <Text style={styles.success}>{successMessage}</Text>
+          ) : null}
 
           {!hasSuccess ? (
             <Pressable
-              style={[styles.primaryButton, isSubmitDisabled && styles.primaryButtonDisabled]}
+              style={[
+                styles.primaryButton,
+                isSubmitDisabled && styles.primaryButtonDisabled,
+              ]}
               onPress={handleSubmit}
               disabled={isSubmitDisabled}
               accessibilityRole="button"
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={COLORS.textOnPrimary} />
               ) : (
-                <Text style={styles.primaryButtonText}>{t('auth.forgotPasswordModal.submit')}</Text>
+                <Text style={styles.primaryButtonText}>
+                  {t('auth.forgotPasswordModal.submit')}
+                </Text>
               )}
             </Pressable>
           ) : null}
@@ -106,7 +130,9 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
             style={styles.secondaryButton}
           >
             <Text style={styles.secondaryButtonText}>
-              {hasSuccess ? t('auth.forgotPasswordModal.closeAfterSuccess') : t('auth.forgotPasswordModal.cancel')}
+              {hasSuccess
+                ? t('auth.forgotPasswordModal.closeAfterSuccess')
+                : t('auth.forgotPasswordModal.cancel')}
             </Text>
           </Pressable>
         </View>
@@ -118,7 +144,7 @@ export const ForgotPasswordModal: React.FC<ForgotPasswordModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: COLORS.overlaySoft,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
@@ -127,41 +153,41 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
     padding: 24,
     gap: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   description: {
     fontSize: 14,
-    color: '#475569',
+    color: COLORS.textSecondary,
   },
   formGroup: {
     gap: 8,
   },
   label: {
     fontSize: 14,
-    color: '#1E293B',
+    color: COLORS.textOnMuted,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
+    color: COLORS.textPrimary,
+    backgroundColor: COLORS.surface,
   },
   primaryButton: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#2563EB',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -169,7 +195,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -179,15 +205,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   secondaryButtonText: {
-    color: '#2563EB',
+    color: COLORS.primary,
     fontWeight: '600',
   },
   error: {
-    color: '#DC2626',
+    color: COLORS.error,
     fontSize: 14,
   },
   success: {
-    color: '#15803D',
+    color: COLORS.success,
     fontSize: 14,
     fontWeight: '500',
   },

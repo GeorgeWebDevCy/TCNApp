@@ -18,6 +18,7 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
 import { MembershipScreen } from './src/screens/MembershipScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
+import { COLORS } from './src/config/theme';
 
 const AppContent: React.FC = () => {
   const {
@@ -36,7 +37,7 @@ const AppContent: React.FC = () => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2563EB" />
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
   },
   logToggle: {
     position: 'absolute',
@@ -153,21 +154,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#2563EB',
-    shadowColor: '#1E3A8A',
+    backgroundColor: COLORS.primary,
+    shadowColor: COLORS.primaryDark,
     shadowOpacity: 0.3,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
   logToggleText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 14,
     fontWeight: '600',
   },
   logOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.96)',
+    backgroundColor: COLORS.overlay,
     padding: 16,
     paddingTop: 32,
   },
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   logOverlayTitle: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -186,10 +187,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    backgroundColor: COLORS.overlayMuted,
   },
   logOverlayCloseText: {
-    color: '#93C5FD',
+    color: COLORS.primaryLighter,
     fontSize: 14,
     fontWeight: '600',
   },

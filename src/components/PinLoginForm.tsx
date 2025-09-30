@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { COLORS } from '../config/theme';
 
 interface PinLoginFormProps {
   hasPin: boolean;
@@ -30,7 +31,9 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
 }) => {
   const [pin, setPin] = useState('');
   const [confirmationPin, setConfirmationPin] = useState('');
-  const [mode, setMode] = useState<'login' | 'create'>(hasPin ? 'login' : 'create');
+  const [mode, setMode] = useState<'login' | 'create'>(
+    hasPin ? 'login' : 'create',
+  );
   const { t } = useLocalization();
 
   useEffect(() => {
@@ -72,7 +75,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
   };
 
   const toggleMode = () => {
-    setMode((prev) => (prev === 'login' ? 'create' : 'login'));
+    setMode(prev => (prev === 'login' ? 'create' : 'login'));
     setPin('');
     setConfirmationPin('');
   };
@@ -81,12 +84,20 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>
-          {mode === 'login' ? t('auth.pinForm.titleLogin') : t('auth.pinForm.titleCreate')}
+          {mode === 'login'
+            ? t('auth.pinForm.titleLogin')
+            : t('auth.pinForm.titleCreate')}
         </Text>
         {hasPin && canManagePin ? (
-          <Pressable onPress={toggleMode} accessibilityRole="button" hitSlop={8}>
+          <Pressable
+            onPress={toggleMode}
+            accessibilityRole="button"
+            hitSlop={8}
+          >
             <Text style={styles.linkText}>
-              {mode === 'login' ? t('auth.pinForm.toggleCreate') : t('auth.pinForm.toggleUseExisting')}
+              {mode === 'login'
+                ? t('auth.pinForm.toggleCreate')
+                : t('auth.pinForm.toggleUseExisting')}
             </Text>
           </Pressable>
         ) : null}
@@ -130,21 +141,28 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
 
       <Pressable
         onPress={handlePrimaryAction}
-        style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
+        style={[
+          styles.primaryButton,
+          !canSubmit && styles.primaryButtonDisabled,
+        ]}
         disabled={!canSubmit}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={COLORS.textOnPrimary} />
         ) : (
           <Text style={styles.primaryButtonText}>
-            {mode === 'login' ? t('auth.pinForm.submitLogin') : t('auth.pinForm.submitCreate')}
+            {mode === 'login'
+              ? t('auth.pinForm.submitLogin')
+              : t('auth.pinForm.submitCreate')}
           </Text>
         )}
       </Pressable>
 
       {mode === 'login' && hasPin && onResetPin && canManagePin ? (
         <Pressable onPress={onResetPin} hitSlop={8} style={styles.dangerButton}>
-          <Text style={styles.dangerButtonText}>{t('auth.pinForm.removePin')}</Text>
+          <Text style={styles.dangerButtonText}>
+            {t('auth.pinForm.removePin')}
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -157,9 +175,9 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 20,
     borderRadius: 16,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: COLORS.border,
   },
   headerRow: {
     flexDirection: 'row',
@@ -169,44 +187,45 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   linkText: {
-    color: '#2563EB',
+    color: COLORS.primary,
     fontWeight: '500',
   },
   formGroup: {
     gap: 8,
   },
   label: {
-    color: '#334155',
+    color: COLORS.textOnMuted,
     fontSize: 14,
     fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#CBD5F5',
+    borderColor: COLORS.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 20,
     textAlign: 'center',
     letterSpacing: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.surface,
+    color: COLORS.textPrimary,
   },
   error: {
-    color: '#DC2626',
+    color: COLORS.error,
     textAlign: 'center',
   },
   helperText: {
-    color: '#475569',
+    color: COLORS.textSecondary,
     fontSize: 13,
     textAlign: 'center',
   },
   primaryButton: {
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#0EA5E9',
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -214,7 +233,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -222,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dangerButtonText: {
-    color: '#DC2626',
+    color: COLORS.error,
     fontWeight: '500',
     textDecorationLine: 'underline',
   },
