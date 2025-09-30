@@ -550,7 +550,22 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           throw new Error('Unable to change password.');
         }
 
-        await updateWordPressPassword({ token: session.token, newPassword });
+        const resolvedUserId =
+          typeof session.user?.id === 'number' &&
+          Number.isFinite(session.user.id) &&
+          session.user.id > 0
+            ? session.user.id
+            : typeof state.user?.id === 'number' &&
+              Number.isFinite(state.user.id) &&
+              state.user.id > 0
+            ? state.user.id
+            : undefined;
+
+        await updateWordPressPassword({
+          token: session.token,
+          newPassword,
+          userId: resolvedUserId,
+        });
         await loginWithWordPress({
           username: identifier,
           password: newPassword,

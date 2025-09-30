@@ -706,17 +706,25 @@ export const loginWithPassword = async ({
 export const updatePassword = async ({
   token,
   newPassword,
+  userId,
 }: {
   token: string;
   newPassword: string;
+  userId?: number;
 }): Promise<void> => {
   const trimmedPassword = newPassword.trim();
   if (trimmedPassword.length === 0) {
     throw new Error('Unable to change password.');
   }
 
+  const hasValidUserId =
+    typeof userId === 'number' && Number.isFinite(userId) && userId > 0;
+  const updateEndpoint = hasValidUserId
+    ? `/wp-json/wp/v2/users/${userId}`
+    : WORDPRESS_CONFIG.endpoints.profile;
+
   const response = await fetchWithRouteFallback(
-    WORDPRESS_CONFIG.endpoints.profile,
+    updateEndpoint,
     {
       method: 'POST',
       headers: {
