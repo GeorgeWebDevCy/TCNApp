@@ -526,49 +526,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       currentPassword: string;
       newPassword: string;
     }) => {
-      if (!state.user?.email) {
-        throw new Error('Unable to change password.');
-      }
-
       if (!state.hasPasswordAuthenticated) {
         throw new Error(
           'Please log in with your username and password before changing your password.',
         );
       }
 
-      const identifier = state.user.email.trim();
-      if (identifier.length === 0) {
-        throw new Error('Unable to change password.');
-      }
-
       try {
-        const session = await loginWithWordPress({
-          username: identifier,
-          password: currentPassword,
-        });
-        if (!session.token) {
+        const session = sessionRef.current ?? (await ensureValidSession());
+        if (!session || !session.token) {
           throw new Error('Unable to change password.');
         }
 
-        const resolvedUserId =
-          typeof session.user?.id === 'number' &&
-          Number.isFinite(session.user.id) &&
-          session.user.id > 0
-            ? session.user.id
-            : typeof state.user?.id === 'number' &&
-              Number.isFinite(state.user.id) &&
-              state.user.id > 0
-            ? state.user.id
-            : undefined;
+        sessionRef.current = session;
 
         await updateWordPressPassword({
           token: session.token,
+          currentPassword,
           newPassword,
-          userId: resolvedUserId,
-        });
-        await loginWithWordPress({
-          username: identifier,
-          password: newPassword,
         });
         await refreshSession();
         deviceLog.success('Password updated successfully');
@@ -579,7 +554,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           : new Error('Unable to change password.');
       }
     },
-    [refreshSession, state.hasPasswordAuthenticated, state.user?.email],
+    [ensureValidSession, refreshSession, state.hasPasswordAuthenticated],
   );
 
   const value = useMemo<AuthContextValue>(
