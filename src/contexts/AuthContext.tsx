@@ -367,6 +367,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       }
 
       let session = await ensureValidSession();
+
       if (!session && sessionRef.current) {
         await persistSessionSnapshot(sessionRef.current);
         session = await ensureValidSession();
@@ -374,15 +375,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 
       if (!session) {
         if (state.user) {
-          const snapshot: PersistedSession = {
+          session = {
             token: sessionRef.current?.token,
             refreshToken: sessionRef.current?.refreshToken,
             user: state.user,
             locked: false,
           };
-          sessionRef.current = snapshot;
-          await persistSessionSnapshot(snapshot);
-          session = snapshot;
         } else {
           throw new Error(
             'You must log in with your password before setting a PIN.',
@@ -390,17 +388,15 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         }
       }
 
-      if (session && !session.user && state.user) {
-        const snapshot: PersistedSession = {
-          token: session.token,
-          refreshToken: session.refreshToken,
-          user: state.user,
-          locked: session.locked,
-        };
-        sessionRef.current = snapshot;
-        await persistSessionSnapshot(snapshot);
-      }
+      const snapshot: PersistedSession = {
+        token: session.token ?? sessionRef.current?.token,
+        refreshToken: session.refreshToken ?? sessionRef.current?.refreshToken,
+        user: session.user ?? state.user ?? sessionRef.current?.user ?? null,
+        locked: session.locked,
+      };
 
+      sessionRef.current = snapshot;
+      await persistSessionSnapshot(snapshot);
       await persistPin(pin);
     },
     [canManagePin, state.user],
