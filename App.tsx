@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import deviceLog, { LogView } from './src/utils/deviceLog';
 import { AuthProvider, useAuthContext } from './src/contexts/AuthContext';
@@ -15,12 +16,16 @@ import { OneSignalProvider } from './src/notifications/OneSignalProvider';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
+import { MembershipScreen } from './src/screens/MembershipScreen';
+import { STRIPE_CONFIG } from './src/config/stripeConfig';
 
 const AppContent: React.FC = () => {
   const {
     state: { isAuthenticated, isLoading },
   } = useAuthContext();
-  const [activeScreen, setActiveScreen] = useState<'home' | 'profile'>('home');
+  const [activeScreen, setActiveScreen] = useState<
+    'home' | 'profile' | 'membership'
+  >('home');
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -44,11 +49,29 @@ const AppContent: React.FC = () => {
     return <UserProfileScreen onBack={() => setActiveScreen('home')} />;
   }
 
-  return <HomeScreen onManageProfile={() => setActiveScreen('profile')} />;
+  if (activeScreen === 'membership') {
+    return <MembershipScreen onBack={() => setActiveScreen('home')} />;
+  }
+
+  return (
+    <HomeScreen
+      onManageProfile={() => setActiveScreen('profile')}
+      onUpgradeMembership={() => setActiveScreen('membership')}
+    />
+  );
 };
 
 function App(): JSX.Element {
   const [areLogsVisible, setAreLogsVisible] = useState(false);
+  const { publishableKey, merchantIdentifier, urlScheme } = STRIPE_CONFIG;
+  const stripeProviderProps = useMemo(
+    () => ({
+      publishableKey,
+      merchantIdentifier,
+      urlScheme,
+    }),
+    [merchantIdentifier, publishableKey, urlScheme],
+  );
 
   useEffect(() => {
     deviceLog
@@ -67,47 +90,49 @@ function App(): JSX.Element {
   }, []);
 
   return (
-    <LocalizationProvider>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <OneSignalProvider>
-            <View style={styles.appContainer}>
-              <AppContent />
-              {!areLogsVisible && (
-                <TouchableOpacity
-                  accessibilityRole="button"
-                  accessibilityLabel="Show device logs"
-                  style={styles.logToggle}
-                  onPress={() => setAreLogsVisible(true)}
-                >
-                  <Text style={styles.logToggleText}>Show Logs</Text>
-                </TouchableOpacity>
-              )}
-              {areLogsVisible && (
-                <View style={styles.logOverlay}>
-                  <View style={styles.logOverlayHeader}>
-                    <Text style={styles.logOverlayTitle}>Device Logs</Text>
-                    <TouchableOpacity
-                      accessibilityRole="button"
-                      accessibilityLabel="Hide device logs"
-                      onPress={() => setAreLogsVisible(false)}
-                      style={styles.logOverlayClose}
-                    >
-                      <Text style={styles.logOverlayCloseText}>Close</Text>
-                    </TouchableOpacity>
+    <StripeProvider {...stripeProviderProps}>
+      <LocalizationProvider>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <OneSignalProvider>
+              <View style={styles.appContainer}>
+                <AppContent />
+                {!areLogsVisible && (
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel="Show device logs"
+                    style={styles.logToggle}
+                    onPress={() => setAreLogsVisible(true)}
+                  >
+                    <Text style={styles.logToggleText}>Show Logs</Text>
+                  </TouchableOpacity>
+                )}
+                {areLogsVisible && (
+                  <View style={styles.logOverlay}>
+                    <View style={styles.logOverlayHeader}>
+                      <Text style={styles.logOverlayTitle}>Device Logs</Text>
+                      <TouchableOpacity
+                        accessibilityRole="button"
+                        accessibilityLabel="Hide device logs"
+                        onPress={() => setAreLogsVisible(false)}
+                        style={styles.logOverlayClose}
+                      >
+                        <Text style={styles.logOverlayCloseText}>Close</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <LogView
+                      style={styles.logView}
+                      multiExpanded
+                      timeStampFormat="HH:mm:ss"
+                    />
                   </View>
-                  <LogView
-                    style={styles.logView}
-                    multiExpanded
-                    timeStampFormat="HH:mm:ss"
-                  />
-                </View>
-              )}
-            </View>
-          </OneSignalProvider>
-        </AuthProvider>
-      </SafeAreaProvider>
-    </LocalizationProvider>
+                )}
+              </View>
+            </OneSignalProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </LocalizationProvider>
+    </StripeProvider>
   );
 }
 

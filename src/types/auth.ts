@@ -13,6 +13,18 @@ export interface MembershipInfo {
   benefits: MembershipBenefit[];
 }
 
+export interface MembershipPlan {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  interval?: 'day' | 'week' | 'month' | 'year';
+  description?: string;
+  features?: string[];
+  highlight?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -69,6 +81,7 @@ export interface AuthContextValue {
   logout: () => Promise<void>;
   resetError: () => void;
   refreshSession: () => Promise<void>;
+  getSessionToken: () => Promise<string | null>;
   requestPasswordReset: (identifier: string) => Promise<string | undefined>;
   registerAccount: (options: RegisterOptions) => Promise<string | undefined>;
   resetPasswordWithCode: (
