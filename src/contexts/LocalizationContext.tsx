@@ -79,6 +79,7 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Something went wrong while saving your PIN.': 'errors.pinSaveGeneric',
   'Something went wrong while removing your PIN.': 'errors.pinRemoveGeneric',
   'Unable to send password reset email.': 'errors.passwordReset',
+  'Unable to reset password.': 'errors.resetPassword',
   'Unable to register a new account.': 'errors.registerAccount',
   'Passwords do not match.': 'errors.passwordMismatch',
   'Unable to change password.': 'errors.changePassword',

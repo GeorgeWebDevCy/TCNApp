@@ -49,6 +49,12 @@ export interface RegisterOptions {
   lastName?: string;
 }
 
+export interface ResetPasswordOptions {
+  identifier: string;
+  verificationCode: string;
+  newPassword: string;
+}
+
 export interface AuthContextValue {
   state: AuthState;
   loginWithPassword: (options: LoginOptions) => Promise<void>;
@@ -65,4 +71,7 @@ export interface AuthContextValue {
   refreshSession: () => Promise<void>;
   requestPasswordReset: (identifier: string) => Promise<string | undefined>;
   registerAccount: (options: RegisterOptions) => Promise<string | undefined>;
+  resetPasswordWithCode: (
+    options: ResetPasswordOptions,
+  ) => Promise<string | undefined>;
 }

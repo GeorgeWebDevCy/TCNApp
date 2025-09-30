@@ -144,6 +144,78 @@ const extractMessageFromResponse = async (
   return fallback;
 };
 
+const extractSuccessFlag = (
+  payload: Record<string, unknown> | null | undefined,
+): boolean | undefined => {
+  if (!payload || typeof payload !== 'object') {
+    return undefined;
+  }
+
+  if ('success' in payload) {
+    const raw = payload.success;
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+
+    if (typeof raw === 'number') {
+      if (raw === 1) {
+        return true;
+      }
+      if (raw === 0) {
+        return false;
+      }
+    }
+
+    if (typeof raw === 'string') {
+      const normalized = raw.toLowerCase();
+      if (['true', '1', 'ok', 'yes', 'success'].includes(normalized)) {
+        return true;
+      }
+      if (['false', '0', 'no', 'error', 'failed'].includes(normalized)) {
+        return false;
+      }
+    }
+  }
+
+  if ('status' in payload) {
+    const raw = payload.status;
+    if (typeof raw === 'boolean') {
+      return raw;
+    }
+
+    if (typeof raw === 'number') {
+      if (raw >= 200 && raw < 400) {
+        return true;
+      }
+      if (raw >= 400) {
+        return false;
+      }
+    }
+
+    if (typeof raw === 'string') {
+      const normalized = raw.toLowerCase();
+      if (['success', 'ok', 'completed', 'valid'].includes(normalized)) {
+        return true;
+      }
+      if (['error', 'failed', 'fail', 'invalid'].includes(normalized)) {
+        return false;
+      }
+    }
+  }
+
+  if ('data' in payload) {
+    const raw = payload.data;
+    if (raw && typeof raw === 'object') {
+      const nested = extractSuccessFlag(raw as Record<string, unknown>);
+      if (typeof nested === 'boolean') {
+        return nested;
+      }
+    }
+  }
+
+  return undefined;
+};
+
 const fetchWithRouteFallback = async (
   path: string,
   init?: RequestInit,
@@ -675,6 +747,14 @@ export const requestPasswordReset = async (
     throw new Error('Unable to send password reset email.');
   }
 
+  const payload: Record<string, string> = {
+    identifier: trimmed,
+    user_login: trimmed,
+    user_email: trimmed,
+    username: trimmed,
+    email: trimmed,
+  };
+
   const response = await fetchWithRouteFallback(
     WORDPRESS_CONFIG.endpoints.passwordReset,
     {
@@ -683,20 +763,12 @@ export const requestPasswordReset = async (
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({
-        user_login: trimmed,
-        user_email: trimmed,
-        username: trimmed,
-        email: trimmed,
-      }),
+      body: JSON.stringify(payload),
     },
   );
 
   const json = await parseJsonResponse<Record<string, unknown>>(response);
-  const successFlag =
-    json && typeof json === 'object' && typeof json.success === 'boolean'
-      ? json.success
-      : undefined;
+  const successFlag = extractSuccessFlag(json);
 
   if (!response.ok || successFlag === false) {
     const message = await extractMessageFromResponse(
@@ -714,6 +786,11 @@ export const requestPasswordReset = async (
       json.data !== null &&
       typeof (json.data as Record<string, unknown>).message === 'string' &&
       (json.data as Record<string, unknown>).message) ||
+    (json &&
+      typeof json?.data === 'object' &&
+      json.data !== null &&
+      typeof (json.data as Record<string, unknown>).notice === 'string' &&
+      (json.data as Record<string, unknown>).notice) ||
     null;
 
   return messageSource ? sanitizeErrorMessage(messageSource) : undefined;
@@ -753,10 +830,7 @@ export const registerAccount = async (
   );
 
   const json = await parseJsonResponse<Record<string, unknown>>(response);
-  const successFlag =
-    json && typeof json === 'object' && typeof json.success === 'boolean'
-      ? json.success
-      : undefined;
+  const successFlag = extractSuccessFlag(json);
 
   if (!response.ok || successFlag === false) {
     const message = await extractMessageFromResponse(
@@ -774,6 +848,81 @@ export const registerAccount = async (
       json.data !== null &&
       typeof (json.data as Record<string, unknown>).message === 'string' &&
       (json.data as Record<string, unknown>).message) ||
+    (json &&
+      typeof json?.data === 'object' &&
+      json.data !== null &&
+      typeof (json.data as Record<string, unknown>).notice === 'string' &&
+      (json.data as Record<string, unknown>).notice) ||
+    null;
+
+  return messageSource ? sanitizeErrorMessage(messageSource) : undefined;
+};
+
+export const resetPasswordWithCode = async ({
+  identifier,
+  verificationCode,
+  newPassword,
+}: {
+  identifier: string;
+  verificationCode: string;
+  newPassword: string;
+}): Promise<string | undefined> => {
+  const trimmedIdentifier = identifier.trim();
+  const trimmedCode = verificationCode.trim();
+  const trimmedPassword = newPassword.trim();
+
+  if (!trimmedIdentifier || !trimmedCode || !trimmedPassword) {
+    throw new Error('Unable to reset password.');
+  }
+
+  const payload: Record<string, string> = {
+    identifier: trimmedIdentifier,
+    user_login: trimmedIdentifier,
+    user_email: trimmedIdentifier,
+    username: trimmedIdentifier,
+    email: trimmedIdentifier,
+    verification_code: trimmedCode,
+    code: trimmedCode,
+    password: trimmedPassword,
+    new_password: trimmedPassword,
+  };
+
+  const response = await fetchWithRouteFallback(
+    WORDPRESS_CONFIG.endpoints.directPasswordReset,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+    },
+  );
+
+  const json = await parseJsonResponse<Record<string, unknown>>(response);
+  const successFlag = extractSuccessFlag(json);
+
+  if (!response.ok || successFlag === false) {
+    const message = await extractMessageFromResponse(
+      response,
+      'Unable to reset password.',
+    );
+    throw new Error(message);
+  }
+
+  const messageSource =
+    (json && typeof json?.message === 'string' && json.message) ||
+    (json && typeof json?.notice === 'string' && json.notice) ||
+    (json &&
+      typeof json?.data === 'object' &&
+      json.data !== null &&
+      typeof (json.data as Record<string, unknown>).message === 'string' &&
+      (json.data as Record<string, unknown>).message) ||
+    (json &&
+      typeof json?.data === 'object' &&
+      json.data !== null &&
+      typeof (json.data as Record<string, unknown>).notice === 'string' &&
+      (json.data as Record<string, unknown>).notice) ||
     null;
 
   return messageSource ? sanitizeErrorMessage(messageSource) : undefined;

@@ -24,6 +24,7 @@ import {
   markPasswordAuthenticated,
   registerAccount as registerWordPressAccount,
   requestPasswordReset as requestWordpressPasswordReset,
+  resetPasswordWithCode as resetWordpressPasswordWithCode,
   refreshPersistedUserProfile,
   updatePassword as updateWordPressPassword,
   setSessionLock,
@@ -38,6 +39,7 @@ import {
   MembershipInfo,
   PinLoginOptions,
   RegisterOptions,
+  ResetPasswordOptions,
 } from '../types/auth';
 
 interface LoginSuccessPayload {
@@ -445,6 +447,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     }
   }, []);
 
+  const resetPasswordWithCode = useCallback(
+    async (options: ResetPasswordOptions) => {
+      try {
+        const message = await resetWordpressPasswordWithCode(options);
+        deviceLog.info('Direct password reset completed', {
+          identifier: options.identifier,
+        });
+        return message;
+      } catch (error) {
+        deviceLog.error('Direct password reset failed', error);
+        throw error instanceof Error
+          ? error
+          : new Error('Unable to reset password.');
+      }
+    },
+    [],
+  );
+
   const refreshSession = useCallback(async () => {
     const session = await ensureValidSession();
     if (!session) {
@@ -561,6 +581,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       refreshSession,
       requestPasswordReset,
       registerAccount,
+      resetPasswordWithCode,
     }),
     [
       state,
@@ -575,6 +596,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       refreshSession,
       requestPasswordReset,
       registerAccount,
+      resetPasswordWithCode,
     ],
   );
 
