@@ -47,6 +47,8 @@ export interface AuthState {
 export interface LoginOptions {
   username: string;
   password: string;
+  mode?: 'token' | 'cookie';
+  remember?: boolean;
 }
 
 export interface PinLoginOptions {

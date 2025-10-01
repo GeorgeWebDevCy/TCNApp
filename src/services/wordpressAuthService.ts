@@ -255,12 +255,12 @@ const fetchWithRouteFallback = async (
 const hydrateWordPressCookieSession = async (
   tokenLoginUrl?: string | null,
   token?: string,
-): Promise<void> => {
+): Promise<{ status: number; ok: boolean }> => {
   const resolvedUrl =
     typeof tokenLoginUrl === 'string' ? tokenLoginUrl.trim() : '';
 
   if (!resolvedUrl) {
-    return;
+    return { status: 0, ok: false };
   }
 
   const headers: Record<string, string> | undefined = token
@@ -270,14 +270,25 @@ const hydrateWordPressCookieSession = async (
     : undefined;
 
   try {
-    await fetch(resolvedUrl, {
+    const response = await fetch(resolvedUrl, {
       method: 'GET',
       headers,
       credentials: 'include',
     });
+    return { status: response.status, ok: response.ok };
   } catch (error) {
-    // Best-effort: lack of a cookie should not block password changes outright.
+    return { status: 0, ok: false };
   }
+};
+
+export const ensureCookieSession = async (
+  session?: PersistedSession | null,
+): Promise<{ status: number; ok: boolean }> => {
+  if (!session) {
+    return { status: 0, ok: false };
+  }
+
+  return hydrateWordPressCookieSession(session.tokenLoginUrl, session.token);
 };
 
 const parseProfileUserPayload = (
@@ -720,6 +731,8 @@ export const ensureValidSession =
 export const loginWithPassword = async ({
   username,
   password,
+  mode = 'token',
+  remember = true,
 }: LoginOptions): Promise<PersistedSession> => {
   // Authenticate against the GN Password Login API plugin endpoint so native clients can
   // perform username/password logins over the WordPress REST API.
@@ -734,8 +747,8 @@ export const loginWithPassword = async ({
       body: JSON.stringify({
         username,
         password,
-        mode: 'token',
-        remember: true,
+        mode,
+        remember,
       }),
     },
   );
@@ -817,7 +830,9 @@ export const loginWithPassword = async ({
 
   await storeSession(session);
   await markPasswordAuthenticated();
-  await hydrateWordPressCookieSession(tokenLoginUrl, token);
+  if (mode === 'token') {
+    await hydrateWordPressCookieSession(tokenLoginUrl, token);
+  }
 
   return session;
 };
@@ -829,7 +844,7 @@ export const updatePassword = async ({
   confirmPassword,
   tokenLoginUrl,
 }: {
-  token: string;
+  token?: string | null;
   currentPassword: string;
   newPassword: string;
   confirmPassword?: string;
@@ -843,7 +858,7 @@ export const updatePassword = async ({
     throw new Error('Unable to change password.');
   }
 
-  await hydrateWordPressCookieSession(tokenLoginUrl, token);
+  await hydrateWordPressCookieSession(tokenLoginUrl, token ?? undefined);
 
   const response = await fetchWithRouteFallback(
     WORDPRESS_CONFIG.endpoints.changePassword,
@@ -852,7 +867,11 @@ export const updatePassword = async ({
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${token}`,
+        ...(token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {}),
       },
       body: JSON.stringify({
         current_password: trimmedCurrent,

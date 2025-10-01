@@ -1,0 +1,24 @@
+diff --git a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
+index 6a48a81..e6e9916 100644
+--- a/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
++++ b/node_modules/react-native-webview/android/src/main/java/com/reactnativecommunity/webview/RNCWebViewManagerImpl.kt
+@@ -331,13 +331,17 @@ class RNCWebViewManagerImpl {
+         } catch (e: JSONException) {
+           throw RuntimeException(e)
+         }
+-        "injectJavaScript" -> webView.evaluateJavascriptWithFallback(args.getString(0))
++        "injectJavaScript" -> {
++          val script = args.getString(0) ?: return
++          webView.evaluateJavascriptWithFallback(script)
++        }
+         "loadUrl" -> {
+           if (args == null) {
+             throw RuntimeException("Arguments for loading an url are null!")
+           }
+           webView.progressChangedFilter.setWaitingForCommandLoadUrl(false)
+-          webView.loadUrl(args.getString(0))
++          val url = args.getString(0) ?: return
++          webView.loadUrl(url)
+         }
+         "requestFocus" -> webView.requestFocus()
+         "clearFormData" -> webView.clearFormData()

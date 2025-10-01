@@ -11,6 +11,7 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import deviceLog, { LogView } from './src/utils/deviceLog';
 import { AuthProvider, useAuthContext } from './src/contexts/AuthContext';
+import { TokenLoginProvider } from './src/providers/TokenLoginProvider';
 import { LocalizationProvider } from './src/contexts/LocalizationContext';
 import { OneSignalProvider } from './src/notifications/OneSignalProvider';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -94,43 +95,55 @@ function App(): JSX.Element {
     <StripeProvider {...stripeProviderProps}>
       <LocalizationProvider>
         <SafeAreaProvider>
-          <AuthProvider>
-            <OneSignalProvider>
-              <View style={styles.appContainer}>
-                <AppContent />
-                {!areLogsVisible && (
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    accessibilityLabel="Show device logs"
-                    style={styles.logToggle}
-                    onPress={() => setAreLogsVisible(true)}
-                  >
-                    <Text style={styles.logToggleText}>Show Logs</Text>
-                  </TouchableOpacity>
-                )}
-                {areLogsVisible && (
-                  <View style={styles.logOverlay}>
-                    <View style={styles.logOverlayHeader}>
-                      <Text style={styles.logOverlayTitle}>Device Logs</Text>
-                      <TouchableOpacity
-                        accessibilityRole="button"
-                        accessibilityLabel="Hide device logs"
-                        onPress={() => setAreLogsVisible(false)}
-                        style={styles.logOverlayClose}
-                      >
-                        <Text style={styles.logOverlayCloseText}>Close</Text>
-                      </TouchableOpacity>
+          <TokenLoginProvider>
+            <AuthProvider>
+              <OneSignalProvider>
+                <View style={styles.appContainer}>
+                  <AppContent />
+                  {!areLogsVisible && (
+                    <TouchableOpacity
+                      accessibilityRole="button"
+                      accessibilityLabel="Show device logs"
+                      style={styles.logToggle}
+                      onPress={() => setAreLogsVisible(true)}
+                    >
+                      <Text style={styles.logToggleText}>Show Logs</Text>
+                    </TouchableOpacity>
+                  )}
+                  {areLogsVisible && (
+                    <View style={styles.logOverlay}>
+                      <View style={styles.logOverlayHeader}>
+                        <Text style={styles.logOverlayTitle}>Device Logs</Text>
+                        <View style={styles.logOverlayActions}>
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Clear device logs"
+                            onPress={() => deviceLog.clear()}
+                            style={styles.logOverlaySecondary}
+                          >
+                            <Text style={styles.logOverlaySecondaryText}>Clear</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            accessibilityRole="button"
+                            accessibilityLabel="Hide device logs"
+                            onPress={() => setAreLogsVisible(false)}
+                            style={styles.logOverlayClose}
+                          >
+                            <Text style={styles.logOverlayCloseText}>Close</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                      <LogView
+                        style={styles.logView}
+                        multiExpanded
+                        timeStampFormat="HH:mm:ss"
+                      />
                     </View>
-                    <LogView
-                      style={styles.logView}
-                      multiExpanded
-                      timeStampFormat="HH:mm:ss"
-                    />
-                  </View>
-                )}
-              </View>
-            </OneSignalProvider>
-          </AuthProvider>
+                  )}
+                </View>
+              </OneSignalProvider>
+            </AuthProvider>
+          </TokenLoginProvider>
         </SafeAreaProvider>
       </LocalizationProvider>
     </StripeProvider>
@@ -178,10 +191,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
+  logOverlayActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   logOverlayTitle: {
     color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '700',
+  },
+  logOverlaySecondary: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: COLORS.overlayMuted,
+  },
+  logOverlaySecondaryText: {
+    color: COLORS.primaryLighter,
+    fontSize: 14,
+    fontWeight: '600',
   },
   logOverlayClose: {
     paddingHorizontal: 12,

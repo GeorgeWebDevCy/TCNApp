@@ -30,7 +30,9 @@ import {
   updatePassword as updateWordPressPassword,
   setSessionLock,
   persistSessionSnapshot,
+  ensureCookieSession,
 } from '../services/wordpressAuthService';
+import { useTokenLogin } from '../providers/TokenLoginProvider';
 import type { PersistedSession } from '../services/wordpressAuthService';
 import {
   AuthContextValue,
@@ -163,6 +165,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
   const sessionRef = useRef<PersistedSession | null>(null);
+  const { hydrateTokenLogin } = useTokenLogin();
 
   const logSessionSnapshot = useCallback(
     (label: string, session: PersistedSession | null | undefined) => {
@@ -182,6 +185,25 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         } catch (error) {
           console.log('[auth-debug]', label, summary);
         }
+      }
+    },
+    [],
+  );
+
+  const logCookieHydration = useCallback(
+    (
+      label: string,
+      result: { status: number; ok: boolean } | null,
+      extras: Record<string, unknown> = {},
+    ) => {
+      const payload = {
+        status: result?.status ?? null,
+        ok: result?.ok ?? false,
+        ...extras,
+      };
+      deviceLog.debug(label, payload);
+      if (result && !result.ok) {
+        deviceLog.warn(`${label}.warn`, payload);
       }
     },
     [],
@@ -219,6 +241,25 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       sessionRef.current = session;
       await setSessionLock(false);
       await markPasswordAuthenticated();
+
+      let cookieResult = await ensureCookieSession(session);
+      logCookieHydration('auth.password.cookie.initial', cookieResult, {
+        hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+      });
+      if (!cookieResult.ok && session.tokenLoginUrl) {
+        try {
+          await hydrateTokenLogin(session.tokenLoginUrl);
+          cookieResult = await ensureCookieSession(session);
+          logCookieHydration('auth.password.cookie.retry', cookieResult, {
+            hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+          });
+        } catch (error) {
+          deviceLog.warn('Token login hydration failed', {
+            message: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
@@ -237,7 +278,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       deviceLog.error('Password login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
-  }, []);
+  }, [hydrateTokenLogin, logCookieHydration]);
 
   const loginWithPin = useCallback(
     async ({ pin }: PinLoginOptions) => {
@@ -266,6 +307,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         }
 
         logSessionSnapshot('auth.pin.sessionBeforeUnlock', session);
+        let cookieResult = await ensureCookieSession(session);
+        logCookieHydration('auth.pin.cookie.initial', cookieResult, {
+          hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+        });
+        if (!cookieResult.ok && session.tokenLoginUrl) {
+          try {
+            await hydrateTokenLogin(session.tokenLoginUrl);
+            cookieResult = await ensureCookieSession(session);
+            logCookieHydration('auth.pin.cookie.retry', cookieResult, {
+              hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+            });
+          } catch (error) {
+            deviceLog.warn('PIN unlock cookie hydration failed', {
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
         sessionRef.current = session;
         await setSessionLock(false);
 
@@ -314,7 +372,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         dispatch({ type: 'LOGIN_ERROR', payload: message });
       }
     },
-    [logSessionSnapshot, state.hasPasswordAuthenticated, state.membership],
+    [
+      hydrateTokenLogin,
+      logCookieHydration,
+      logSessionSnapshot,
+      state.hasPasswordAuthenticated,
+      state.membership,
+    ],
   );
 
   const loginWithBiometrics = useCallback(
@@ -356,6 +420,23 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         }
 
         logSessionSnapshot('auth.biometrics.sessionBeforeUnlock', session);
+        let cookieResult = await ensureCookieSession(session);
+        logCookieHydration('auth.biometrics.cookie.initial', cookieResult, {
+          hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+        });
+        if (!cookieResult.ok && session.tokenLoginUrl) {
+          try {
+            await hydrateTokenLogin(session.tokenLoginUrl);
+            cookieResult = await ensureCookieSession(session);
+            logCookieHydration('auth.biometrics.cookie.retry', cookieResult, {
+              hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+            });
+          } catch (error) {
+            deviceLog.warn('Biometric unlock cookie hydration failed', {
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
         sessionRef.current = session;
         await setSessionLock(false);
 
@@ -404,7 +485,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         dispatch({ type: 'LOGIN_ERROR', payload: message });
       }
     },
-    [logSessionSnapshot, state.hasPasswordAuthenticated, state.membership],
+    [
+      hydrateTokenLogin,
+      logCookieHydration,
+      logSessionSnapshot,
+      state.hasPasswordAuthenticated,
+      state.membership,
+    ],
   );
 
   const canManagePin = useMemo(
@@ -602,6 +689,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     }
   }, []);
 
+  const userEmail = state.user?.email ?? null;
+
   const changePassword = useCallback(
     async ({
       currentPassword,
@@ -610,32 +699,61 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       currentPassword: string;
       newPassword: string;
     }) => {
-      if (!state.hasPasswordAuthenticated) {
-        throw new Error(
-          'Please log in with your username and password before changing your password.',
-        );
-      }
-
       try {
         let session = sessionRef.current ?? (await ensureValidSession());
-        if (!session || !session.token) {
+        if (!session) {
           throw new Error('Unable to change password.');
         }
 
-        const identifier = state.user?.email?.trim();
+        const identifier = userEmail?.trim() ?? session.user?.email?.trim();
+
         if (identifier) {
-          const reauthenticatedSession = await loginWithWordPress({
-            username: identifier,
-            password: currentPassword,
-          });
+          try {
+            const refreshed = await loginWithWordPress({
+              username: identifier,
+              password: currentPassword,
+              mode: 'token',
+              remember: true,
+            });
 
-          if (!reauthenticatedSession.token) {
-            throw new Error('Unable to change password.');
+            if (refreshed) {
+              let reauthCookie = await ensureCookieSession(refreshed);
+              logCookieHydration('auth.passwordChange.cookie.reauth.initial', reauthCookie, {
+                hasTokenLoginUrl: Boolean(refreshed.tokenLoginUrl),
+              });
+              if (!reauthCookie.ok && refreshed.tokenLoginUrl) {
+                try {
+                  await hydrateTokenLogin(refreshed.tokenLoginUrl);
+                  reauthCookie = await ensureCookieSession(refreshed);
+                  logCookieHydration('auth.passwordChange.cookie.reauth.retry', reauthCookie, {
+                    hasTokenLoginUrl: Boolean(refreshed.tokenLoginUrl),
+                  });
+                } catch (error) {
+                  deviceLog.warn('Password reauth cookie hydration failed', error);
+                }
+              }
+              session = refreshed;
+            }
+          } catch (error) {
+            deviceLog.warn('Password reauthentication failed', error);
           }
-
-          session = reauthenticatedSession;
         }
 
+        let changeCookie = await ensureCookieSession(session);
+        logCookieHydration('auth.passwordChange.cookie.final.initial', changeCookie, {
+          hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+        });
+        if (!changeCookie.ok && session.tokenLoginUrl) {
+          try {
+            await hydrateTokenLogin(session.tokenLoginUrl);
+            changeCookie = await ensureCookieSession(session);
+            logCookieHydration('auth.passwordChange.cookie.final.retry', changeCookie, {
+              hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+            });
+          } catch (error) {
+            deviceLog.warn('Password change cookie hydration failed', error);
+          }
+        }
         sessionRef.current = session;
 
         await updateWordPressPassword({
@@ -653,7 +771,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           : new Error('Unable to change password.');
       }
     },
-    [refreshSession, state.hasPasswordAuthenticated, state.user?.email],
+    [hydrateTokenLogin, logCookieHydration, refreshSession, userEmail],
   );
 
   const value = useMemo<AuthContextValue>(
