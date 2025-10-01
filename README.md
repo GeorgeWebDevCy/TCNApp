@@ -112,7 +112,7 @@ This repository now includes the starter code for a React Native application tha
    # or
    npm install
    ```
-2. Update the placeholder values in `src/config/notificationsConfig.ts` with your OneSignal application ID and any tag names you prefer.
+2. Copy `.env.example` to `.env` and ensure `ONESIGNAL_APP_ID` is set to `7f9b580a-7f43-4a23-8e4d-d9e3f65d2445` (or the ID for your target OneSignal app).
 3. Run the Metro bundler
    ```bash
    yarn start
@@ -129,7 +129,7 @@ The application bootstraps the `OneSignalProvider`, initializes the SDK during s
 ## 🔔 Push Notification Setup
 
 1. **Configure the SDK**
-   - Replace the placeholder app ID in `src/config/notificationsConfig.ts` with your OneSignal application ID.
+   - Provide your OneSignal application ID via the `ONESIGNAL_APP_ID` environment variable (see `.env.example`).
    - Optionally adjust the tag keys if you need to align with an existing messaging strategy.
 2. **Android**
    - The project already includes the OneSignal React Native package and native dependency; after updating the config, rebuild the app (for example, `npm run android`) so Gradle regenerates the required resources.
