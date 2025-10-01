@@ -735,6 +735,7 @@ export const loginWithPassword = async ({
         username,
         password,
         mode: 'token',
+        remember: true,
       }),
     },
   );
