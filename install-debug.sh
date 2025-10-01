@@ -9,11 +9,12 @@ PROJECT_ROOT="$SCRIPT_DIR"
 ANDROID_DIR="$PROJECT_ROOT/android"
 DEBUG_APK="$ANDROID_DIR/app/build/outputs/apk/debug/app-debug.apk"
 ADB_TCPIP_PORT="${ADB_TCPIP_PORT:-5555}"
-USE_WIFI="${USE_WIFI:-auto}"   # auto|on|off
+USE_WIFI="${USE_WIFI:-off}"    # auto|on|off (default off for USB workflows)
 ADB_WIFI_TARGET="${ADB_WIFI_TARGET:-}"
 SKIP_METRO="${SKIP_METRO:-0}"
 SKIP_INSTALL="${SKIP_INSTALL:-0}"
 SKIP_BUILD="${SKIP_BUILD:-0}"
+METRO_PORT="${METRO_PORT:-8081}"
 GRADLE_USER_HOME="${GRADLE_USER_HOME:-$PROJECT_ROOT/.gradle-cache}"
 export GRADLE_USER_HOME
 GRADLE_LOG_DIR="$PROJECT_ROOT/.gradle-logs"
@@ -283,6 +284,27 @@ select_target_serial() {
   adb devices | awk 'NR>1 && $2=="device" {print $1; exit}'
 }
 
+setup_adb_reverse() {
+  local serial="$1"
+  if [[ -z "$serial" ]]; then
+    return 1
+  fi
+
+  # adb reverse only works for USB targets (serials without host:port form).
+  if [[ "$serial" == *:* ]]; then
+    echo "Skipping adb reverse for Wi-Fi target $serial (Metro must be reachable over network)."
+    return 0
+  fi
+
+  if adb -s "$serial" reverse "tcp:$METRO_PORT" "tcp:$METRO_PORT"; then
+    echo "ADB reverse tcp:$METRO_PORT configured on $serial."
+    return 0
+  fi
+
+  echo "[WARN] Failed to configure adb reverse on $serial. Ensure the device can reach Metro on $METRO_PORT." >&2
+  return 1
+}
+
 main() {
   if [[ "$SKIP_METRO" != "1" ]]; then
     require_command npm
@@ -357,6 +379,8 @@ main() {
     echo "[ERROR] No ADB devices available. Connect a device via USB or configure Wi-Fi." >&2
     exit 1
   fi
+
+  setup_adb_reverse "$chosen_target" || true
 
   if [[ "$SKIP_BUILD" != "1" && ! -f "$DEBUG_APK" ]]; then
     echo "[ERROR] APK not found at $DEBUG_APK" >&2
