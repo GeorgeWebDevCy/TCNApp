@@ -280,6 +280,99 @@ const hydrateWordPressCookieSession = async (
   }
 };
 
+const parseProfileUserPayload = (
+  payload: Record<string, unknown>,
+): AuthUser => {
+  const membership = parseMembershipInfo(payload);
+
+  const idSource = payload.id ?? (payload.ID as unknown);
+  const parsedId =
+    typeof idSource === 'number'
+      ? idSource
+      : typeof idSource === 'string'
+      ? Number.parseInt(idSource, 10)
+      : Number.NaN;
+
+  const emailSource = payload.email ?? payload.user_email ?? '';
+  const resolvedEmail =
+    typeof emailSource === 'string'
+      ? emailSource
+      : String(emailSource ?? '');
+
+  const nameSource =
+    payload.name ?? payload.user_display_name ?? payload.username ?? resolvedEmail;
+  const resolvedName =
+    typeof nameSource === 'string' && nameSource.trim().length > 0
+      ? nameSource
+      : resolvedEmail;
+
+  const avatarUrls = payload.avatar_urls as
+    | Record<string, string>
+    | undefined;
+
+  return {
+    id: Number.isFinite(parsedId) ? parsedId : -1,
+    email: resolvedEmail,
+    name: resolvedName,
+    avatarUrl: avatarUrls?.['96'] ?? avatarUrls?.['48'],
+    membership,
+  };
+};
+
+type ProfileFetchResult = {
+  user: AuthUser | null;
+  status: number;
+};
+
+const fetchProfileWithToken = async (
+  token: string,
+): Promise<ProfileFetchResult> => {
+  try {
+    const response = await fetchWithRouteFallback(
+      WORDPRESS_CONFIG.endpoints.profile,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return { user: null, status: response.status };
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>;
+    return { user: parseProfileUserPayload(payload), status: response.status };
+  } catch (error) {
+    return { user: null, status: 0 };
+  }
+};
+
+const fetchProfileWithCookies = async (): Promise<ProfileFetchResult> => {
+  try {
+    const response = await fetchWithRouteFallback(
+      WORDPRESS_CONFIG.endpoints.profile,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      },
+    );
+
+    if (!response.ok) {
+      return { user: null, status: response.status };
+    }
+
+    const payload = (await response.json()) as Record<string, unknown>;
+    return { user: parseProfileUserPayload(payload), status: response.status };
+  } catch (error) {
+    return { user: null, status: 0 };
+  }
+};
+
 const parseDiscountValue = (value: unknown): number | undefined => {
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : undefined;
@@ -390,51 +483,8 @@ const parseMembershipInfo = (
 
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
-    const response = await fetchWithRouteFallback(
-      WORDPRESS_CONFIG.endpoints.profile,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      },
-    );
-
-    if (!response.ok) {
-      return null;
-    }
-
-    const payload = (await response.json()) as Record<string, unknown>;
-    const membership = parseMembershipInfo(payload);
-
-    const idSource = payload.id ?? (payload.ID as unknown);
-    const parsedId =
-      typeof idSource === 'number'
-        ? idSource
-        : typeof idSource === 'string'
-        ? Number.parseInt(idSource, 10)
-        : Number.NaN;
-    const emailSource = payload.email ?? payload.user_email ?? '';
-    const nameSource =
-      payload.name ??
-      payload.user_display_name ??
-      payload.username ??
-      emailSource;
-
-    return {
-      id: Number.isFinite(parsedId) ? parsedId : -1,
-      email:
-        typeof emailSource === 'string'
-          ? emailSource
-          : String(emailSource ?? ''),
-      name:
-        typeof nameSource === 'string' ? nameSource : String(nameSource ?? ''),
-      avatarUrl:
-        (payload.avatar_urls as Record<string, string> | undefined)?.['96'] ??
-        (payload.avatar_urls as Record<string, string> | undefined)?.['48'],
-      membership,
-    };
+    const result = await fetchProfileWithToken(token);
+    return result.user;
   } catch (error) {
     return null;
   }
@@ -584,37 +634,12 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
   };
 };
 
-export const validateToken = async (token?: string): Promise<boolean> => {
-  if (!token) {
-    return true;
-  }
-
-  try {
-    const response = await fetchWithRouteFallback(
-      WORDPRESS_CONFIG.endpoints.profile,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      },
-    );
-
-    return response.ok;
-  } catch (error) {
-    return false;
-  }
-};
-
 export const refreshPersistedUserProfile = async (
-  token?: string,
+  token?: string | null,
 ): Promise<AuthUser | null> => {
-  if (!token) {
-    return null;
-  }
-
-  const profile = await fetchUserProfile(token);
+  const profile = token
+    ? await fetchUserProfile(token)
+    : (await fetchProfileWithCookies()).user;
   if (!profile) {
     return null;
   }
@@ -637,27 +662,56 @@ export const ensureValidSession =
       return session;
     }
 
-    if (!session.token) {
-      if (!session.user) {
+    const cookieResult = await fetchProfileWithCookies();
+
+    if (cookieResult.user) {
+      await AsyncStorage.setItem(
+        AUTH_STORAGE_KEYS.userProfile,
+        JSON.stringify(cookieResult.user),
+      );
+      return {
+        ...session,
+        user: cookieResult.user,
+      };
+    }
+
+    const isCookieAuthRejected =
+      cookieResult.status === 401 || cookieResult.status === 403;
+
+    if (session.token) {
+      const tokenResult = await fetchProfileWithToken(session.token);
+
+      if (tokenResult.user) {
+        await AsyncStorage.setItem(
+          AUTH_STORAGE_KEYS.userProfile,
+          JSON.stringify(tokenResult.user),
+        );
+        return {
+          ...session,
+          user: tokenResult.user,
+        };
+      }
+
+      const tokenRejected =
+        tokenResult.status === 401 || tokenResult.status === 403;
+
+      if (tokenRejected) {
         await clearSession();
         return null;
       }
 
-      return session;
+      if (tokenResult.status === 0) {
+        return session;
+      }
     }
 
-    const isValid = await validateToken(session.token);
-    if (!isValid) {
+    if (isCookieAuthRejected) {
       await clearSession();
       return null;
     }
 
-    if (!session.user) {
-      const refreshedUser = await refreshPersistedUserProfile(session.token);
-      return {
-        ...session,
-        user: refreshedUser,
-      };
+    if (cookieResult.status === 0) {
+      return session;
     }
 
     return session;
