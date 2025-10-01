@@ -38,7 +38,8 @@ export const LoginScreen: React.FC = () => {
   } = useAuthContext();
   const {
     pin: hasStoredPin,
-    biometrics,
+    biometrics: biometricsEnabled,
+    biometricsSupported,
     biometryType,
     loading: availabilityLoading,
     refresh,
@@ -52,20 +53,29 @@ export const LoginScreen: React.FC = () => {
   const [isForgotPasswordVisible, setForgotPasswordVisible] = useState(false);
   const [isRegisterVisible, setRegisterVisible] = useState(false);
 
-  const authTabs = useMemo(
-    () =>
-      [
-        { id: 'password' as const, label: t('login.tabs.password') },
-        { id: 'pin' as const, label: t('login.tabs.pin') },
-      ] satisfies Array<{ id: AuthTabId; label: string }>,
-    [t],
-  );
+  const authTabs = useMemo(() => {
+    const tabs: Array<{ id: AuthTabId; label: string }> = [
+      { id: 'password', label: t('login.tabs.password') },
+    ];
+
+    if (hasStoredPin) {
+      tabs.push({ id: 'pin', label: t('login.tabs.pin') });
+    }
+
+    return tabs;
+  }, [hasStoredPin, t]);
 
   useEffect(() => {
     if (hasStoredPin && state.isLocked) {
       setActiveTab('pin');
     }
   }, [hasStoredPin, state.isLocked]);
+
+  useEffect(() => {
+    if (!hasStoredPin && activeTab === 'pin') {
+      setActiveTab('password');
+    }
+  }, [activeTab, hasStoredPin]);
 
   const handlePasswordSubmit = useCallback(
     async ({ username, password }: { username: string; password: string }) => {
@@ -218,7 +228,7 @@ export const LoginScreen: React.FC = () => {
               onForgotPassword={() => setForgotPasswordVisible(true)}
               onRegister={() => setRegisterVisible(true)}
             />
-          ) : (
+          ) : hasStoredPin ? (
             <PinLoginForm
               hasPin={hasStoredPin}
               canManagePin={state.hasPasswordAuthenticated}
@@ -228,20 +238,34 @@ export const LoginScreen: React.FC = () => {
               onCreatePin={handlePinCreate}
               onResetPin={hasStoredPin ? handleRemovePin : undefined}
             />
+          ) : (
+            <View style={styles.noticeBox}>
+              <Text style={styles.noticeText}>
+                {t('login.prompts.pinSetup')}
+              </Text>
+            </View>
           )}
 
-          <View style={styles.dividerSection}>
-            <View style={styles.divider} />
-            <Text style={styles.dividerText}>{t('common.or')}</Text>
-            <View style={styles.divider} />
-          </View>
+          {biometricsEnabled ? (
+            <>
+              <View style={styles.dividerSection}>
+                <View style={styles.divider} />
+                <Text style={styles.dividerText}>{t('common.or')}</Text>
+                <View style={styles.divider} />
+              </View>
 
-          <BiometricLoginButton
-            available={biometrics && !availabilityLoading}
-            biometryType={biometryType}
-            loading={isLoading && lastAttempt === 'biometric'}
-            onPress={handleBiometricLogin}
-          />
+              <BiometricLoginButton
+                available={!availabilityLoading}
+                biometryType={biometryType}
+                loading={isLoading && lastAttempt === 'biometric'}
+                onPress={handleBiometricLogin}
+              />
+            </>
+          ) : biometricsSupported ? (
+            <Text style={styles.noticeText}>
+              {t('login.prompts.biometricSetup')}
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
       <ForgotPasswordModal
@@ -333,6 +357,19 @@ const styles = StyleSheet.create({
   dividerText: {
     color: COLORS.textSecondary,
     fontWeight: '600',
+  },
+  noticeBox: {
+    marginTop: 8,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  noticeText: {
+    textAlign: 'center',
+    color: COLORS.textSecondary,
+    fontSize: 14,
   },
   lockMessage: {
     textAlign: 'center',

@@ -10,6 +10,7 @@ import {
   authenticateWithBiometrics,
   isBiometricsAvailable,
 } from '../services/biometricService';
+import { isBiometricLoginEnabled } from '../services/biometricPreferenceService';
 import {
   clearPin,
   registerPin as persistPin,
@@ -163,6 +164,29 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   const [state, dispatch] = useReducer(authReducer, initialState);
   const sessionRef = useRef<PersistedSession | null>(null);
 
+  const logSessionSnapshot = useCallback(
+    (label: string, session: PersistedSession | null | undefined) => {
+      const summary = {
+        hasToken: Boolean(session?.token),
+        hasRefreshToken: Boolean(session?.refreshToken),
+        hasUser: Boolean(session?.user),
+        locked: session?.locked ?? null,
+        hasTokenLoginUrl: Boolean(session?.tokenLoginUrl),
+      };
+
+      deviceLog.debug(label, summary);
+
+      if (__DEV__) {
+        try {
+          console.log('[auth-debug]', label, JSON.stringify(summary));
+        } catch (error) {
+          console.log('[auth-debug]', label, summary);
+        }
+      }
+    },
+    [],
+  );
+
   const bootstrap = useCallback(async () => {
     dispatch({ type: 'BOOTSTRAP_START' });
 
@@ -224,13 +248,24 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           throw new Error('Incorrect PIN.');
         }
 
-        const session = await ensureValidSession();
+        let session = await ensureValidSession();
+        if (!session && sessionRef.current) {
+          logSessionSnapshot(
+            'auth.pin.sessionFallbackToRef',
+            sessionRef.current,
+          );
+          session = sessionRef.current;
+          await persistSessionSnapshot(session);
+        }
+
         if (!session) {
+          logSessionSnapshot('auth.pin.sessionMissing', null);
           throw new Error(
             'No saved session. Please log in with your password first.',
           );
         }
 
+        logSessionSnapshot('auth.pin.sessionBeforeUnlock', session);
         sessionRef.current = session;
         await setSessionLock(false);
 
@@ -269,6 +304,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           },
         });
         deviceLog.success('PIN login succeeded');
+        logSessionSnapshot('auth.pin.sessionAfterUnlock', sessionRef.current);
       } catch (error) {
         const message =
           error instanceof Error
@@ -278,7 +314,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         dispatch({ type: 'LOGIN_ERROR', payload: message });
       }
     },
-    [state.hasPasswordAuthenticated, state.membership],
+    [logSessionSnapshot, state.hasPasswordAuthenticated, state.membership],
   );
 
   const loginWithBiometrics = useCallback(
@@ -292,18 +328,34 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           );
         }
 
+        const enabled = await isBiometricLoginEnabled();
+        if (!enabled) {
+          throw new Error('Biometric authentication is not configured.');
+        }
+
         const success = await authenticateWithBiometrics(promptMessage);
         if (!success) {
           throw new Error('Biometric authentication was cancelled.');
         }
 
-        const session = await ensureValidSession();
+        let session = await ensureValidSession();
+        if (!session && sessionRef.current) {
+          logSessionSnapshot(
+            'auth.biometrics.sessionFallbackToRef',
+            sessionRef.current,
+          );
+          session = sessionRef.current;
+          await persistSessionSnapshot(session);
+        }
+
         if (!session) {
+          logSessionSnapshot('auth.biometrics.sessionMissing', null);
           throw new Error(
             'No saved session. Please log in with your password first.',
           );
         }
 
+        logSessionSnapshot('auth.biometrics.sessionBeforeUnlock', session);
         sessionRef.current = session;
         await setSessionLock(false);
 
@@ -342,6 +394,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           },
         });
         deviceLog.success('Biometric login succeeded');
+        logSessionSnapshot('auth.biometrics.sessionAfterUnlock', sessionRef.current);
       } catch (error) {
         const message =
           error instanceof Error
@@ -351,7 +404,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         dispatch({ type: 'LOGIN_ERROR', payload: message });
       }
     },
-    [state.hasPasswordAuthenticated, state.membership],
+    [logSessionSnapshot, state.hasPasswordAuthenticated, state.membership],
   );
 
   const canManagePin = useMemo(
@@ -393,6 +446,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       const snapshot: PersistedSession = {
         token: session.token ?? sessionRef.current?.token,
         refreshToken: session.refreshToken ?? sessionRef.current?.refreshToken,
+        tokenLoginUrl:
+          session.tokenLoginUrl ?? sessionRef.current?.tokenLoginUrl ?? null,
         user: session.user ?? state.user ?? sessionRef.current?.user ?? null,
         locked: session.locked,
       };
@@ -415,10 +470,27 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   }, [canManagePin]);
 
   const logout = useCallback(async () => {
-    await setSessionLock(true);
+    let snapshot = sessionRef.current ?? (await ensureValidSession());
+
+    if (snapshot) {
+      const mergedSnapshot: PersistedSession = {
+        token: snapshot.token,
+        refreshToken: snapshot.refreshToken,
+        tokenLoginUrl: snapshot.tokenLoginUrl ?? null,
+        user: snapshot.user ?? state.user ?? null,
+        locked: true,
+      };
+
+      sessionRef.current = mergedSnapshot;
+      await persistSessionSnapshot(mergedSnapshot);
+      logSessionSnapshot('auth.logout.persistedSnapshot', mergedSnapshot);
+    } else {
+      await setSessionLock(true);
+      logSessionSnapshot('auth.logout.lockedWithoutSnapshot', null);
+    }
+
     await clearPasswordAuthenticated();
     deviceLog.info('Session locked. User logged out.');
-    sessionRef.current = null;
     dispatch({
       type: 'SET_LOCKED',
       payload: {
@@ -428,7 +500,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         passwordAuthenticated: false,
       },
     });
-  }, [state.membership, state.user]);
+  }, [logSessionSnapshot, state.membership, state.user]);
 
   const resetError = useCallback(() => {
     dispatch({ type: 'RESET_ERROR' });

@@ -13,6 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
+import { authenticateWithBiometrics } from '../services/biometricService';
+import { setBiometricLoginEnabled } from '../services/biometricPreferenceService';
 import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
 
@@ -32,9 +34,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const { t, translateError } = useLocalization();
   const {
     pin: hasPin,
-    biometrics: biometricsAvailable,
+    biometrics: biometricsEnabled,
+    biometricsSupported,
     biometryType,
-    loading: pinLoading,
+    loading: availabilityLoading,
     refresh: refreshAuthAvailability,
   } = useAuthAvailability();
 
@@ -48,6 +51,8 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const [confirmPin, setConfirmPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [pinSubmitting, setPinSubmitting] = useState(false);
+  const [biometricError, setBiometricError] = useState<string | null>(null);
+  const [biometricSubmitting, setBiometricSubmitting] = useState(false);
 
   const biometricLabel = useMemo(() => {
     if (!biometryType) {
@@ -190,6 +195,96 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       ],
     );
   }, [refreshAuthAvailability, removePin, t, translateError]);
+
+  const handleEnableBiometrics = useCallback(async () => {
+    if (biometricSubmitting) {
+      return;
+    }
+
+    setBiometricError(null);
+
+    if (!biometricsSupported) {
+      setBiometricError(t('errors.biometricsUnavailable'));
+      return;
+    }
+
+    try {
+      setBiometricSubmitting(true);
+      const success = await authenticateWithBiometrics(t('biometrics.prompt'));
+
+      if (!success) {
+        setBiometricError(t('errors.biometricsCancelled'));
+        return;
+      }
+
+      await setBiometricLoginEnabled(true);
+      await refreshAuthAvailability();
+      Alert.alert(
+        t('profile.biometric.enabledTitle'),
+        t('profile.biometric.enabledMessage', {
+          replace: { method: biometricLabel },
+        }),
+      );
+    } catch (error) {
+      const translated = translateError(
+        error instanceof Error
+          ? error.message
+          : 'Unable to complete biometric login.',
+      );
+      setBiometricError(translated ?? t('errors.biometricLogin'));
+    } finally {
+      setBiometricSubmitting(false);
+    }
+  }, [
+    biometricLabel,
+    biometricSubmitting,
+    biometricsSupported,
+    refreshAuthAvailability,
+    t,
+    translateError,
+  ]);
+
+  const handleDisableBiometrics = useCallback(() => {
+    Alert.alert(
+      t('profile.biometric.disableConfirmTitle'),
+      t('profile.biometric.disableConfirmMessage'),
+      [
+        {
+          text: t('profile.biometric.disableConfirmCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('profile.biometric.disableConfirmConfirm'),
+          style: 'destructive',
+          onPress: async () => {
+            setBiometricSubmitting(true);
+            setBiometricError(null);
+            try {
+              await setBiometricLoginEnabled(false);
+              await refreshAuthAvailability();
+              Alert.alert(
+                t('profile.biometric.disabledTitle'),
+                t('profile.biometric.disabledMessage'),
+              );
+            } catch (error) {
+              const translated = translateError(
+                error instanceof Error
+                  ? error.message
+                  : 'Unable to complete biometric login.',
+              );
+              setBiometricError(translated ?? t('errors.biometricLogin'));
+            } finally {
+              setBiometricSubmitting(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [
+    refreshAuthAvailability,
+    t,
+    translateError,
+  ]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -336,7 +431,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           </Pressable>
 
           <View style={styles.pinStatusRow}>
-            {pinLoading ? (
+            {availabilityLoading ? (
               <ActivityIndicator color={COLORS.primary} />
             ) : (
               <Text style={styles.pinStatusText}>
@@ -366,7 +461,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             {t('profile.biometric.description')}
           </Text>
 
-          {pinLoading ? (
+          {availabilityLoading ? (
             <ActivityIndicator color={COLORS.primary} />
           ) : (
             <>
@@ -374,19 +469,19 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                 <View
                   style={[
                     styles.statusChip,
-                    biometricsAvailable
+                    biometricsSupported
                       ? styles.statusChipSuccess
                       : styles.statusChipMuted,
                   ]}
                 >
                   <Text
                     style={
-                      biometricsAvailable
+                      biometricsSupported
                         ? styles.statusChipTextSuccess
                         : styles.statusChipTextMuted
                     }
                   >
-                    {biometricsAvailable
+                    {biometricsSupported
                       ? t('profile.biometric.available', {
                           replace: { method: biometricLabel },
                         })
@@ -414,6 +509,68 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                       : t('profile.biometric.pinRequired')}
                   </Text>
                 </View>
+
+                <View
+                  style={[
+                    styles.statusChip,
+                    biometricsEnabled
+                      ? styles.statusChipSuccess
+                      : styles.statusChipMuted,
+                  ]}
+                >
+                  <Text
+                    style={
+                      biometricsEnabled
+                        ? styles.statusChipTextSuccess
+                        : styles.statusChipTextMuted
+                    }
+                  >
+                    {biometricsEnabled
+                      ? t('profile.biometric.enabledStatus', {
+                          replace: { method: biometricLabel },
+                        })
+                      : t('profile.biometric.disabledStatus')}
+                  </Text>
+                </View>
+              </View>
+
+              {biometricError ? (
+                <Text style={styles.errorText}>{biometricError}</Text>
+              ) : null}
+
+              <View style={styles.biometricButtonsRow}>
+                {biometricsSupported && !biometricsEnabled ? (
+                  <Pressable
+                    style={[
+                      styles.primaryButton,
+                      biometricSubmitting ? styles.buttonDisabled : null,
+                    ]}
+                    disabled={biometricSubmitting}
+                    accessibilityRole="button"
+                    onPress={handleEnableBiometrics}
+                  >
+                    {biometricSubmitting ? (
+                      <ActivityIndicator color={COLORS.textOnPrimary} />
+                    ) : (
+                      <Text style={styles.primaryButtonText}>
+                        {t('profile.biometric.enable')}
+                      </Text>
+                    )}
+                  </Pressable>
+                ) : null}
+
+                {biometricsEnabled ? (
+                  <Pressable
+                    style={[styles.outlineButton, biometricSubmitting ? styles.buttonDisabled : null]}
+                    accessibilityRole="button"
+                    disabled={biometricSubmitting}
+                    onPress={handleDisableBiometrics}
+                  >
+                    <Text style={styles.outlineButtonText}>
+                      {t('profile.biometric.disable')}
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
 
               <Text style={styles.sectionFootnote}>
@@ -530,6 +687,12 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     marginTop: 4,
   },
+  biometricButtonsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 12,
+  },
   fieldGroup: {
     gap: 6,
   },
@@ -565,6 +728,20 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.7,
+  },
+  outlineButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+  },
+  outlineButtonText: {
+    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: '600',
   },
   secondaryButton: {
     paddingHorizontal: 16,

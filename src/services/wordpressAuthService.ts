@@ -633,6 +633,10 @@ export const ensureValidSession =
       return null;
     }
 
+    if (session.locked) {
+      return session;
+    }
+
     if (!session.token) {
       if (!session.user) {
         await clearSession();

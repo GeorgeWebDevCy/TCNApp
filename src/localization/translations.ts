@@ -34,6 +34,12 @@ export const translations: Record<Language, TranslationDictionary> = {
         password: 'Password',
         pin: 'PIN',
       },
+      prompts: {
+        pinSetup:
+          'Sign in with your username and password to create a quick login PIN from your profile.',
+        biometricSetup:
+          'Enable biometric login from your profile after signing in.',
+      },
       alerts: {
         cannotOpenLink: {
           title: 'Unable to open link',
@@ -240,8 +246,21 @@ export const translations: Record<Language, TranslationDictionary> = {
         unavailable: 'Biometric login is not available on this device.',
         pinReady: 'PIN ready for quick login.',
         pinRequired: 'Set a PIN to enable quick login.',
+        enabledStatus: '{{method}} login is enabled.',
+        disabledStatus: 'Biometric login is turned off.',
+        enable: 'Enable biometric login',
+        disable: 'Disable biometric login',
+        enabledTitle: 'Biometric login enabled',
+        enabledMessage: '{{method}} can now be used from the login screen.',
+        disabledTitle: 'Biometric login disabled',
+        disabledMessage: 'Biometric login has been turned off for this device.',
+        disableConfirmTitle: 'Disable biometric login',
+        disableConfirmMessage:
+          'Are you sure you want to disable biometric login on this device?',
+        disableConfirmCancel: 'Cancel',
+        disableConfirmConfirm: 'Disable',
         instructions:
-          'After saving a PIN, open the login screen and choose biometrics to sign in with your fingerprint.',
+          'Use the options below to enable or disable biometric quick login on this device.',
       },
       actions: {
         back: 'Back to home',
@@ -302,6 +321,12 @@ export const translations: Record<Language, TranslationDictionary> = {
       tabs: {
         password: 'รหัสผ่าน',
         pin: 'พิน',
+      },
+      prompts: {
+        pinSetup:
+          'ลงชื่อเข้าใช้ด้วยชื่อผู้ใช้และรหัสผ่านเพื่อสร้างพินเข้าสู่ระบบด่วนจากโปรไฟล์ของคุณ',
+        biometricSetup:
+          'เปิดใช้งานการเข้าสู่ระบบด้วยข้อมูลชีวมิติจากหน้าโปรไฟล์หลังจากลงชื่อเข้าใช้',
       },
       alerts: {
         cannotOpenLink: {
@@ -498,13 +523,26 @@ export const translations: Record<Language, TranslationDictionary> = {
       biometric: {
         heading: 'เข้าสู่ระบบด้วยข้อมูลชีวภาพ',
         description:
-          'ใช้ลายนิ้วมือหรือ Face ID เพื่อเข้าสู่ระบบได้รวดเร็วยิ่งขึ้นจากหน้าล็อกอิน.',
+          'จัดการการเข้าสู่ระบบแบบรวดเร็วด้วยลายนิ้วมือหรือ Face ID บนอุปกรณ์นี้.',
         available: '{{method}} สามารถใช้งานได้บนอุปกรณ์นี้',
         unavailable: 'อุปกรณ์นี้ไม่รองรับการเข้าสู่ระบบด้วยข้อมูลชีวภาพ',
         pinReady: 'มีพินพร้อมสำหรับการเข้าสู่ระบบแบบด่วนแล้ว',
         pinRequired: 'ต้องตั้งค่าพินเพื่อเปิดใช้การเข้าสู่ระบบแบบด่วน',
+        enabledStatus: 'เปิดใช้งานการเข้าสู่ระบบด้วย {{method}} แล้ว',
+        disabledStatus: 'ปิดการเข้าสู่ระบบด้วยข้อมูลชีวภาพอยู่',
+        enable: 'เปิดใช้งานการเข้าสู่ระบบด้วยข้อมูลชีวภาพ',
+        disable: 'ปิดการเข้าสู่ระบบด้วยข้อมูลชีวภาพ',
+        enabledTitle: 'เปิดใช้งานข้อมูลชีวภาพแล้ว',
+        enabledMessage: 'ขณะนี้สามารถใช้ {{method}} บนหน้าเข้าสู่ระบบได้แล้ว',
+        disabledTitle: 'ปิดข้อมูลชีวภาพแล้ว',
+        disabledMessage: 'ปิดการเข้าสู่ระบบด้วยข้อมูลชีวภาพบนอุปกรณ์นี้เรียบร้อยแล้ว',
+        disableConfirmTitle: 'ปิดการเข้าสู่ระบบด้วยข้อมูลชีวภาพ',
+        disableConfirmMessage:
+          'คุณแน่ใจหรือไม่ว่าต้องการปิดการเข้าสู่ระบบด้วยข้อมูลชีวภาพบนอุปกรณ์นี้?',
+        disableConfirmCancel: 'ยกเลิก',
+        disableConfirmConfirm: 'ปิดใช้งาน',
         instructions:
-          'เมื่อบันทึกพินแล้ว ให้ไปที่หน้าล็อกอินและเลือกใช้งานข้อมูลชีวภาพเพื่อลงชื่อเข้าใช้ด้วยลายนิ้วมือของคุณ.',
+          'ใช้ตัวเลือกด้านล่างเพื่อเปิดหรือปิดการเข้าสู่ระบบด่วนด้วยข้อมูลชีวภาพบนอุปกรณ์นี้',
       },
       actions: {
         back: 'กลับสู่หน้าหลัก',
