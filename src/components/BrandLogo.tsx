@@ -1,11 +1,13 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
+  Image,
+  ImageSourcePropType,
+  StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   View,
   ViewStyle,
-  StyleProp,
-  TextStyle,
 } from 'react-native';
 import { COLORS } from '../config/theme';
 import { useLocalization } from '../contexts/LocalizationContext';
@@ -15,30 +17,25 @@ type BrandLogoProps = {
   orientation?: 'horizontal' | 'vertical';
   style?: StyleProp<ViewStyle>;
   align?: 'left' | 'center' | 'right';
-  showName?: boolean;
-  showAbbreviationLabel?: boolean;
+  showText?: boolean;
+  logoSource?: ImageSourcePropType;
 };
 
+const defaultLogoSource = require('../assets/logo.png');
+
 export const BrandLogo: React.FC<BrandLogoProps> = ({
-  size = 64,
+  size = 72,
   orientation = 'vertical',
   style,
   align = 'center',
-  showName = true,
-  showAbbreviationLabel = true,
+  showText = true,
+  logoSource = defaultLogoSource,
 }) => {
   const { t } = useLocalization();
-  const abbreviation = t('common.appAbbreviation');
-  const brandName = t('common.appName');
-  const brandTagline = t('common.appTagline', {
-    replace: { abbreviation },
-  });
-  const containerStyles = [
-    styles.container,
-    orientation === 'horizontal' ? styles.horizontal : styles.vertical,
-    style,
-  ];
+  const abbreviation = useMemo(() => t('common.appAbbreviation'), [t]);
 
+  const orientationStyle =
+    orientation === 'horizontal' ? styles.horizontal : styles.vertical;
   const groupAlignment =
     align === 'left'
       ? styles.alignLeft
@@ -52,44 +49,27 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       ? styles.textAlignRight
       : styles.textAlignCenter;
 
-  const circleStyle = [
-    styles.logoMark,
+  const imageStyle = [
+    styles.logoImage,
     {
       width: size,
       height: size,
-      borderRadius: size / 2,
     },
   ];
 
-  const abbreviationFontSize = Math.max(18, size * 0.38);
-
   return (
-    <View style={containerStyles} accessibilityRole="header">
-      <View style={circleStyle}>
-        <Text style={[styles.logoMarkText, { fontSize: abbreviationFontSize }]}>
+    <View style={[styles.container, orientationStyle, groupAlignment, style]}>
+      <Image
+        source={logoSource}
+        style={imageStyle}
+        resizeMode="contain"
+        accessibilityIgnoresInvertColors
+      />
+      {showText ? (
+        <Text style={[styles.logoText, textAlignment]} accessibilityRole="text">
           {abbreviation}
         </Text>
-      </View>
-      {(showName || showAbbreviationLabel) && (
-        <View style={[styles.textGroup, groupAlignment]}>
-          {showName ? (
-            <Text
-              style={[styles.brandName, textAlignment]}
-              accessibilityRole="text"
-            >
-              {brandName}
-            </Text>
-          ) : null}
-          {showAbbreviationLabel ? (
-            <Text
-              style={[styles.brandTagline, textAlignment]}
-              accessibilityRole="text"
-            >
-              {brandTagline}
-            </Text>
-          ) : null}
-        </View>
-      )}
+      ) : null}
     </View>
   );
 };
@@ -100,43 +80,22 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   vertical: {
-    alignSelf: 'center',
+    flexDirection: 'column',
   },
   horizontal: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
-  logoMark: {
-    backgroundColor: COLORS.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#00000033',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.24,
-    shadowRadius: 8,
-    elevation: 3,
-    paddingHorizontal: 12,
+  logoImage: {
+    maxWidth: 160,
+    maxHeight: 160,
   },
-  logoMarkText: {
-    color: COLORS.textOnPrimary,
+  logoText: {
+    fontSize: 24,
     fontWeight: '700',
-    letterSpacing: 2,
-  },
-  textGroup: {
-    gap: 4,
-  },
-  brandName: {
-    fontSize: 20,
-    fontWeight: '700',
+    letterSpacing: 4,
     color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-  brandTagline: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    textAlign: 'center',
   },
   alignLeft: {
     alignItems: 'flex-start',
