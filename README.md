@@ -218,6 +218,11 @@ Before building, update the placeholders in `src/config/authConfig.ts`:
 3. Update the registration and password reset links to match your deployment.
 4. Optionally customize the AsyncStorage keys if you need to namespace multiple environments.
 
+Ensure the `.env` file contains the correct OneSignal and Stripe settings before building:
+
+- `STRIPE_PUBLISHABLE_KEY` is safe for the mobile client and required for initializing the React Native Stripe SDK.
+- Keep `STRIPE_SECRET_KEY` in the `.env` file (or another secure store) for local testing only—never bundle it into production builds or commit it to version control.
+
 For PIN storage and biometrics to work correctly, ensure the listed native dependencies are linked and the necessary platform permissions (e.g., Face ID usage description on iOS) are set in your native project files.
 
 ---

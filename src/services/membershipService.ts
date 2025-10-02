@@ -105,6 +105,7 @@ export const fetchMembershipPlans = async (
     {
       method: 'GET',
       headers: buildHeaders(token),
+      credentials: 'include',
     },
   );
 
@@ -132,6 +133,7 @@ export const createMembershipPaymentSession = async (
     {
       method: 'POST',
       headers: buildHeaders(token),
+      credentials: 'include',
       body: JSON.stringify({ planId }),
     },
   );
@@ -157,6 +159,7 @@ export const confirmMembershipUpgrade = async (
     {
       method: 'POST',
       headers: buildHeaders(token),
+      credentials: 'include',
       body: JSON.stringify({ planId }),
     },
   );
