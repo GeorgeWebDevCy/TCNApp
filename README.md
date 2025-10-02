@@ -22,6 +22,7 @@ Here's the current README.md for the project.
 - [🧠 Supporting Services & Hooks](#-supporting-services--hooks)
 - [🗄️ Persisted Storage Keys](#-persisted-storage-keys)
 - [🛡️ WordPress Backend Requirements](#-wordpress-backend-requirements)
+- [🔗 Related Repositories](#-related-repositories)
 - [⚙️ Development Scripts & Tooling](#-development-scripts--tooling)
 
 ## 🎯 Overview
@@ -249,9 +250,17 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 
 ## 🛡️ WordPress Backend Requirements
 
+- Install and configure the [TCN Consumer Network MLM](https://github.com/GeorgeWebDevCy/tcn-mlm) plugin alongside WooCommerce to manage membership tiers, commissions, and expose the REST endpoints (`gn/v1/memberships/*`, membership metadata on `/wp-json/wp/v2/users/me`) consumed by the mobile upgrade flows.
 - Install and configure the GN Password Login API plugin so `/wp-json/gn/v1/login` is reachable for REST authentication, and ensure `/wp-json/wp/v2/users/me` remains accessible for profile hydration when tokens are available.【F:src/config/authConfig.ts†L1-L17】【F:src/services/wordpressAuthService.ts†L1-L220】
 - Ensure CORS and HTTPS are enabled so the React Native app can reach the WordPress API from devices and simulators.
 - Grant users permission to call the profile endpoint so their display name and avatar can be hydrated after login.【F:src/services/wordpressAuthService.ts†L29-L61】
+
+---
+
+## 🔗 Related Repositories
+
+- [TCN Consumer Network MLM](https://github.com/GeorgeWebDevCy/tcn-mlm): WordPress plugin that powers membership catalogue data, upgrade confirmations, and commission tracking for the TCN network, exposing the REST endpoints consumed by the mobile app.
+- [GN Password Login API](https://github.com/GeorgeWebDevCy/gn-password-login-api): Companion authentication plugin that provides the `/wp-json/gn/v1/login` endpoint used by the React Native client.
 
 ---
 
