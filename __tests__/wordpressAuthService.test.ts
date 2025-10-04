@@ -5,7 +5,7 @@ import {
   __unsafeResetWordPressCookieCacheForTests,
   clearStoredWordPressCookies,
 } from '../src/services/wordpressCookieService';
-import { loginWithPassword } from '../src/services/wordpressAuthService';
+import { loginWithPassword, registerAccount } from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
@@ -120,5 +120,37 @@ describe('wordpressAuthService', () => {
     ).rejects.toThrow(
       'There has been a critical error on this website. Learn more about troubleshooting WordPress.',
     );
+  });
+
+  it('sends membership metadata when registering a new account so the blue plan is auto-purchased', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2024-02-01T10:00:00.000Z'));
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(createJsonResponse(200, { success: true }));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      await registerAccount({
+        username: 'newmember',
+        email: 'newmember@example.com',
+        password: 'aSecurePassword123',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse((requestInit?.body as string) ?? '{}');
+
+    expect(body.create_membership_order).toBe(true);
+    expect(body.membership_status).toBe('active');
+    expect(body.membership_purchase_date).toBe('2024-02-01T10:00:00.000Z');
+    expect(body.membership_subscription_date).toBe('2024-02-01T10:00:00.000Z');
+    expect(body.role).toBe('customer');
   });
 });
