@@ -964,6 +964,7 @@ export const requestPasswordReset = async (
 export const registerAccount = async (
   options: RegisterOptions,
 ): Promise<string | undefined> => {
+  const registrationDate = new Date().toISOString();
   const payload: Record<string, unknown> = {
     username: options.username.trim(),
     email: options.email.trim(),
@@ -973,6 +974,9 @@ export const registerAccount = async (
     membership_plan: 'blue-membership',
     create_membership_order: true,
     membership_order_status: 'completed',
+    membership_status: 'active',
+    membership_purchase_date: registrationDate,
+    membership_subscription_date: registrationDate,
     suppress_emails: true,
     suppress_registration_email: true,
     suppress_order_email: true,
