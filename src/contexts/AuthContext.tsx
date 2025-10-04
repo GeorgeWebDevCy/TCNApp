@@ -703,10 +703,27 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   }, [hydrateTokenLogin, logCookieHydration]);
 
   const registerAccount = useCallback(async (options: RegisterOptions) => {
+    const registrationDate = new Date().toISOString();
+
     try {
-      const message = await registerWordPressAccount(options);
-      deviceLog.info('Account registration succeeded', {
+      const message = await registerWordPressAccount({
+        ...options,
+        registrationDate,
+      });
+      deviceLog.success('Account registration succeeded', {
         username: options.username,
+      });
+      deviceLog.info('WooCommerce customer created', {
+        username: options.username,
+        role: 'customer',
+        membershipPlan: 'blue-membership',
+      });
+      deviceLog.info('WooCommerce order created', {
+        username: options.username,
+        membershipPlan: 'blue-membership',
+        status: 'completed',
+        purchaseDate: registrationDate,
+        subscriptionDate: registrationDate,
       });
       return message;
     } catch (error) {

@@ -152,5 +152,68 @@ describe('wordpressAuthService', () => {
     expect(body.membership_purchase_date).toBe('2024-02-01T10:00:00.000Z');
     expect(body.membership_subscription_date).toBe('2024-02-01T10:00:00.000Z');
     expect(body.role).toBe('customer');
+    expect(body.woocommerce_customer).toEqual(
+      expect.objectContaining({
+        role: 'customer',
+        email: 'newmember@example.com',
+        username: 'newmember',
+      }),
+    );
+    expect(body.woocommerce_customer.first_name).toBeUndefined();
+    expect(body.woocommerce_customer.last_name).toBeUndefined();
+    expect(body.woocommerce_customer.billing).toEqual(
+      expect.objectContaining({
+        email: 'newmember@example.com',
+      }),
+    );
+    expect(body.woocommerce_customer.meta_data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'membership_tier', value: 'blue' }),
+        expect.objectContaining({ key: 'membership_plan', value: 'blue-membership' }),
+      ]),
+    );
+    expect(body.woocommerce_order).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        set_paid: true,
+        payment_method: 'app_membership_auto',
+        payment_method_title: 'TCN App Membership',
+        date_created_gmt: '2024-02-01T10:00:00.000Z',
+        date_paid_gmt: '2024-02-01T10:00:00.000Z',
+      }),
+    );
+    expect(body.woocommerce_order.billing).toEqual(
+      expect.objectContaining({
+        email: 'newmember@example.com',
+      }),
+    );
+    expect(body.woocommerce_order.line_items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          product_sku: 'blue-membership',
+          quantity: 1,
+          subtotal: '0',
+          total: '0',
+        }),
+      ]),
+    );
+    expect(body.woocommerce_order.meta_data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: 'membership_purchase_date',
+          value: '2024-02-01T10:00:00.000Z',
+        }),
+        expect.objectContaining({
+          key: 'membership_subscription_date',
+          value: '2024-02-01T10:00:00.000Z',
+        }),
+      ]),
+    );
+    expect(body.woocommerce_order.line_items[0]?.meta_data).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'membership_tier', value: 'blue' }),
+        expect.objectContaining({ key: 'membership_plan', value: 'blue-membership' }),
+      ]),
+    );
   });
 });
