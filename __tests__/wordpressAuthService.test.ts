@@ -216,4 +216,41 @@ describe('wordpressAuthService', () => {
       ]),
     );
   });
+
+  it('attaches WooCommerce REST API credentials when calling WooCommerce endpoints', async () => {
+    const originalRegisterEndpoint = WORDPRESS_CONFIG.endpoints.register;
+    const originalConsumerKey = WORDPRESS_CONFIG.woocommerce.consumerKey;
+    const originalConsumerSecret = WORDPRESS_CONFIG.woocommerce.consumerSecret;
+
+    WORDPRESS_CONFIG.endpoints.register = '/wp-json/wc/v3/customers';
+    WORDPRESS_CONFIG.woocommerce.consumerKey = 'ck_test_consumer_key';
+    WORDPRESS_CONFIG.woocommerce.consumerSecret = 'cs_test_consumer_secret';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(createJsonResponse(200, { success: true }));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      await registerAccount({
+        username: 'woo-member',
+        email: 'woo-member@example.com',
+        password: 'aSecurePassword123',
+      });
+    } finally {
+      WORDPRESS_CONFIG.endpoints.register = originalRegisterEndpoint;
+      WORDPRESS_CONFIG.woocommerce.consumerKey = originalConsumerKey;
+      WORDPRESS_CONFIG.woocommerce.consumerSecret = originalConsumerSecret;
+    }
+
+    const requestUrl = fetchMock.mock.calls[0]?.[0] as string;
+
+    expect(requestUrl).toContain(
+      `consumer_key=${encodeURIComponent('ck_test_consumer_key')}`,
+    );
+    expect(requestUrl).toContain(
+      `consumer_secret=${encodeURIComponent('cs_test_consumer_secret')}`,
+    );
+  });
 });

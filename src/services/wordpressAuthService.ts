@@ -61,6 +61,58 @@ const buildRestRouteUrl = (path: string) => {
   )}/?rest_route=${restRoute}`;
 };
 
+const isWooCommerceRestPath = (path: string): boolean => {
+  const normalizedPath = ensureLeadingSlash(path);
+  return normalizedPath.startsWith('/wp-json/wc/');
+};
+
+const appendWooCommerceCredentialsIfNeeded = (
+  url: string,
+  path: string,
+): string => {
+  if (!isWooCommerceRestPath(path)) {
+    return url;
+  }
+
+  const consumerKey = WORDPRESS_CONFIG.woocommerce.consumerKey.trim();
+  const consumerSecret = WORDPRESS_CONFIG.woocommerce.consumerSecret.trim();
+
+  if (!consumerKey || !consumerSecret) {
+    return url;
+  }
+
+  try {
+    const parsed = new URL(url);
+
+    if (!parsed.searchParams.has('consumer_key')) {
+      parsed.searchParams.append('consumer_key', consumerKey);
+    }
+
+    if (!parsed.searchParams.has('consumer_secret')) {
+      parsed.searchParams.append('consumer_secret', consumerSecret);
+    }
+
+    return parsed.toString();
+  } catch (error) {
+    const params: string[] = [];
+
+    if (!url.includes('consumer_key=')) {
+      params.push(`consumer_key=${encodeURIComponent(consumerKey)}`);
+    }
+
+    if (!url.includes('consumer_secret=')) {
+      params.push(`consumer_secret=${encodeURIComponent(consumerSecret)}`);
+    }
+
+    if (params.length === 0) {
+      return url;
+    }
+
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}${params.join('&')}`;
+  }
+};
+
 const decodeNumericEntities = (value: string): string =>
   value.replace(/&#(x?[0-9a-fA-F]+);/g, (match, entity) => {
     const isHexEntity =
@@ -227,7 +279,7 @@ const fetchWithRouteFallback = async (
   init?: RequestInit,
 ): Promise<Response> => {
   const primaryRequestInit = await buildWordPressRequestInit(init);
-  const primaryUrl = buildUrl(path);
+  const primaryUrl = appendWooCommerceCredentialsIfNeeded(buildUrl(path), path);
   const primaryResponse = await fetch(primaryUrl, primaryRequestInit);
   await syncWordPressCookiesFromResponse(primaryResponse);
 
@@ -252,7 +304,10 @@ const fetchWithRouteFallback = async (
   }
 
   const fallbackRequestInit = await buildWordPressRequestInit(init);
-  const fallbackUrl = buildRestRouteUrl(path);
+  const fallbackUrl = appendWooCommerceCredentialsIfNeeded(
+    buildRestRouteUrl(path),
+    path,
+  );
   const fallbackResponse = await fetch(fallbackUrl, fallbackRequestInit);
   await syncWordPressCookiesFromResponse(fallbackResponse);
   return fallbackResponse;
