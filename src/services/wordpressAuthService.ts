@@ -731,7 +731,7 @@ export const ensureValidSession =
 export const loginWithPassword = async ({
   username,
   password,
-  mode = 'token',
+  mode = 'cookie',
   remember = true,
 }: LoginOptions): Promise<PersistedSession> => {
   // Authenticate against the GN Password Login API plugin endpoint so native clients can

@@ -25,7 +25,7 @@ describe('wordpressAuthService', () => {
   it('retries WordPress requests using rest_route when the GN Password Login API route is missing', async () => {
     const loginResponseBody = {
       success: true,
-      mode: 'token',
+      mode: 'cookie',
       token: 'token-value',
       user: {
         id: 42,
