@@ -671,8 +671,36 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     }
 
     sessionRef.current = session;
+
+    if (!session.locked) {
+      try {
+        let cookieResult = await ensureCookieSession(session);
+        logCookieHydration('auth.session.cookie.initial', cookieResult, {
+          hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+        });
+
+        if (!cookieResult.ok && session.tokenLoginUrl) {
+          try {
+            await hydrateTokenLogin(session.tokenLoginUrl);
+            cookieResult = await ensureCookieSession(session);
+            logCookieHydration('auth.session.cookie.retry', cookieResult, {
+              hasTokenLoginUrl: Boolean(session.tokenLoginUrl),
+            });
+          } catch (error) {
+            deviceLog.warn('Session token login hydration failed', {
+              message: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      } catch (error) {
+        deviceLog.warn('Session cookie refresh failed', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     return session.token ?? null;
-  }, []);
+  }, [hydrateTokenLogin, logCookieHydration]);
 
   const registerAccount = useCallback(async (options: RegisterOptions) => {
     try {
