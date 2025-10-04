@@ -806,6 +806,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           currentPassword,
           newPassword,
           tokenLoginUrl: session.tokenLoginUrl,
+          restNonce: session.restNonce,
         });
         await refreshSession();
         deviceLog.success('Password updated successfully');
