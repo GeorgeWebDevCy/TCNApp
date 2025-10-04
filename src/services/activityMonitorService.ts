@@ -1,4 +1,8 @@
 import { ACTIVITY_MONITOR_CONFIG } from '../config/activityMonitorConfig';
+import {
+  buildWordPressRequestInit,
+  syncWordPressCookiesFromResponse,
+} from './wordpressCookieService';
 
 export type ActivityMonitorLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'success';
 
@@ -97,17 +101,18 @@ const processQueue = async (): Promise<void> => {
     }
 
     try {
+      const requestInit = await buildWordPressRequestInit({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(buildPayload(entry)),
+      });
       const response = await fetch(
         `${ACTIVITY_MONITOR_CONFIG.baseUrl}${ACTIVITY_MONITOR_CONFIG.endpoint}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify(buildPayload(entry)),
-        },
+        requestInit,
       );
+      await syncWordPressCookiesFromResponse(response);
 
       await safeConsumeResponse(response);
     } catch (error) {

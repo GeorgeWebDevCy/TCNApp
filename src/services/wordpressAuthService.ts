@@ -1,6 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
 import {
+  buildWordPressRequestInit,
+  clearStoredWordPressCookies,
+  syncWordPressCookiesFromResponse,
+} from './wordpressCookieService';
+import {
   AuthUser,
   LoginOptions,
   MembershipBenefit,
@@ -221,12 +226,10 @@ const fetchWithRouteFallback = async (
   path: string,
   init?: RequestInit,
 ): Promise<Response> => {
-  const requestInit: RequestInit = {
-    ...(init ?? {}),
-    credentials: init?.credentials ?? 'include',
-  };
+  const primaryRequestInit = await buildWordPressRequestInit(init);
   const primaryUrl = buildUrl(path);
-  const primaryResponse = await fetch(primaryUrl, requestInit);
+  const primaryResponse = await fetch(primaryUrl, primaryRequestInit);
+  await syncWordPressCookiesFromResponse(primaryResponse);
 
   if (primaryResponse.status !== 404) {
     return primaryResponse;
@@ -248,8 +251,11 @@ const fetchWithRouteFallback = async (
     return primaryResponse;
   }
 
+  const fallbackRequestInit = await buildWordPressRequestInit(init);
   const fallbackUrl = buildRestRouteUrl(path);
-  return fetch(fallbackUrl, requestInit);
+  const fallbackResponse = await fetch(fallbackUrl, fallbackRequestInit);
+  await syncWordPressCookiesFromResponse(fallbackResponse);
+  return fallbackResponse;
 };
 
 const hydrateWordPressCookieSession = async (
@@ -270,11 +276,12 @@ const hydrateWordPressCookieSession = async (
     : undefined;
 
   try {
-    const response = await fetch(resolvedUrl, {
+    const requestInit = await buildWordPressRequestInit({
       method: 'GET',
       headers,
-      credentials: 'include',
     });
+    const response = await fetch(resolvedUrl, requestInit);
+    await syncWordPressCookiesFromResponse(response);
     return { status: response.status, ok: response.ok };
   } catch (error) {
     return { status: 0, ok: false };
@@ -596,6 +603,7 @@ export const clearSession = async () => {
     AUTH_STORAGE_KEYS.passwordAuthenticated,
     AUTH_STORAGE_KEYS.tokenLoginUrl,
   ]);
+  await clearStoredWordPressCookies();
 };
 
 export const restoreSession = async (): Promise<PersistedSession | null> => {
