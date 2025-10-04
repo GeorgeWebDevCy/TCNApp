@@ -1,4 +1,4 @@
-Here's the current README.md for the project.
+
 
 # Consumer Network Program Overview
 
