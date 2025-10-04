@@ -964,10 +964,19 @@ export const requestPasswordReset = async (
 export const registerAccount = async (
   options: RegisterOptions,
 ): Promise<string | undefined> => {
-  const payload: Record<string, string> = {
+  const payload: Record<string, unknown> = {
     username: options.username.trim(),
     email: options.email.trim(),
     password: options.password,
+    role: 'customer',
+    membership_tier: 'blue',
+    membership_plan: 'blue-membership',
+    create_membership_order: true,
+    membership_order_status: 'completed',
+    suppress_emails: true,
+    suppress_registration_email: true,
+    suppress_order_email: true,
+    send_user_notification: false,
   };
 
   if (!payload.username || !payload.email || !payload.password) {
@@ -1005,22 +1014,7 @@ export const registerAccount = async (
     throw new Error(message);
   }
 
-  const messageSource =
-    (json && typeof json?.message === 'string' && json.message) ||
-    (json && typeof json?.notice === 'string' && json.notice) ||
-    (json &&
-      typeof json?.data === 'object' &&
-      json.data !== null &&
-      typeof (json.data as Record<string, unknown>).message === 'string' &&
-      (json.data as Record<string, unknown>).message) ||
-    (json &&
-      typeof json?.data === 'object' &&
-      json.data !== null &&
-      typeof (json.data as Record<string, unknown>).notice === 'string' &&
-      (json.data as Record<string, unknown>).notice) ||
-    null;
-
-  return messageSource ? sanitizeErrorMessage(messageSource) : undefined;
+  return 'Registration successful. Please log in to continue.';
 };
 
 export const resetPasswordWithCode = async ({
