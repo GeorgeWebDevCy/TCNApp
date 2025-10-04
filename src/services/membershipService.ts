@@ -1,6 +1,10 @@
 import { MEMBERSHIP_CONFIG } from '../config/membershipConfig';
 import { StripePaymentSession } from '../config/stripeConfig';
 import { MembershipPlan } from '../types/auth';
+import {
+  buildWordPressRequestInit,
+  syncWordPressCookiesFromResponse,
+} from './wordpressCookieService';
 
 export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
@@ -100,14 +104,15 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
 export const fetchMembershipPlans = async (
   token?: string,
 ): Promise<MembershipPlan[]> => {
+  const requestInit = await buildWordPressRequestInit({
+    method: 'GET',
+    headers: buildHeaders(token),
+  });
   const response = await fetch(
     `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.plans}`,
-    {
-      method: 'GET',
-      headers: buildHeaders(token),
-      credentials: 'include',
-    },
+    requestInit,
   );
+  await syncWordPressCookiesFromResponse(response);
 
   const payload = await handleResponse<
     MembershipPlansResponse | MembershipPlan[]
@@ -128,15 +133,16 @@ export const createMembershipPaymentSession = async (
   planId: string,
   token?: string,
 ): Promise<PaymentSessionResponse> => {
+  const requestInit = await buildWordPressRequestInit({
+    method: 'POST',
+    headers: buildHeaders(token),
+    body: JSON.stringify({ planId }),
+  });
   const response = await fetch(
     `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.createPaymentSession}`,
-    {
-      method: 'POST',
-      headers: buildHeaders(token),
-      credentials: 'include',
-      body: JSON.stringify({ planId }),
-    },
+    requestInit,
   );
+  await syncWordPressCookiesFromResponse(response);
 
   const payload = await handleResponse<PaymentSessionResponse>(response);
 
@@ -154,15 +160,16 @@ export const confirmMembershipUpgrade = async (
   planId: string,
   token?: string,
 ): Promise<ConfirmUpgradeResponse> => {
+  const requestInit = await buildWordPressRequestInit({
+    method: 'POST',
+    headers: buildHeaders(token),
+    body: JSON.stringify({ planId }),
+  });
   const response = await fetch(
     `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.confirm}`,
-    {
-      method: 'POST',
-      headers: buildHeaders(token),
-      credentials: 'include',
-      body: JSON.stringify({ planId }),
-    },
+    requestInit,
   );
+  await syncWordPressCookiesFromResponse(response);
 
   const payload = await handleResponse<ConfirmUpgradeResponse>(response);
   return payload;

@@ -28,4 +28,5 @@ export const AUTH_STORAGE_KEYS = {
   sessionLock: '@tcnapp/session-locked',
   passwordAuthenticated: '@tcnapp/password-authenticated',
   tokenLoginUrl: '@tcnapp/wp-token-login-url',
+  wordpressCookies: '@tcnapp/wp-cookies',
 };
