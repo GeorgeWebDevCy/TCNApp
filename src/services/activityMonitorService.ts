@@ -3,6 +3,7 @@ import {
   buildWordPressRequestInit,
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
+import { restoreSession } from './wordpressAuthService';
 
 export type ActivityMonitorLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'success';
 
@@ -11,6 +12,7 @@ export interface ActivityMonitorLogEntry {
   message: string;
   timestamp: number;
   params?: unknown[];
+  username?: string | null;
 }
 
 interface PendingLogPayload {
@@ -25,9 +27,49 @@ interface PendingLogPayload {
 const queue: ActivityMonitorLogEntry[] = [];
 let isProcessing = false;
 
-const buildPayload = (entry: ActivityMonitorLogEntry): PendingLogPayload => {
+const resolveUsername = async (
+  override?: string | null,
+): Promise<string> => {
+  const fallback = ACTIVITY_MONITOR_CONFIG.sentinelUsername;
+
+  const trimmedOverride =
+    typeof override === 'string' ? override.trim() : '';
+
+  if (trimmedOverride.length > 0) {
+    return trimmedOverride;
+  }
+
+  try {
+    const session = await restoreSession();
+    const sessionUser = session?.user;
+
+    if (!sessionUser) {
+      return fallback;
+    }
+
+    const email =
+      typeof sessionUser.email === 'string' ? sessionUser.email.trim() : '';
+    if (email.length > 0) {
+      return email;
+    }
+
+    const name =
+      typeof sessionUser.name === 'string' ? sessionUser.name.trim() : '';
+    if (name.length > 0) {
+      return name;
+    }
+  } catch (error) {
+    // Ignore errors resolving the username and fall back to the sentinel.
+  }
+
+  return fallback;
+};
+
+const buildPayload = async (
+  entry: ActivityMonitorLogEntry,
+): Promise<PendingLogPayload> => {
   const payload: PendingLogPayload = {
-    username: ACTIVITY_MONITOR_CONFIG.sentinelUsername,
+    username: await resolveUsername(entry.username),
     log_level: entry.level,
     log_message: entry.message,
     log_timestamp: entry.timestamp,
@@ -101,12 +143,13 @@ const processQueue = async (): Promise<void> => {
     }
 
     try {
+      const payload = await buildPayload(entry);
       const requestInit = await buildWordPressRequestInit({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(buildPayload(entry)),
+        body: JSON.stringify(payload),
       });
       const response = await fetch(
         `${ACTIVITY_MONITOR_CONFIG.baseUrl}${ACTIVITY_MONITOR_CONFIG.endpoint}`,
