@@ -17,6 +17,7 @@ export interface PersistedSession {
   token?: string;
   refreshToken?: string;
   tokenLoginUrl?: string | null;
+  restNonce?: string | null;
   user: AuthUser | null;
   locked: boolean;
 }
@@ -36,6 +37,8 @@ interface GnPasswordLoginResponse {
   token?: string;
   token_expires_in?: number;
   token_login_url?: string;
+  rest_nonce?: string;
+  nonce?: string;
   user?: GnPasswordLoginUserPayload | null;
   code?: string;
   data?: { status?: number };
@@ -590,6 +593,7 @@ const storeSession = async ({
   token,
   refreshToken,
   tokenLoginUrl,
+  restNonce,
   user,
 }: Omit<PersistedSession, 'locked'>) => {
   const entries: [string, string][] = [];
@@ -619,6 +623,12 @@ const storeSession = async ({
     removals.push(AUTH_STORAGE_KEYS.tokenLoginUrl);
   }
 
+  if (restNonce) {
+    entries.push([AUTH_STORAGE_KEYS.wpRestNonce, restNonce]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.wpRestNonce);
+  }
+
   if (entries.length > 0) {
     await AsyncStorage.multiSet(entries);
   }
@@ -641,6 +651,7 @@ export const persistSessionSnapshot = async (
     token: session.token,
     refreshToken: session.refreshToken,
     tokenLoginUrl: session.tokenLoginUrl ?? undefined,
+    restNonce: session.restNonce ?? undefined,
     user: session.user,
   });
 
@@ -657,6 +668,7 @@ export const clearSession = async () => {
     AUTH_STORAGE_KEYS.sessionLock,
     AUTH_STORAGE_KEYS.passwordAuthenticated,
     AUTH_STORAGE_KEYS.tokenLoginUrl,
+    AUTH_STORAGE_KEYS.wpRestNonce,
   ]);
   await clearStoredWordPressCookies();
 };
@@ -668,12 +680,14 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     [, userJson],
     [, lockValue],
     [, storedTokenLoginUrl],
+    [, storedRestNonce],
   ] = await AsyncStorage.multiGet([
     AUTH_STORAGE_KEYS.token,
     AUTH_STORAGE_KEYS.refreshToken,
     AUTH_STORAGE_KEYS.userProfile,
     AUTH_STORAGE_KEYS.sessionLock,
     AUTH_STORAGE_KEYS.tokenLoginUrl,
+    AUTH_STORAGE_KEYS.wpRestNonce,
   ]);
 
   const token = storedToken && storedToken.length > 0 ? storedToken : undefined;
@@ -702,6 +716,10 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     tokenLoginUrl:
       storedTokenLoginUrl && storedTokenLoginUrl.length > 0
         ? storedTokenLoginUrl
+        : undefined,
+    restNonce:
+      storedRestNonce && storedRestNonce.length > 0
+        ? storedRestNonce
         : undefined,
     user,
     locked: lockValue === 'locked',
@@ -884,10 +902,18 @@ export const loginWithPassword = async ({
       ? json.token_login_url
       : undefined;
 
+  const restNonce =
+    typeof json.rest_nonce === 'string' && json.rest_nonce.trim().length > 0
+      ? json.rest_nonce.trim()
+      : typeof json.nonce === 'string' && json.nonce.trim().length > 0
+      ? json.nonce.trim()
+      : undefined;
+
   const session: PersistedSession = {
     token,
     user,
     tokenLoginUrl,
+    restNonce,
     locked: false,
   };
 
@@ -906,12 +932,14 @@ export const updatePassword = async ({
   newPassword,
   confirmPassword,
   tokenLoginUrl,
+  restNonce,
 }: {
   token?: string | null;
   currentPassword: string;
   newPassword: string;
   confirmPassword?: string;
   tokenLoginUrl?: string | null;
+  restNonce?: string | null;
 }): Promise<void> => {
   const trimmedCurrent = currentPassword.trim();
   const trimmedNew = newPassword.trim();
@@ -930,6 +958,11 @@ export const updatePassword = async ({
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        ...(restNonce
+          ? {
+              'X-WP-Nonce': restNonce,
+            }
+          : {}),
         ...(token
           ? {
               Authorization: `Bearer ${token}`,
