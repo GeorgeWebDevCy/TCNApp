@@ -933,6 +933,8 @@ export const updatePassword = async ({
   confirmPassword,
   tokenLoginUrl,
   restNonce,
+  userId,
+  identifier,
 }: {
   token?: string | null;
   currentPassword: string;
@@ -940,20 +942,85 @@ export const updatePassword = async ({
   confirmPassword?: string;
   tokenLoginUrl?: string | null;
   restNonce?: string | null;
+  userId?: number | null;
+  identifier?: string | null;
 }): Promise<void> => {
   const trimmedCurrent = currentPassword.trim();
   const trimmedNew = newPassword.trim();
   const trimmedConfirm = (confirmPassword ?? newPassword).trim();
+  const resolvedUserId =
+    typeof userId === 'number' && Number.isFinite(userId) ? userId : null;
+  const normalizedIdentifier =
+    typeof identifier === 'string' && identifier.trim().length > 0
+      ? identifier.trim()
+      : undefined;
 
   if (!trimmedCurrent || !trimmedNew) {
     throw new Error('Unable to change password.');
   }
 
   await hydrateWordPressCookieSession(tokenLoginUrl, token ?? undefined);
+  const performRestPasswordUpdate = async () => {
+    const response = await fetchWithRouteFallback(
+      WORDPRESS_CONFIG.endpoints.changePassword,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...(restNonce
+            ? {
+                'X-WP-Nonce': restNonce,
+              }
+            : {}),
+          ...(token
+            ? {
+                Authorization: `Bearer ${token}`,
+              }
+            : {}),
+        },
+        body: JSON.stringify({
+          current_password: trimmedCurrent,
+          new_password: trimmedNew,
+          confirm_password: trimmedConfirm,
+        }),
+      },
+    );
 
-  const response = await fetchWithRouteFallback(
-    WORDPRESS_CONFIG.endpoints.changePassword,
-    {
+    const json = await parseJsonResponse<Record<string, unknown>>(response);
+    const successFlag = extractSuccessFlag(json);
+
+    if (!response.ok || successFlag === false) {
+      const message = await extractMessageFromResponse(
+        response,
+        'Unable to change password.',
+      );
+      throw new Error(message);
+    }
+  };
+
+  const performSqlPasswordUpdate = async () => {
+    if (!resolvedUserId) {
+      throw new Error('Unable to change password.');
+    }
+
+    const sqlEndpoint = WORDPRESS_CONFIG.endpoints.changePasswordSql;
+    if (!sqlEndpoint) {
+      throw new Error('Unable to change password.');
+    }
+
+    const payload: Record<string, unknown> = {
+      user_id: resolvedUserId,
+      current_password: trimmedCurrent,
+      new_password: trimmedNew,
+      confirm_password: trimmedConfirm,
+    };
+
+    if (normalizedIdentifier) {
+      payload.identifier = normalizedIdentifier;
+    }
+
+    const response = await fetchWithRouteFallback(sqlEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -969,23 +1036,47 @@ export const updatePassword = async ({
             }
           : {}),
       },
-      body: JSON.stringify({
-        current_password: trimmedCurrent,
-        new_password: trimmedNew,
-        confirm_password: trimmedConfirm,
-      }),
-    },
-  );
+      body: JSON.stringify(payload),
+    });
 
-  const json = await parseJsonResponse<Record<string, unknown>>(response);
-  const successFlag = extractSuccessFlag(json);
+    const json = await parseJsonResponse<Record<string, unknown>>(response);
+    const successFlag = extractSuccessFlag(json);
 
-  if (!response.ok || successFlag === false) {
-    const message = await extractMessageFromResponse(
-      response,
-      'Unable to change password.',
-    );
-    throw new Error(message);
+    if (!response.ok || successFlag === false) {
+      const message = await extractMessageFromResponse(
+        response,
+        'Unable to change password.',
+      );
+      throw new Error(message);
+    }
+  };
+
+  let restError: Error | null = null;
+
+  try {
+    await performRestPasswordUpdate();
+  } catch (error) {
+    restError =
+      error instanceof Error
+        ? error
+        : new Error('Unable to change password.');
+  }
+
+  if (restError) {
+    if (!resolvedUserId || !WORDPRESS_CONFIG.endpoints.changePasswordSql) {
+      throw restError;
+    }
+
+    try {
+      await performSqlPasswordUpdate();
+      await refreshPersistedUserProfile(token);
+      return;
+    } catch (sqlError) {
+      if (sqlError instanceof Error) {
+        throw sqlError;
+      }
+      throw restError;
+    }
   }
 
   await refreshPersistedUserProfile(token);

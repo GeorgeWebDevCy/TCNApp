@@ -5,7 +5,11 @@ import {
   __unsafeResetWordPressCookieCacheForTests,
   clearStoredWordPressCookies,
 } from '../src/services/wordpressCookieService';
-import { loginWithPassword, registerAccount } from '../src/services/wordpressAuthService';
+import {
+  loginWithPassword,
+  registerAccount,
+  updatePassword,
+} from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
@@ -251,6 +255,61 @@ describe('wordpressAuthService', () => {
     );
     expect(requestUrl).toContain(
       `consumer_secret=${encodeURIComponent('cs_test_consumer_secret')}`,
+    );
+  });
+
+  it('falls back to the SQL password change endpoint when the REST endpoint fails', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(500, {
+          success: false,
+          message: 'REST endpoint unavailable',
+        }),
+      )
+      .mockResolvedValueOnce(createJsonResponse(200, { success: true }))
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 7,
+          email: 'member@example.com',
+          name: 'Member Example',
+          avatar_urls: {},
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await updatePassword({
+      token: 'token-value',
+      currentPassword: 'OldPass123!',
+      newPassword: 'NewPass456!',
+      tokenLoginUrl: null,
+      restNonce: null,
+      userId: 7,
+      identifier: 'member@example.com',
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${WORDPRESS_CONFIG.baseUrl}/wp-json/gn/v1/change-password`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}/wp-json/gn/v1/sql/change-password`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `${WORDPRESS_CONFIG.baseUrl}/wp-json/wp/v2/users/me`,
+      expect.objectContaining({ method: 'GET' }),
+    );
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      AUTH_STORAGE_KEYS.userProfile,
+      expect.stringContaining('Member Example'),
     );
   });
 });
