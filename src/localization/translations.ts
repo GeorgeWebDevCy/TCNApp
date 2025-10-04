@@ -108,7 +108,7 @@ export const translations: Record<Language, TranslationDictionary> = {
         submit: 'Create account',
         cancel: 'Cancel',
         closeAfterSuccess: 'Close',
-        success: 'Account created. Check your email for verification details.',
+        success: 'Account created successfully. Please log in to continue.',
       },
     },
     biometrics: {
@@ -394,7 +394,7 @@ export const translations: Record<Language, TranslationDictionary> = {
         submit: 'สร้างบัญชี',
         cancel: 'ยกเลิก',
         closeAfterSuccess: 'ปิด',
-        success: 'สร้างบัญชีเรียบร้อย ตรวจสอบอีเมลเพื่อยืนยัน.',
+        success: 'สร้างบัญชีเรียบร้อย กรุณาเข้าสู่ระบบเพื่อเริ่มต้น.',
       },
     },
     biometrics: {
