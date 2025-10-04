@@ -1,4 +1,19 @@
+import {
+  WOOCOMMERCE_CONSUMER_KEY,
+  WOOCOMMERCE_CONSUMER_SECRET,
+} from '@env';
+
+const sanitizeEnvValue = (value?: string): string =>
+  value && typeof value === 'string' ? value.trim() : '';
+
 const BASE_URL = 'https://dominicb72.sg-host.com';
+
+const WOOCOMMERCE_CONSUMER_KEY_VALUE = sanitizeEnvValue(
+  WOOCOMMERCE_CONSUMER_KEY,
+);
+const WOOCOMMERCE_CONSUMER_SECRET_VALUE = sanitizeEnvValue(
+  WOOCOMMERCE_CONSUMER_SECRET,
+);
 
 export const WORDPRESS_CONFIG = {
   baseUrl: BASE_URL,
@@ -13,6 +28,10 @@ export const WORDPRESS_CONFIG = {
   links: {
     register: `${BASE_URL}/register`,
     forgotPassword: `${BASE_URL}/wp-login.php?action=lostpassword`,
+  },
+  woocommerce: {
+    consumerKey: WOOCOMMERCE_CONSUMER_KEY_VALUE,
+    consumerSecret: WOOCOMMERCE_CONSUMER_SECRET_VALUE,
   },
 };
 
