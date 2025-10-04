@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, ViewProps } from 'react-native';
 import { COLORS } from '../config/theme';
+import type { ActivityMonitorLogLevel } from '../services/activityMonitorService';
+import { enqueueActivityLog } from '../services/activityMonitorService';
 
 export interface StorageAdapter {
   getItem(key: string): Promise<string | null> | string | null;
@@ -11,11 +13,13 @@ export interface StorageAdapter {
 export interface DeviceLogOptions {
   logToConsole?: boolean;
   logRNErrors?: boolean;
+  logToActivityMonitor?: boolean;
+  activityMonitorMinimumLevel?: ActivityMonitorLogLevel;
   maxNumberToRender?: number;
   maxNumberToPersist?: number;
 }
 
-type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'success';
+type LogLevel = ActivityMonitorLogLevel;
 
 interface LogEntry {
   id: string;
@@ -30,11 +34,19 @@ type Subscriber = (entries: LogEntry[]) => void;
 
 const LOG_STORAGE_KEY = '@device-log';
 const defaultOptions: Required<
-  Pick<DeviceLogOptions, 'logToConsole' | 'logRNErrors'>
+  Pick<
+    DeviceLogOptions,
+    'logToConsole' | 'logRNErrors' | 'logToActivityMonitor'
+  >
 > &
-  Omit<DeviceLogOptions, 'logToConsole' | 'logRNErrors'> = {
+  Omit<
+    DeviceLogOptions,
+    'logToConsole' | 'logRNErrors' | 'logToActivityMonitor'
+  > = {
   logToConsole: true,
   logRNErrors: true,
+  logToActivityMonitor: true,
+  activityMonitorMinimumLevel: 'debug',
   maxNumberToRender: 200,
   maxNumberToPersist: 500,
 };
@@ -48,6 +60,23 @@ const originalConsole: Partial<
   Record<ConsoleMethod, (...args: unknown[]) => void>
 > = {};
 const timers = new Map<string, number>();
+
+const logLevelPriority: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  success: 1,
+  warn: 2,
+  error: 3,
+};
+
+const shouldSendToActivityMonitor = (level: LogLevel): boolean => {
+  if (activeOptions.logToActivityMonitor === false) {
+    return false;
+  }
+
+  const threshold = activeOptions.activityMonitorMinimumLevel ?? 'debug';
+  return logLevelPriority[level] >= logLevelPriority[threshold];
+};
 
 const consoleToLogLevel: Record<ConsoleMethod, LogLevel> = {
   log: 'info',
@@ -127,6 +156,15 @@ const handleNewEntry = (
   entries = [...entries, entry];
   notifySubscribers();
   void persistEntries();
+
+  if (shouldSendToActivityMonitor(level)) {
+    enqueueActivityLog({
+      level,
+      message: formattedMessage,
+      timestamp: entry.timestamp,
+      params,
+    });
+  }
 
   if (!skipConsoleOutput && activeOptions.logToConsole !== false) {
     const consoleMethod: ConsoleMethod = level === 'success' ? 'info' : level;
