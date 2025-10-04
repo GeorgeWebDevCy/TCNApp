@@ -61,6 +61,7 @@ export interface RegisterOptions {
   password: string;
   firstName?: string;
   lastName?: string;
+  registrationDate?: string;
 }
 
 export interface ResetPasswordOptions {

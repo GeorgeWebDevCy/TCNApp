@@ -964,10 +964,31 @@ export const requestPasswordReset = async (
 export const registerAccount = async (
   options: RegisterOptions,
 ): Promise<string | undefined> => {
-  const registrationDate = new Date().toISOString();
+  const registrationDate =
+    typeof options.registrationDate === 'string' &&
+    options.registrationDate.trim().length > 0
+      ? options.registrationDate
+      : new Date().toISOString();
+
+  const username = options.username.trim();
+  const email = options.email.trim();
+  const firstName = options.firstName?.trim() ?? '';
+  const lastName = options.lastName?.trim() ?? '';
+
+  const billing: Record<string, string | undefined> = {
+    first_name: firstName || undefined,
+    last_name: lastName || undefined,
+    email,
+  };
+
+  const shipping: Record<string, string | undefined> = {
+    first_name: firstName || undefined,
+    last_name: lastName || undefined,
+  };
+
   const payload: Record<string, unknown> = {
-    username: options.username.trim(),
-    email: options.email.trim(),
+    username,
+    email,
     password: options.password,
     role: 'customer',
     membership_tier: 'blue',
@@ -981,18 +1002,60 @@ export const registerAccount = async (
     suppress_registration_email: true,
     suppress_order_email: true,
     send_user_notification: false,
+    woocommerce_customer: {
+      role: 'customer',
+      email,
+      username,
+      first_name: firstName || undefined,
+      last_name: lastName || undefined,
+      billing,
+      shipping,
+      meta_data: [
+        { key: 'membership_tier', value: 'blue' },
+        { key: 'membership_plan', value: 'blue-membership' },
+      ],
+    },
+    woocommerce_order: {
+      status: 'completed',
+      set_paid: true,
+      payment_method: 'app_membership_auto',
+      payment_method_title: 'TCN App Membership',
+      currency: 'THB',
+      total: '0',
+      line_items: [
+        {
+          name: 'Blue Membership',
+          product_sku: 'blue-membership',
+          quantity: 1,
+          subtotal: '0',
+          total: '0',
+          meta_data: [
+            { key: 'membership_tier', value: 'blue' },
+            { key: 'membership_plan', value: 'blue-membership' },
+          ],
+        },
+      ],
+      billing,
+      shipping,
+      date_created_gmt: registrationDate,
+      date_paid_gmt: registrationDate,
+      meta_data: [
+        { key: 'membership_purchase_date', value: registrationDate },
+        { key: 'membership_subscription_date', value: registrationDate },
+      ],
+    },
   };
 
   if (!payload.username || !payload.email || !payload.password) {
     throw new Error('Unable to register a new account.');
   }
 
-  if (options.firstName) {
-    payload.first_name = options.firstName.trim();
+  if (firstName) {
+    payload.first_name = firstName;
   }
 
-  if (options.lastName) {
-    payload.last_name = options.lastName.trim();
+  if (lastName) {
+    payload.last_name = lastName;
   }
 
   const response = await fetchWithRouteFallback(
