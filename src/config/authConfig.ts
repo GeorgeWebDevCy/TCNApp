@@ -21,6 +21,7 @@ export const WORDPRESS_CONFIG = {
     passwordLogin: '/wp-json/gn/v1/login',
     profile: '/wp-json/wp/v2/users/me',
     changePassword: '/wp-json/gn/v1/change-password',
+    changePasswordSql: '/wp-json/gn/v1/sql/change-password',
     passwordReset: '/wp-json/gn/v1/forgot-password',
     directPasswordReset: '/wp-json/gn/v1/reset-password',
     register: '/wp-json/gn/v1/register',
