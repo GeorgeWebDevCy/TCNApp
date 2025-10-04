@@ -70,7 +70,80 @@ Content-Type: application/json
   "email": "newuser@example.com",
   "password": "aSecurePassword123",
   "first_name": "New",
-  "last_name": "User"
+  "last_name": "User",
+
+  // Important: the mobile app sends the following metadata so the
+  // blue plan is auto-provisioned and WooCommerce creates the
+  // complimentary order. When omitted, WordPress falls back to the
+  // default "subscriber" role with no membership attached.
+  "role": "customer",
+  "membership_tier": "blue",
+  "membership_plan": "blue-membership",
+  "create_membership_order": true,
+  "membership_order_status": "completed",
+  "membership_status": "active",
+  "membership_purchase_date": "2024-02-01T10:00:00.000Z",
+  "membership_subscription_date": "2024-02-01T10:00:00.000Z",
+  "suppress_emails": true,
+  "suppress_registration_email": true,
+  "suppress_order_email": true,
+  "send_user_notification": false,
+  "woocommerce_customer": {
+    "role": "customer",
+    "email": "newuser@example.com",
+    "username": "newuser",
+    "first_name": "New",
+    "last_name": "User",
+    "billing": {
+      "first_name": "New",
+      "last_name": "User",
+      "email": "newuser@example.com"
+    },
+    "shipping": {
+      "first_name": "New",
+      "last_name": "User"
+    },
+    "meta_data": [
+      { "key": "membership_tier", "value": "blue" },
+      { "key": "membership_plan", "value": "blue-membership" }
+    ]
+  },
+  "woocommerce_order": {
+    "status": "completed",
+    "set_paid": true,
+    "payment_method": "app_membership_auto",
+    "payment_method_title": "TCN App Membership",
+    "currency": "THB",
+    "total": "0",
+    "line_items": [
+      {
+        "name": "Blue Membership",
+        "product_sku": "blue-membership",
+        "quantity": 1,
+        "subtotal": "0",
+        "total": "0",
+        "meta_data": [
+          { "key": "membership_tier", "value": "blue" },
+          { "key": "membership_plan", "value": "blue-membership" }
+        ]
+      }
+    ],
+    "billing": {
+      "first_name": "New",
+      "last_name": "User",
+      "email": "newuser@example.com"
+    },
+    "shipping": {
+      "first_name": "New",
+      "last_name": "User"
+    },
+    "date_created_gmt": "2024-02-01T10:00:00.000Z",
+    "date_paid_gmt": "2024-02-01T10:00:00.000Z",
+    "meta_data": [
+      { "key": "membership_purchase_date", "value": "2024-02-01T10:00:00.000Z" },
+      { "key": "membership_subscription_date", "value": "2024-02-01T10:00:00.000Z" }
+    ]
+  }
 }
 ```
 
@@ -83,6 +156,12 @@ Successful response:
   "user_id": 456
 }
 ```
+
+> ℹ️ The mobile app builds this payload automatically (see
+> `registerAccount()` in `src/services/wordpressAuthService.ts`). When you
+> use an API client manually, ensure you include the same fields if you
+> expect the membership tier, customer role, and complimentary order to be
+> created.
 
 ### Password reset (email flow)
 
