@@ -757,7 +757,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             const refreshed = await loginWithWordPress({
               username: identifier,
               password: currentPassword,
-              mode: 'cookie',
+              mode: 'token',
               remember: true,
             });
 
