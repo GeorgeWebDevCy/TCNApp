@@ -202,7 +202,6 @@ exports[`HomeScreen renders the membership overview 1`] = `
         }
       >
         <View
-          accessibilityRole="header"
           style={
             [
               {
@@ -210,126 +209,151 @@ exports[`HomeScreen renders the membership overview 1`] = `
                 "gap": 12,
               },
               {
-                "alignSelf": "center",
+                "flexDirection": "column",
+              },
+              {
+                "alignItems": "center",
               },
               undefined,
             ]
           }
         >
-          <View
+          <Image
+            accessibilityIgnoresInvertColors={true}
+            resizeMode="contain"
+            source={
+              {
+                "testUri": "../../../src/assets/logo.png",
+              }
+            }
             style={
               [
                 {
-                  "alignItems": "center",
-                  "backgroundColor": "#2563EB",
-                  "elevation": 3,
-                  "justifyContent": "center",
-                  "paddingHorizontal": 12,
-                  "shadowColor": "#00000033",
-                  "shadowOffset": {
-                    "height": 4,
-                    "width": 0,
-                  },
-                  "shadowOpacity": 0.24,
-                  "shadowRadius": 8,
+                  "maxHeight": 160,
+                  "maxWidth": 160,
                 },
                 {
-                  "borderRadius": 32,
-                  "height": 64,
-                  "width": 64,
+                  "height": 72,
+                  "width": 72,
+                },
+              ]
+            }
+          />
+          <Text
+            accessibilityRole="text"
+            style={
+              [
+                {
+                  "color": "#0F172A",
+                  "fontSize": 24,
+                  "fontWeight": "700",
+                  "letterSpacing": 4,
+                },
+                {
+                  "textAlign": "center",
                 },
               ]
             }
           >
-            <Text
-              style={
-                [
-                  {
-                    "color": "#FFFFFF",
-                    "fontWeight": "700",
-                    "letterSpacing": 2,
-                  },
-                  {
-                    "fontSize": 24.32,
-                  },
-                ]
+            TCN
+          </Text>
+        </View>
+      </View>
+      <View
+        style={
+          {
+            "alignItems": "center",
+            "flexDirection": "row",
+            "gap": 16,
+            "marginTop": 16,
+          }
+        }
+      >
+        <View
+          style={
+            {
+              "alignItems": "center",
+              "backgroundColor": "#F1F5F9",
+              "borderRadius": 32,
+              "height": 64,
+              "justifyContent": "center",
+              "width": 64,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#0F172A",
+                "fontSize": 20,
+                "fontWeight": "700",
               }
-            >
-              TCN
-            </Text>
-          </View>
+            }
+          >
+            JD
+          </Text>
+        </View>
+        <View
+          style={
+            {
+              "flex": 1,
+              "gap": 6,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#0F172A",
+                "fontSize": 24,
+                "fontWeight": "700",
+              }
+            }
+          >
+            Welcome, Jane Doe!
+          </Text>
+          <Text
+            style={
+              {
+                "color": "#475569",
+                "fontSize": 16,
+              }
+            }
+          >
+            jane@example.com
+          </Text>
           <View
             style={
-              [
-                {
-                  "gap": 4,
-                },
-                {
-                  "alignItems": "center",
-                },
-              ]
+              {
+                "gap": 2,
+                "marginTop": 4,
+              }
             }
           >
             <Text
-              accessibilityRole="text"
               style={
-                [
-                  {
-                    "color": "#0F172A",
-                    "fontSize": 20,
-                    "fontWeight": "700",
-                    "textAlign": "center",
-                  },
-                  {
-                    "textAlign": "center",
-                  },
-                ]
+                {
+                  "color": "#0F172A",
+                  "fontSize": 14,
+                  "fontWeight": "600",
+                }
               }
             >
-              The Consumer Network
+              Plan: Gold
             </Text>
             <Text
-              accessibilityRole="text"
               style={
-                [
-                  {
-                    "color": "#475569",
-                    "fontSize": 14,
-                    "fontWeight": "600",
-                    "textAlign": "center",
-                  },
-                  {
-                    "textAlign": "center",
-                  },
-                ]
+                {
+                  "color": "#475569",
+                  "fontSize": 13,
+                }
               }
             >
-              Trusted as TCN
+              Renews on Jan 10, 2030
             </Text>
           </View>
         </View>
       </View>
-      <Text
-        style={
-          {
-            "color": "#0F172A",
-            "fontSize": 24,
-            "fontWeight": "700",
-          }
-        }
-      >
-        Welcome, Jane Doe!
-      </Text>
-      <Text
-        style={
-          {
-            "color": "#475569",
-            "fontSize": 16,
-          }
-        }
-      >
-        jane@example.com
-      </Text>
       <View
         accessibilityRole="button"
         accessibilityState={

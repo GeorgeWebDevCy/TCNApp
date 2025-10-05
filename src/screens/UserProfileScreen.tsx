@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,6 +18,8 @@ import { authenticateWithBiometrics } from '../services/biometricService';
 import { setBiometricLoginEnabled } from '../services/biometricPreferenceService';
 import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { getUserDisplayName, getUserInitials } from '../utils/user';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -30,6 +33,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     changePassword,
     registerPin,
     removePin,
+    updateProfileAvatar,
   } = useAuthContext();
   const { t, translateError } = useLocalization();
   const {
@@ -53,6 +57,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const [pinSubmitting, setPinSubmitting] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
   const [biometricSubmitting, setBiometricSubmitting] = useState(false);
+  const [avatarSubmitting, setAvatarSubmitting] = useState(false);
 
   const biometricLabel = useMemo(() => {
     if (!biometryType) {
@@ -63,17 +68,49 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     return t(key);
   }, [biometryType, t]);
 
-  const displayName = useMemo(() => {
-    if (!user) {
-      return '';
-    }
+  const displayName = useMemo(() => getUserDisplayName(user) ?? '', [user]);
+  const avatarInitials = useMemo(() => getUserInitials(user), [user]);
 
-    if (user.name && user.name.trim().length > 0) {
-      return user.name;
-    }
+  const handleChangeAvatar = useCallback(async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        quality: 0.85,
+      });
 
-    return user.email;
-  }, [user]);
+      if (result.didCancel || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const asset = result.assets[0];
+      if (!asset?.uri) {
+        throw new Error(t('profile.avatar.errors.invalidSelection'));
+      }
+
+      setAvatarSubmitting(true);
+      await updateProfileAvatar({
+        uri: asset.uri,
+        fileName: asset.fileName ?? undefined,
+        mimeType: asset.type ?? undefined,
+      });
+
+      Alert.alert(
+        t('profile.avatar.successTitle'),
+        t('profile.avatar.successMessage'),
+      );
+    } catch (error) {
+      const translated = translateError(
+        error instanceof Error ? error.message : null,
+      );
+      Alert.alert(
+        t('profile.avatar.errorTitle'),
+        translated ?? t('profile.avatar.errorMessage'),
+      );
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  }, [t, translateError, updateProfileAvatar]);
 
   const handlePasswordSubmit = useCallback(async () => {
     setPasswordError(null);
@@ -298,12 +335,38 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         <View style={styles.header}>
           <Text style={styles.title}>{t('profile.title')}</Text>
           <Text style={styles.subtitle}>{t('profile.subtitle')}</Text>
-          {displayName ? (
-            <Text style={styles.userName}>{displayName}</Text>
-          ) : null}
-          {user?.email ? (
-            <Text style={styles.userEmail}>{user.email}</Text>
-          ) : null}
+        </View>
+        <View style={styles.avatarSection}>
+          {user?.avatarUrl ? (
+            <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Text style={styles.avatarInitials}>{avatarInitials}</Text>
+            </View>
+          )}
+          <View style={styles.avatarContent}>
+            {displayName ? (
+              <Text style={styles.avatarName}>{displayName}</Text>
+            ) : null}
+            {user?.email ? (
+              <Text style={styles.avatarEmail}>{user.email}</Text>
+            ) : null}
+            <Text style={styles.avatarHint}>{t('profile.avatar.subtitle')}</Text>
+            <Pressable
+              onPress={handleChangeAvatar}
+              style={styles.avatarButton}
+              accessibilityRole="button"
+              disabled={avatarSubmitting}
+            >
+              {avatarSubmitting ? (
+                <ActivityIndicator color={COLORS.textOnPrimary} />
+              ) : (
+                <Text style={styles.avatarButtonText}>
+                  {t('profile.avatar.changeButton')}
+                </Text>
+              )}
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -612,6 +675,59 @@ const styles = StyleSheet.create({
   header: {
     gap: 6,
   },
+  avatarSection: {
+    flexDirection: 'row',
+    gap: 16,
+    alignItems: 'center',
+  },
+  avatarImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  avatarContent: {
+    flex: 1,
+    gap: 6,
+  },
+  avatarName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  avatarEmail: {
+    fontSize: 14,
+    color: COLORS.textOnMuted,
+  },
+  avatarHint: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  avatarButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+    backgroundColor: COLORS.primary,
+  },
+  avatarButtonText: {
+    color: COLORS.textOnPrimary,
+    fontWeight: '600',
+  },
   title: {
     fontSize: 24,
     fontWeight: '700',
@@ -620,15 +736,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: COLORS.textSecondary,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: COLORS.textOnMuted,
   },
   section: {
     backgroundColor: COLORS.surface,

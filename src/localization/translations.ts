@@ -125,6 +125,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     home: {
       title: 'Welcome{{name}}!',
+      planSummary: 'Plan: {{plan}}',
       logout: 'Log out',
       manageProfile: 'Manage profile',
       membership: {
@@ -203,6 +204,20 @@ export const translations: Record<Language, TranslationDictionary> = {
     profile: {
       title: 'Your profile',
       subtitle: 'Manage your account security preferences.',
+      avatar: {
+        subtitle:
+          'This photo appears on your membership card and welcome screen.',
+        changeButton: 'Change photo',
+        successTitle: 'Profile photo updated',
+        successMessage:
+          'Your new photo may take a moment to appear across the app.',
+        errorTitle: 'Unable to update photo',
+        errorMessage:
+          'Please try again or ensure the WordPress avatar endpoint is configured.',
+        errors: {
+          invalidSelection: 'Select a valid image to continue.',
+        },
+      },
       password: {
         heading: 'Change password',
         description: 'Update the password you use to sign in.',
@@ -411,6 +426,7 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     home: {
       title: 'ยินดีต้อนรับ{{name}}!',
+      planSummary: 'แผน: {{plan}}',
       logout: 'ออกจากระบบ',
       manageProfile: 'จัดการโปรไฟล์',
       membership: {
@@ -484,6 +500,18 @@ export const translations: Record<Language, TranslationDictionary> = {
     profile: {
       title: 'โปรไฟล์ของคุณ',
       subtitle: 'จัดการการตั้งค่าความปลอดภัยของบัญชีคุณ.',
+      avatar: {
+        subtitle: 'รูปภาพนี้จะแสดงบนบัตรสมาชิกและหน้าจอต้อนรับของคุณ.',
+        changeButton: 'เปลี่ยนรูปภาพ',
+        successTitle: 'อัปเดตรูปโปรไฟล์แล้ว',
+        successMessage: 'รูปใหม่ของคุณอาจใช้เวลาสักครู่จึงจะแสดงทั่วทั้งแอป.',
+        errorTitle: 'ไม่สามารถอัปเดตรูปภาพได้',
+        errorMessage:
+          'โปรดลองอีกครั้งหรือตรวจสอบว่ามีการตั้งค่าเอ็นด์พอยต์สำหรับอัปโหลดรูปภาพแล้ว.',
+        errors: {
+          invalidSelection: 'โปรดเลือกรูปภาพที่ถูกต้องเพื่อดำเนินการต่อ.',
+        },
+      },
       password: {
         heading: 'เปลี่ยนรหัสผ่าน',
         description: 'อัปเดตรหัสผ่านที่คุณใช้ในการเข้าสู่ระบบ.',

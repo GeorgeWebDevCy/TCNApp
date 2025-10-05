@@ -96,6 +96,8 @@ describe('wordpressAuthService', () => {
             id: 42,
             email: 'member@example.com',
             name: 'Member Example',
+            firstName: null,
+            lastName: null,
             membership: null,
           }),
         ],

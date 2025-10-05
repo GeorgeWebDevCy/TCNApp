@@ -21,6 +21,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useAuthAvailability } from '../hooks/useAuthAvailability';
 import { RegisterOptions } from '../types/auth';
 import { COLORS } from '../config/theme';
+import { getUserDisplayName } from '../utils/user';
 
 type AuthTabId = 'password' | 'pin';
 
@@ -170,10 +171,13 @@ export const LoginScreen: React.FC = () => {
   }, [activeTab, lastAttempt, pinError, state.error]);
 
   const isLoading = state.isLoading;
-  const greeting =
-    state.user?.name !== undefined
-      ? t('login.greeting', { replace: { name: state.user.name } })
-      : undefined;
+  const loginDisplayName = useMemo(
+    () => getUserDisplayName(state.user),
+    [state.user],
+  );
+  const greeting = loginDisplayName
+    ? t('login.greeting', { replace: { name: loginDisplayName } })
+    : undefined;
   const lockMessage = state.isLocked ? t('login.lockMessage') : undefined;
   const translatedError = translateError(activeError);
   const passwordError =

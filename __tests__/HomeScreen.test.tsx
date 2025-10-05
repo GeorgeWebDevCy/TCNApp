@@ -32,6 +32,8 @@ jest.mock('../src/contexts/AuthContext', () => ({
         id: 1,
         email: 'jane@example.com',
         name: 'Jane Doe',
+        firstName: 'Jane',
+        lastName: 'Doe',
         membership,
       },
       membership,
