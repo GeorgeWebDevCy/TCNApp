@@ -18,6 +18,10 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 
+jest.mock('../src/services/activityMonitorService', () => ({
+  enqueueActivityLog: jest.fn(),
+}));
+
 const createJsonResponse = (
   status: number,
   body: unknown,
@@ -57,7 +61,7 @@ describe('wordpressAuthService', () => {
   it('retries WordPress requests using rest_route when the GN Password Login API route is missing', async () => {
     const loginResponseBody = {
       success: true,
-      mode: 'cookie',
+      mode: 'token',
       api_token: 'api-token-value',
       token: 'token-value',
       user: {
@@ -105,6 +109,11 @@ describe('wordpressAuthService', () => {
       expect.objectContaining({ method: 'POST' }),
     );
 
+    const firstRequestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const firstRequestBody = JSON.parse((firstRequestInit?.body as string) ?? '{}');
+
+    expect(firstRequestBody.mode).toBe('token');
+
     expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
       expect.arrayContaining([
         [
@@ -127,9 +136,8 @@ describe('wordpressAuthService', () => {
       ]),
     );
 
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
       AUTH_STORAGE_KEYS.wordpressCookies,
-      expect.stringContaining('wordpress_logged_in_hash=logged-in'),
     );
 
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
@@ -167,7 +175,7 @@ describe('wordpressAuthService', () => {
           200,
           {
             success: true,
-            mode: 'cookie',
+            mode: 'token',
             api_token: 'api-token-value',
             token: 'token-value',
             user: {
@@ -388,7 +396,7 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      `${WORDPRESS_CONFIG.baseUrl}/wp-json/wp/v2/users/me`,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
       expect.objectContaining({ method: 'GET' }),
     );
 

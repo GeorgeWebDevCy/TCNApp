@@ -443,46 +443,12 @@ const hydrateWordPressCookieSession = async (
   tokenLoginUrl?: string | null,
   token?: string,
 ): Promise<{ status: number; ok: boolean }> => {
-  const resolvedUrl =
-    typeof tokenLoginUrl === 'string' ? tokenLoginUrl.trim() : '';
-
-  if (!resolvedUrl) {
-    deviceLog.debug('wordpressAuth.cookie.hydrate.skip', {
-      reason: 'missing_token_login_url',
-      hasToken: Boolean(token),
-    });
-    return { status: 0, ok: false };
-  }
-
-  const headers: Record<string, string> | undefined = token
-    ? {
-        Authorization: `Bearer ${token}`,
-      }
-    : undefined;
-
-  try {
-    deviceLog.info('wordpressAuth.cookie.hydrate.start', {
-      tokenLoginUrl: describeUrlForLogging(resolvedUrl),
-      hasToken: Boolean(token),
-      maskedToken: maskTokenForLogging(token),
-    });
-    const requestInit = await buildWordPressRequestInit({
-      method: 'GET',
-      headers,
-    });
-    const response = await fetch(resolvedUrl, requestInit);
-    await syncWordPressCookiesFromResponse(response);
-    deviceLog.debug('wordpressAuth.cookie.hydrate.response', {
-      status: response.status,
-      ok: response.ok,
-    });
-    return { status: response.status, ok: response.ok };
-  } catch (error) {
-    deviceLog.warn('wordpressAuth.cookie.hydrate.error', {
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return { status: 0, ok: false };
-  }
+  deviceLog.debug('wordpressAuth.cookie.hydrate.disabled', {
+    hasTokenLoginUrl: Boolean(tokenLoginUrl),
+    hasToken: Boolean(token),
+    maskedToken: maskTokenForLogging(token),
+  });
+  return { status: 0, ok: true };
 };
 
 export const ensureCookieSession = async (
@@ -1280,9 +1246,9 @@ export const ensureValidSession =
 export const loginWithPassword = async ({
   username,
   password,
-  mode = 'cookie',
   remember = true,
 }: LoginOptions): Promise<PersistedSession> => {
+  const mode: 'token' = 'token';
   deviceLog.info('wordpressAuth.loginWithPassword.start', {
     username,
     mode,
@@ -1440,14 +1406,6 @@ export const loginWithPassword = async ({
 
   await storeSession(session);
   await markPasswordAuthenticated();
-  if (mode === 'token') {
-    deviceLog.info('wordpressAuth.loginWithPassword.tokenHydration', {
-      tokenLoginUrl: describeUrlForLogging(tokenLoginUrl ?? null),
-      hasToken: Boolean(token),
-      maskedToken: maskTokenForLogging(token),
-    });
-    await hydrateWordPressCookieSession(tokenLoginUrl, token);
-  }
 
   deviceLog.success('wordpressAuth.loginWithPassword.success', {
     username,
