@@ -219,7 +219,11 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       }
 
       try {
-        await confirmMembershipUpgrade(selectedPlan.id, token ?? undefined);
+        await confirmMembershipUpgrade(
+          selectedPlan.id,
+          token ?? undefined,
+          paymentSession.paymentIntentId ?? null,
+        );
       } catch (confirmError) {
         console.warn('Membership confirmation failed', confirmError);
       }
