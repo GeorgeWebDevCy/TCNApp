@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../src/config/authConfig';
 import {
+  __unsafeResetBearerTokenCacheForTests,
   __unsafeResetWordPressCookieCacheForTests,
   __unsafeResetWooCommerceAuthHeaderCacheForTests,
   clearStoredWordPressCookies,
@@ -48,6 +49,7 @@ describe('wordpressAuthService', () => {
     jest.clearAllMocks();
     await clearStoredWordPressCookies();
     await clearStoredWooCommerceAuthHeader();
+    __unsafeResetBearerTokenCacheForTests();
     __unsafeResetWordPressCookieCacheForTests();
     __unsafeResetWooCommerceAuthHeaderCacheForTests();
   });
@@ -154,7 +156,7 @@ describe('wordpressAuthService', () => {
     );
   });
 
-  it('applies the WooCommerce Basic authorization header to subsequent requests after login', async () => {
+  it('applies the API token authorization header to subsequent requests after login', async () => {
     const setCookieHeader =
       'wordpress_logged_in_hash=logged-in; path=/; secure; httponly';
 
@@ -204,7 +206,7 @@ describe('wordpressAuthService', () => {
     const registerRequestInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
     expect(registerRequestInit?.headers).toEqual(
       expect.objectContaining({
-        Authorization: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+        Authorization: 'Bearer api-token-value',
       }),
     );
   });
