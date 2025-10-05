@@ -137,6 +137,63 @@ const normalizeApiToken = (
   return trimmed;
 };
 
+const normalizeTokenLoginUrl = (
+  value?: string | null,
+): string | undefined => {
+  if (!value || typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return undefined;
+    }
+
+    return parsed.toString();
+  } catch (error) {
+    return undefined;
+  }
+};
+
+const buildTokenLoginUrlFromToken = (
+  token?: string | null,
+  userLogin?: string | null,
+): string | undefined => {
+  if (!token || typeof token !== 'string') {
+    return undefined;
+  }
+
+  const trimmedToken = token.trim();
+  if (!trimmedToken) {
+    return undefined;
+  }
+
+  const trimmedLogin =
+    typeof userLogin === 'string' && userLogin.trim().length > 0
+      ? userLogin.trim()
+      : undefined;
+
+  try {
+    const url = new URL('/wp-login.php', WORDPRESS_CONFIG.baseUrl);
+    url.searchParams.set('action', 'gn_token_login');
+    url.searchParams.set('token', trimmedToken);
+
+    if (trimmedLogin) {
+      url.searchParams.set('u', trimmedLogin);
+    }
+
+    return url.toString();
+  } catch (error) {
+    return undefined;
+  }
+};
+
 const describeSessionForLogging = (
   session?: PersistedSession | null,
 ):
@@ -1371,13 +1428,28 @@ export const loginWithPassword = async ({
   const rawLoginToken =
     typeof json.token === 'string' ? json.token.trim() : undefined;
 
+  const normalizedUserLogin =
+    typeof payload?.login === 'string' && payload.login.trim().length > 0
+      ? payload.login.trim()
+      : undefined;
+
+  const normalizedTokenLoginUrl = normalizeTokenLoginUrl(
+    json.token_login_url,
+  );
+  const tokenLoginUrlFromToken = buildTokenLoginUrlFromToken(
+    rawLoginToken,
+    normalizedUserLogin ?? null,
+  );
+  const tokenLoginUrl =
+    normalizedTokenLoginUrl ?? tokenLoginUrlFromToken ?? undefined;
+
   if (rawLoginToken && !normalizeApiToken(rawLoginToken)) {
     deviceLog.debug('wordpressAuth.loginWithPassword.ignoredLoginToken', {
       length: rawLoginToken.length,
+      usedForTokenLoginUrl:
+        Boolean(tokenLoginUrlFromToken) && !normalizedTokenLoginUrl,
     });
   }
-
-  const tokenLoginUrl = undefined;
 
   const restNonce =
     typeof json.rest_nonce === 'string' && json.rest_nonce.trim().length > 0

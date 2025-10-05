@@ -64,6 +64,8 @@ describe('wordpressAuthService', () => {
       mode: 'token',
       api_token: 'api-token-value',
       token: 'token-value',
+      token_login_url:
+        'https://example.com/wp-login.php?action=gn_token_login&token=token-value&u=member',
       user: {
         id: 42,
         email: 'member@example.com',
@@ -133,6 +135,10 @@ describe('wordpressAuthService', () => {
             },
           }),
         ],
+        [
+          AUTH_STORAGE_KEYS.tokenLoginUrl,
+          'https://example.com/wp-login.php?action=gn_token_login&token=token-value&u=member',
+        ],
       ]),
     );
 
@@ -143,6 +149,47 @@ describe('wordpressAuthService', () => {
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       AUTH_STORAGE_KEYS.woocommerceAuthHeader,
       'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+    );
+  });
+
+  it('builds a token login URL from the login token when the API omits token_login_url', async () => {
+    const loginResponseBody = {
+      success: true,
+      mode: 'token',
+      token: 'abcdefghijklmnopqrstuvwxyzABCDEFGH123456',
+      user: {
+        id: 42,
+        email: 'member@example.com',
+        display: 'Member Example',
+        login: 'member',
+      },
+    };
+
+    const setCookieHeader =
+      'wordpress_logged_in_hash=logged-in; path=/; secure; httponly, wordpress_sec_hash=secure; path=/; secure; httponly';
+
+    const fetchMock = jest.fn().mockResolvedValue(
+      createJsonResponse(200, loginResponseBody, {
+        'set-cookie': setCookieHeader,
+      }),
+    );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await loginWithPassword({ username: 'member', password: 'passw0rd' });
+
+    const entries =
+      (AsyncStorage.multiSet as jest.Mock).mock.calls[0]?.[0] as
+        | [string, string][]
+        | undefined;
+
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        [
+          AUTH_STORAGE_KEYS.tokenLoginUrl,
+          `${WORDPRESS_CONFIG.baseUrl}/wp-login.php?action=gn_token_login&token=${loginResponseBody.token}&u=member`,
+        ],
+      ]),
     );
   });
 
