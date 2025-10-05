@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AUTH_STORAGE_KEYS } from '../config/authConfig';
+import { getSecureValue } from './secureTokenStorage';
 
 type HeaderRecord = Record<string, string>;
 
@@ -50,6 +51,12 @@ const getStoredWooCommerceAuthHeader = async (): Promise<string | null> => {
 
 const getStoredBearerToken = async (): Promise<string | null> => {
   if (typeof cachedBearerToken !== 'undefined') {
+    return cachedBearerToken;
+  }
+
+  const secureToken = await getSecureValue(AUTH_STORAGE_KEYS.token);
+  if (secureToken) {
+    cachedBearerToken = secureToken;
     return cachedBearerToken;
   }
 
