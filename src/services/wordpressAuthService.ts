@@ -1105,9 +1105,11 @@ export const uploadProfileAvatar = async (
   const endpoint = resolveAvatarEndpoint();
   const session = await restoreSession();
   const token = session?.token?.trim();
+  const restNonce = session?.restNonce?.trim();
 
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
   };
 
   if (token) {
