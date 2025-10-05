@@ -1161,7 +1161,7 @@ export const uploadProfileAvatar = async (
   const formData = buildAvatarFormData(options);
   const endpoint = resolveAvatarEndpoint();
   const session = await restoreSession();
-  const token = session?.token?.trim();
+  const token = normalizeApiToken(session?.token);
   const restNonce = session?.restNonce?.trim();
 
   const headers: Record<string, string> = {
