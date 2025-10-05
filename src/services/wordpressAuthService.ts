@@ -165,6 +165,8 @@ const describeSessionForLogging = (
   };
 };
 
+let lastRestoreSessionLogSummary: string | null = null;
+
 const normalizeBaseUrl = (baseUrl: string): string =>
   baseUrl.replace(/\/+$/, '');
 
@@ -979,6 +981,7 @@ export const clearSession = async () => {
   clearCachedBearerToken();
   await clearStoredWordPressCookies();
   await clearStoredWooCommerceAuthHeader();
+  lastRestoreSessionLogSummary = null;
 };
 
 export const restoreSession = async (): Promise<PersistedSession | null> => {
@@ -1016,6 +1019,7 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
 
   if (!token && !userJson) {
     deviceLog.debug('wordpressAuth.restoreSession.empty');
+    lastRestoreSessionLogSummary = null;
     return null;
   }
 
@@ -1043,9 +1047,14 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     user,
     locked: lockValue === 'locked',
   };
-  deviceLog.debug('wordpressAuth.restoreSession.success', {
-    session: describeSessionForLogging(session),
-  });
+  const sessionSummary = describeSessionForLogging(session);
+  const serializedSessionSummary = JSON.stringify(sessionSummary);
+  if (serializedSessionSummary !== lastRestoreSessionLogSummary) {
+    lastRestoreSessionLogSummary = serializedSessionSummary;
+    deviceLog.debug('wordpressAuth.restoreSession.success', {
+      session: sessionSummary,
+    });
+  }
   return session;
 };
 
