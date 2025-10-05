@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
+import deviceLog from '../utils/deviceLog';
 import {
   buildWordPressRequestInit,
   clearStoredWordPressCookies,
@@ -62,6 +63,72 @@ interface GnPasswordLoginWooCommercePayload {
   authorization?: unknown;
   auth_header?: unknown;
 }
+
+const maskTokenForLogging = (token?: string | null): string | null => {
+  if (!token) {
+    return null;
+  }
+
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const lastFour = trimmed.slice(-4);
+  return `***${lastFour} (length=${trimmed.length})`;
+};
+
+const describeUrlForLogging = (
+  value?: string | null,
+): { host?: string; pathname?: string; hasQuery?: boolean; length?: number } | null => {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return {
+      host: parsed.host,
+      pathname: parsed.pathname,
+      hasQuery: parsed.search.length > 0,
+    };
+  } catch (error) {
+    return { length: trimmed.length };
+  }
+};
+
+const describeSessionForLogging = (
+  session?: PersistedSession | null,
+):
+  | {
+      hasToken: boolean;
+      maskedToken: string | null;
+      hasRefreshToken: boolean;
+      maskedRefreshToken: string | null;
+      tokenLoginUrl: ReturnType<typeof describeUrlForLogging>;
+      locked: boolean;
+      hasUser: boolean;
+    }
+  | null => {
+  if (!session) {
+    return null;
+  }
+
+  return {
+    hasToken: Boolean(session.token),
+    maskedToken: maskTokenForLogging(session.token),
+    hasRefreshToken: Boolean(session.refreshToken),
+    maskedRefreshToken: maskTokenForLogging(session.refreshToken),
+    tokenLoginUrl: describeUrlForLogging(session.tokenLoginUrl ?? null),
+    locked: session.locked,
+    hasUser: Boolean(session.user),
+  };
+};
 
 const normalizeBaseUrl = (baseUrl: string): string =>
   baseUrl.replace(/\/+$/, '');
@@ -343,6 +410,10 @@ const hydrateWordPressCookieSession = async (
     typeof tokenLoginUrl === 'string' ? tokenLoginUrl.trim() : '';
 
   if (!resolvedUrl) {
+    deviceLog.debug('wordpressAuth.cookie.hydrate.skip', {
+      reason: 'missing_token_login_url',
+      hasToken: Boolean(token),
+    });
     return { status: 0, ok: false };
   }
 
@@ -353,14 +424,26 @@ const hydrateWordPressCookieSession = async (
     : undefined;
 
   try {
+    deviceLog.info('wordpressAuth.cookie.hydrate.start', {
+      tokenLoginUrl: describeUrlForLogging(resolvedUrl),
+      hasToken: Boolean(token),
+      maskedToken: maskTokenForLogging(token),
+    });
     const requestInit = await buildWordPressRequestInit({
       method: 'GET',
       headers,
     });
     const response = await fetch(resolvedUrl, requestInit);
     await syncWordPressCookiesFromResponse(response);
+    deviceLog.debug('wordpressAuth.cookie.hydrate.response', {
+      status: response.status,
+      ok: response.ok,
+    });
     return { status: response.status, ok: response.ok };
   } catch (error) {
+    deviceLog.warn('wordpressAuth.cookie.hydrate.error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return { status: 0, ok: false };
   }
 };
@@ -369,10 +452,24 @@ export const ensureCookieSession = async (
   session?: PersistedSession | null,
 ): Promise<{ status: number; ok: boolean }> => {
   if (!session) {
+    deviceLog.debug('wordpressAuth.cookie.ensure.skip', {
+      reason: 'missing_session',
+    });
     return { status: 0, ok: false };
   }
 
-  return hydrateWordPressCookieSession(session.tokenLoginUrl, session.token);
+  deviceLog.info('wordpressAuth.cookie.ensure.start', {
+    session: describeSessionForLogging(session),
+  });
+  const result = await hydrateWordPressCookieSession(
+    session.tokenLoginUrl,
+    session.token,
+  );
+  deviceLog.debug('wordpressAuth.cookie.ensure.result', {
+    status: result.status,
+    ok: result.ok,
+  });
+  return result;
 };
 
 const getString = (value: unknown): string | null => {
@@ -561,6 +658,9 @@ type ProfileFetchResult = {
 const fetchProfileWithToken = async (
   token: string,
 ): Promise<ProfileFetchResult> => {
+  deviceLog.info('wordpressAuth.fetchProfileWithToken.start', {
+    maskedToken: maskTokenForLogging(token),
+  });
   try {
     const response = await fetchWithRouteFallback(
       WORDPRESS_CONFIG.endpoints.profile,
@@ -573,6 +673,11 @@ const fetchProfileWithToken = async (
       },
     );
 
+    deviceLog.debug('wordpressAuth.fetchProfileWithToken.response', {
+      status: response.status,
+      ok: response.ok,
+    });
+
     if (!response.ok) {
       return { user: null, status: response.status };
     }
@@ -580,11 +685,15 @@ const fetchProfileWithToken = async (
     const payload = (await response.json()) as Record<string, unknown>;
     return { user: parseProfileUserPayload(payload), status: response.status };
   } catch (error) {
+    deviceLog.warn('wordpressAuth.fetchProfileWithToken.error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return { user: null, status: 0 };
   }
 };
 
 const fetchProfileWithCookies = async (): Promise<ProfileFetchResult> => {
+  deviceLog.info('wordpressAuth.fetchProfileWithCookies.start');
   try {
     const response = await fetchWithRouteFallback(
       WORDPRESS_CONFIG.endpoints.profile,
@@ -596,6 +705,11 @@ const fetchProfileWithCookies = async (): Promise<ProfileFetchResult> => {
       },
     );
 
+    deviceLog.debug('wordpressAuth.fetchProfileWithCookies.response', {
+      status: response.status,
+      ok: response.ok,
+    });
+
     if (!response.ok) {
       return { user: null, status: response.status };
     }
@@ -603,6 +717,9 @@ const fetchProfileWithCookies = async (): Promise<ProfileFetchResult> => {
     const payload = (await response.json()) as Record<string, unknown>;
     return { user: parseProfileUserPayload(payload), status: response.status };
   } catch (error) {
+    deviceLog.warn('wordpressAuth.fetchProfileWithCookies.error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
     return { user: null, status: 0 };
   }
 };
@@ -870,6 +987,7 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
       : undefined;
 
   if (!token && !userJson) {
+    deviceLog.debug('wordpressAuth.restoreSession.empty');
     return null;
   }
 
@@ -879,11 +997,14 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     try {
       user = JSON.parse(userJson) as AuthUser;
     } catch (error) {
+      deviceLog.warn('wordpressAuth.restoreSession.userParseError', {
+        message: error instanceof Error ? error.message : String(error),
+      });
       user = null;
     }
   }
 
-  return {
+  const session: PersistedSession = {
     token,
     refreshToken,
     tokenLoginUrl:
@@ -897,15 +1018,26 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     user,
     locked: lockValue === 'locked',
   };
+  deviceLog.debug('wordpressAuth.restoreSession.success', {
+    session: describeSessionForLogging(session),
+  });
+  return session;
 };
 
 export const refreshPersistedUserProfile = async (
   token?: string | null,
 ): Promise<AuthUser | null> => {
+  deviceLog.info('wordpressAuth.refreshPersistedUserProfile.start', {
+    hasToken: Boolean(token),
+    maskedToken: maskTokenForLogging(token),
+  });
   const profile = token
     ? await fetchUserProfile(token)
     : (await fetchProfileWithCookies()).user;
   if (!profile) {
+    deviceLog.warn('wordpressAuth.refreshPersistedUserProfile.empty', {
+      hasToken: Boolean(token),
+    });
     return null;
   }
 
@@ -913,6 +1045,10 @@ export const refreshPersistedUserProfile = async (
     AUTH_STORAGE_KEYS.userProfile,
     JSON.stringify(profile),
   );
+  deviceLog.debug('wordpressAuth.refreshPersistedUserProfile.success', {
+    userId: profile.id,
+    hasMembership: Boolean(profile.membership),
+  });
   return profile;
 };
 
@@ -976,14 +1112,28 @@ export const uploadProfileAvatar = async (
   }
 
   try {
+    deviceLog.info('wordpressAuth.uploadProfileAvatar.start', {
+      session: describeSessionForLogging(session),
+      hasTokenHeader: Boolean(headers.Authorization),
+      endpoint: describeUrlForLogging(endpoint),
+    });
     const response = await fetchWithRouteFallback(endpoint, {
       method: 'POST',
       headers,
       body: formData,
     });
 
+    deviceLog.debug('wordpressAuth.uploadProfileAvatar.response', {
+      status: response.status,
+      ok: response.ok,
+    });
+
     if (!response.ok) {
       const errorBody = await response.text();
+      deviceLog.error('wordpressAuth.uploadProfileAvatar.failed', {
+        status: response.status,
+        errorBody,
+      });
       throw new Error(
         `Avatar upload failed (${response.status}). ${
           errorBody || 'Enable the WordPress avatar upload endpoint.'
@@ -1001,8 +1151,16 @@ export const uploadProfileAvatar = async (
       JSON.stringify(user),
     );
 
+    deviceLog.success('wordpressAuth.uploadProfileAvatar.success', {
+      userId: user.id,
+    });
+
     return user;
   } catch (error) {
+    deviceLog.error('wordpressAuth.uploadProfileAvatar.error', {
+      message: error instanceof Error ? error.message : String(error),
+      session: describeSessionForLogging(session),
+    });
     if (error instanceof Error) {
       throw error;
     }
@@ -1016,21 +1174,32 @@ export const uploadProfileAvatar = async (
 export const ensureValidSession =
   async (): Promise<PersistedSession | null> => {
     const session = await restoreSession();
+    deviceLog.info('wordpressAuth.ensureValidSession.start', {
+      session: describeSessionForLogging(session),
+    });
     if (!session) {
+      deviceLog.debug('wordpressAuth.ensureValidSession.noSession');
       return null;
     }
 
     if (session.locked) {
+      deviceLog.debug('wordpressAuth.ensureValidSession.locked', {
+        session: describeSessionForLogging(session),
+      });
       return session;
     }
 
     const cookieResult = await fetchProfileWithCookies();
+    deviceLog.debug('wordpressAuth.ensureValidSession.cookieResult', cookieResult);
 
     if (cookieResult.user) {
       await AsyncStorage.setItem(
         AUTH_STORAGE_KEYS.userProfile,
         JSON.stringify(cookieResult.user),
       );
+      deviceLog.debug('wordpressAuth.ensureValidSession.cookieUser', {
+        userId: cookieResult.user.id,
+      });
       return {
         ...session,
         user: cookieResult.user,
@@ -1042,12 +1211,16 @@ export const ensureValidSession =
 
     if (session.token) {
       const tokenResult = await fetchProfileWithToken(session.token);
+      deviceLog.debug('wordpressAuth.ensureValidSession.tokenResult', tokenResult);
 
       if (tokenResult.user) {
         await AsyncStorage.setItem(
           AUTH_STORAGE_KEYS.userProfile,
           JSON.stringify(tokenResult.user),
         );
+        deviceLog.debug('wordpressAuth.ensureValidSession.tokenUser', {
+          userId: tokenResult.user.id,
+        });
         return {
           ...session,
           user: tokenResult.user,
@@ -1058,24 +1231,33 @@ export const ensureValidSession =
         tokenResult.status === 401 || tokenResult.status === 403;
 
       if (tokenRejected) {
+        deviceLog.warn('wordpressAuth.ensureValidSession.tokenRejected', {
+          status: tokenResult.status,
+        });
         await clearSession();
         return null;
       }
 
       if (tokenResult.status === 0) {
+        deviceLog.warn('wordpressAuth.ensureValidSession.tokenNetworkIssue');
         return session;
       }
     }
 
     if (isCookieAuthRejected) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.cookieRejected', {
+        status: cookieResult.status,
+      });
       await clearSession();
       return null;
     }
 
     if (cookieResult.status === 0) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.cookieNetworkIssue');
       return session;
     }
 
+    deviceLog.debug('wordpressAuth.ensureValidSession.returningExisting');
     return session;
   };
 
@@ -1085,6 +1267,11 @@ export const loginWithPassword = async ({
   mode = 'cookie',
   remember = true,
 }: LoginOptions): Promise<PersistedSession> => {
+  deviceLog.info('wordpressAuth.loginWithPassword.start', {
+    username,
+    mode,
+    remember,
+  });
   // Authenticate against the GN Password Login API plugin endpoint so native clients can
   // perform username/password logins over the WordPress REST API.
   const response = await fetchWithRouteFallback(
@@ -1108,10 +1295,17 @@ export const loginWithPassword = async ({
   try {
     json = (await response.json()) as GnPasswordLoginResponse;
   } catch (error) {
+    deviceLog.error('wordpressAuth.loginWithPassword.parseError', {
+      message: error instanceof Error ? error.message : String(error),
+      status: response.status,
+    });
     throw new Error('Unable to log in with WordPress credentials.');
   }
 
   if (!json || typeof json !== 'object') {
+    deviceLog.error('wordpressAuth.loginWithPassword.invalidPayload', {
+      status: response.status,
+    });
     throw new Error('Unable to log in with WordPress credentials.');
   }
 
@@ -1120,6 +1314,14 @@ export const loginWithPassword = async ({
       typeof json?.message === 'string' && json.message.trim().length > 0
         ? sanitizeErrorMessage(json.message)
         : 'Unable to log in with WordPress credentials.';
+    deviceLog.warn('wordpressAuth.loginWithPassword.failed', {
+      status: response.status,
+      ok: response.ok,
+      success: json.success ?? null,
+      code: json.code ?? null,
+      dataStatus: json.data?.status ?? null,
+      message,
+    });
     throw new Error(message);
   }
 
@@ -1206,12 +1408,32 @@ export const loginWithPassword = async ({
     locked: false,
   };
 
+  deviceLog.debug('wordpressAuth.loginWithPassword.session', {
+    status: response.status,
+    mode,
+    maskedToken: maskTokenForLogging(token),
+    tokenLoginUrl: describeUrlForLogging(tokenLoginUrl ?? null),
+    hasRestNonce: Boolean(restNonce),
+    restNonceLength: restNonce?.length ?? 0,
+    hasUser: Boolean(user),
+    wooCredentials: Boolean(woocommerceCredentials),
+  });
+
   await storeSession(session);
   await markPasswordAuthenticated();
   if (mode === 'token') {
+    deviceLog.info('wordpressAuth.loginWithPassword.tokenHydration', {
+      tokenLoginUrl: describeUrlForLogging(tokenLoginUrl ?? null),
+      hasToken: Boolean(token),
+      maskedToken: maskTokenForLogging(token),
+    });
     await hydrateWordPressCookieSession(tokenLoginUrl, token);
   }
 
+  deviceLog.success('wordpressAuth.loginWithPassword.success', {
+    username,
+    userId: user?.id ?? null,
+  });
   return session;
 };
 
