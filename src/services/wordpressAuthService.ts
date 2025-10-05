@@ -130,7 +130,7 @@ const normalizeApiToken = (
     return undefined;
   }
 
-  if (isLikelyUrl(trimmed) || isLikelyLoginLinkToken(trimmed)) {
+  if (isLikelyUrl(trimmed)) {
     return undefined;
   }
 
