@@ -20,6 +20,7 @@ export const WORDPRESS_CONFIG = {
   endpoints: {
     passwordLogin: '/wp-json/gn/v1/login',
     profile: '/wp-json/wp/v2/users/me',
+    profileAvatar: '/wp-json/gn/v1/profile/avatar',
     changePassword: '/wp-json/gn/v1/change-password',
     changePasswordSql: '/wp-json/gn/v1/sql/change-password',
     passwordReset: '/wp-json/gn/v1/forgot-password',

@@ -356,6 +356,13 @@ export const ensureCookieSession = async (
   return hydrateWordPressCookieSession(session.tokenLoginUrl, session.token);
 };
 
+const getString = (value: unknown): string | null => {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+  return null;
+};
+
 const parseProfileUserPayload = (
   payload: Record<string, unknown>,
 ): AuthUser => {
@@ -382,6 +389,22 @@ const parseProfileUserPayload = (
       ? nameSource
       : resolvedEmail;
 
+  const meta = (payload.meta as Record<string, unknown> | undefined) ?? undefined;
+  const firstNameSource =
+    payload.first_name ??
+    payload.firstName ??
+    meta?.first_name ??
+    meta?.firstName ??
+    payload.meta_first_name ??
+    undefined;
+  const lastNameSource =
+    payload.last_name ??
+    payload.lastName ??
+    meta?.last_name ??
+    meta?.lastName ??
+    payload.meta_last_name ??
+    undefined;
+
   const avatarUrls = payload.avatar_urls as
     | Record<string, string>
     | undefined;
@@ -390,6 +413,8 @@ const parseProfileUserPayload = (
     id: Number.isFinite(parsedId) ? parsedId : -1,
     email: resolvedEmail,
     name: resolvedName,
+    firstName: getString(firstNameSource),
+    lastName: getString(lastNameSource),
     avatarUrl: avatarUrls?.['96'] ?? avatarUrls?.['48'],
     membership,
   };
@@ -743,6 +768,95 @@ export const refreshPersistedUserProfile = async (
   return profile;
 };
 
+type UploadProfileAvatarOptions = {
+  uri: string;
+  fileName?: string;
+  mimeType?: string;
+};
+
+const resolveAvatarEndpoint = (): string => {
+  const endpoint = WORDPRESS_CONFIG.endpoints.profileAvatar;
+  if (!endpoint || typeof endpoint !== 'string') {
+    throw new Error(
+      'Profile avatar endpoint is not configured. Please expose a WordPress REST endpoint that accepts avatar uploads.',
+    );
+  }
+  return endpoint;
+};
+
+const buildAvatarFormData = ({
+  uri,
+  fileName,
+  mimeType,
+}: UploadProfileAvatarOptions): FormData => {
+  if (!uri || typeof uri !== 'string') {
+    throw new Error('A valid image selection is required.');
+  }
+
+  const normalizedName =
+    typeof fileName === 'string' && fileName.trim().length > 0
+      ? fileName.trim()
+      : 'avatar.jpg';
+  const normalizedType =
+    typeof mimeType === 'string' && mimeType.trim().length > 0
+      ? mimeType.trim()
+      : 'image/jpeg';
+
+  const formData = new FormData();
+  formData.append('avatar', {
+    uri,
+    name: normalizedName,
+    type: normalizedType,
+  } as unknown as Blob);
+  return formData;
+};
+
+export const uploadProfileAvatar = async (
+  options: UploadProfileAvatarOptions,
+): Promise<AuthUser> => {
+  const formData = buildAvatarFormData(options);
+  const endpoint = resolveAvatarEndpoint();
+
+  try {
+    const response = await fetchWithRouteFallback(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `Avatar upload failed (${response.status}). ${
+          errorBody || 'Enable the WordPress avatar upload endpoint.'
+        }`,
+      );
+    }
+
+    const json = (await response.json()) as Record<string, unknown>;
+    const userPayload =
+      (json.user as Record<string, unknown> | undefined) ?? json;
+    const user = parseProfileUserPayload(userPayload);
+
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(user),
+    );
+
+    return user;
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error(
+      'Unable to upload profile photo. Please ensure the WordPress avatar upload endpoint is available.',
+    );
+  }
+};
+
 export const ensureValidSession =
   async (): Promise<PersistedSession | null> => {
     const session = await restoreSession();
@@ -887,6 +1001,8 @@ export const loginWithPassword = async ({
       id: Number.isFinite(parsedId) ? parsedId : -1,
       email,
       name,
+      firstName: null,
+      lastName: null,
       membership: null,
     };
   }

@@ -31,6 +31,7 @@ import {
   setSessionLock,
   persistSessionSnapshot,
   ensureCookieSession,
+  uploadProfileAvatar as uploadWordPressProfileAvatar,
 } from '../services/wordpressAuthService';
 import { useTokenLogin } from '../providers/TokenLoginProvider';
 import type { PersistedSession } from '../services/wordpressAuthService';
@@ -624,6 +625,50 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     [],
   );
 
+  const updateProfileAvatar = useCallback(
+    async (options: {
+      uri: string;
+      fileName?: string;
+      mimeType?: string;
+    }) => {
+      try {
+        const updatedUser = await uploadWordPressProfileAvatar(options);
+
+        if (sessionRef.current) {
+          sessionRef.current = { ...sessionRef.current, user: updatedUser };
+        } else {
+          sessionRef.current = {
+            token: undefined,
+            refreshToken: undefined,
+            tokenLoginUrl: undefined,
+            restNonce: undefined,
+            user: updatedUser,
+            locked: false,
+          };
+        }
+
+        dispatch({
+          type: 'LOGIN_SUCCESS',
+          payload: {
+            user: updatedUser,
+            method: state.authMethod,
+            membership: updatedUser?.membership ?? state.membership,
+            passwordAuthenticated: state.hasPasswordAuthenticated,
+          },
+        });
+
+        deviceLog.success('Profile avatar updated');
+        return updatedUser;
+      } catch (error) {
+        deviceLog.error('Profile avatar update failed', error);
+        throw error instanceof Error
+          ? error
+          : new Error('Unable to update profile photo.');
+      }
+    },
+    [state.authMethod, state.hasPasswordAuthenticated, state.membership],
+  );
+
   const refreshSession = useCallback(async () => {
     const session = await ensureValidSession();
     if (!session) {
@@ -838,6 +883,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       requestPasswordReset,
       registerAccount,
       resetPasswordWithCode,
+      updateProfileAvatar,
     }),
     [
       state,
@@ -854,6 +900,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       requestPasswordReset,
       registerAccount,
       resetPasswordWithCode,
+      updateProfileAvatar,
     ],
   );
 

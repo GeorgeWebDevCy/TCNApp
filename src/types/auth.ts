@@ -29,6 +29,8 @@ export interface AuthUser {
   id: number;
   email: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   avatarUrl?: string;
   membership?: MembershipInfo | null;
 }
@@ -90,4 +92,9 @@ export interface AuthContextValue {
   resetPasswordWithCode: (
     options: ResetPasswordOptions,
   ) => Promise<string | undefined>;
+  updateProfileAvatar: (options: {
+    uri: string;
+    fileName?: string;
+    mimeType?: string;
+  }) => Promise<AuthUser>;
 }

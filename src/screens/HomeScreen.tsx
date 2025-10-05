@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,11 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { useOneSignalNotifications } from '../notifications/OneSignalProvider';
 import { MembershipBenefit } from '../types/auth';
 import { COLORS } from '../config/theme';
+import {
+  getUserDisplayName,
+  getUserFullName,
+  getUserInitials,
+} from '../utils/user';
 
 export const getMaxDiscount = (
   benefits: MembershipBenefit[],
@@ -68,13 +74,14 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     pendingNavigationTarget,
     consumeNavigationTarget,
   } = useOneSignalNotifications();
-  const greeting = useMemo(
-    () =>
-      t('home.title', {
-        replace: { name: user?.name ? `, ${user.name}` : '' },
-      }),
-    [t, user?.name],
-  );
+  const fullName = useMemo(() => getUserFullName(user), [user]);
+  const displayName = useMemo(() => getUserDisplayName(user), [user]);
+  const greeting = useMemo(() => {
+    const name = fullName ?? displayName;
+    return t('home.title', {
+      replace: { name: name ? `, ${name}` : '' },
+    });
+  }, [displayName, fullName, t]);
 
   const expiryLabel = useMemo(() => {
     if (!membership) {
@@ -244,8 +251,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         <View style={styles.brandHeader}>
           <BrandLogo orientation="vertical" />
         </View>
-        <Text style={styles.title}>{greeting}</Text>
-        {user?.email ? <Text style={styles.subtitle}>{user.email}</Text> : null}
+        <View style={styles.profileHeader}>
+          {user?.avatarUrl ? (
+            <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+          ) : displayName ? (
+            <View style={styles.avatarFallback}>
+              <Text style={styles.avatarInitials}>{getUserInitials(user)}</Text>
+            </View>
+          ) : null}
+          <View style={styles.profileDetails}>
+            <Text style={styles.title}>{greeting}</Text>
+            {user?.email ? (
+              <Text style={styles.subtitle}>{user.email}</Text>
+            ) : null}
+            {membership ? (
+              <View style={styles.planSummary}>
+                <Text style={styles.planLabel}>
+                  {t('home.planSummary', {
+                    replace: { plan: membership.tier },
+                  })}
+                </Text>
+                {expiryLabel ? (
+                  <Text style={styles.planMeta}>{expiryLabel}</Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        </View>
 
         {onManageProfile ? (
           <Pressable
@@ -422,6 +454,35 @@ const styles = StyleSheet.create({
   brandHeader: {
     marginTop: 8,
   },
+  profileHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginTop: 16,
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  avatarFallback: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+  },
+  profileDetails: {
+    flex: 1,
+    gap: 6,
+  },
   title: {
     fontSize: 24,
     fontWeight: '700',
@@ -429,6 +490,19 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    color: COLORS.textSecondary,
+  },
+  planSummary: {
+    marginTop: 4,
+    gap: 2,
+  },
+  planLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  planMeta: {
+    fontSize: 13,
     color: COLORS.textSecondary,
   },
   notificationBanner: {
