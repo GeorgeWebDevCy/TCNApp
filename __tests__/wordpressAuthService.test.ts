@@ -223,7 +223,8 @@ describe('wordpressAuthService', () => {
           {
             success: true,
             mode: 'token',
-            api_token: 'api-token-value',
+            api_token:
+              'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
             token: 'token-value',
             user: {
               id: 42,
@@ -261,7 +262,8 @@ describe('wordpressAuthService', () => {
     const registerRequestInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
     expect(registerRequestInit?.headers).toEqual(
       expect.objectContaining({
-        Authorization: 'Bearer api-token-value',
+        Authorization:
+          'Bearer ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
       }),
     );
   });
