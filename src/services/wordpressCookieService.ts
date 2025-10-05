@@ -8,6 +8,7 @@ const WORDPRESS_COOKIE_PATTERN = /(wordpress_[^=]+)=([^;]*)/gi;
 
 let cachedCookieHeader: string | null | undefined;
 let cachedWooCommerceAuthHeader: string | null | undefined;
+let cachedBearerToken: string | null | undefined;
 
 const normalizeHeaders = (headers?: HeadersInit): HeaderRecord => {
   if (!headers) {
@@ -96,9 +97,40 @@ const getStoredWooCommerceAuthHeader = async (): Promise<string | null> => {
   const stored = await AsyncStorage.getItem(
     AUTH_STORAGE_KEYS.woocommerceAuthHeader,
   );
-  cachedWooCommerceAuthHeader = stored && stored.trim().length > 0 ? stored : null;
+  const trimmed = stored?.trim();
+  cachedWooCommerceAuthHeader = trimmed && trimmed.length > 0 ? trimmed : null;
 
   return cachedWooCommerceAuthHeader;
+};
+
+const getStoredBearerToken = async (): Promise<string | null> => {
+  if (typeof cachedBearerToken !== 'undefined') {
+    return cachedBearerToken;
+  }
+
+  const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.token);
+  cachedBearerToken = stored && stored.trim().length > 0 ? stored.trim() : null;
+
+  return cachedBearerToken;
+};
+
+const ensureAuthorizationHeader = async (
+  headers: HeaderRecord,
+): Promise<void> => {
+  if (hasAuthorizationHeader(headers)) {
+    return;
+  }
+
+  const bearerToken = await getStoredBearerToken();
+  if (bearerToken) {
+    headers.Authorization = `Bearer ${bearerToken}`;
+    return;
+  }
+
+  const wooAuthHeader = await getStoredWooCommerceAuthHeader();
+  if (wooAuthHeader) {
+    headers.Authorization = wooAuthHeader;
+  }
 };
 
 export const persistWooCommerceAuthHeader = async (
@@ -140,12 +172,7 @@ export const buildWordPressRequestInit = async (
     }
   }
 
-  if (!hasAuthorizationHeader(headers)) {
-    const wooAuthHeader = await getStoredWooCommerceAuthHeader();
-    if (wooAuthHeader) {
-      headers.Authorization = wooAuthHeader;
-    }
-  }
+  await ensureAuthorizationHeader(headers);
 
   return {
     ...(init ?? {}),
@@ -214,4 +241,16 @@ export const clearStoredWooCommerceAuthHeader = async (): Promise<void> => {
 
 export const __unsafeResetWooCommerceAuthHeaderCacheForTests = () => {
   cachedWooCommerceAuthHeader = undefined;
+};
+
+export const updateCachedBearerToken = (token: string | null): void => {
+  cachedBearerToken = token && token.trim().length > 0 ? token.trim() : null;
+};
+
+export const clearCachedBearerToken = (): void => {
+  cachedBearerToken = null;
+};
+
+export const __unsafeResetBearerTokenCacheForTests = () => {
+  cachedBearerToken = undefined;
 };

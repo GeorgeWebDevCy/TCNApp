@@ -3,9 +3,11 @@ import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
 import deviceLog from '../utils/deviceLog';
 import {
   buildWordPressRequestInit,
+  clearCachedBearerToken,
   clearStoredWordPressCookies,
   clearStoredWooCommerceAuthHeader,
   persistWooCommerceAuthHeader,
+  updateCachedBearerToken,
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
 import {
@@ -917,6 +919,8 @@ const storeSession = async ({
     removals.push(AUTH_STORAGE_KEYS.wpRestNonce);
   }
 
+  updateCachedBearerToken(normalizedToken ?? null);
+
   if (entries.length > 0) {
     await AsyncStorage.multiSet(entries);
   }
@@ -972,6 +976,7 @@ export const clearSession = async () => {
     AUTH_STORAGE_KEYS.tokenLoginUrl,
     AUTH_STORAGE_KEYS.wpRestNonce,
   ]);
+  clearCachedBearerToken();
   await clearStoredWordPressCookies();
   await clearStoredWooCommerceAuthHeader();
 };
