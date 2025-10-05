@@ -4,7 +4,7 @@ The mobile app now calls `POST /wp-json/gn/v1/profile/avatar` to upload a member
 
 ## Minimum requirements
 
-1. **Authentication** – The route must require a logged-in user and support both cookie- and token-based authentication (Bearer token).
+1. **Authentication** – The route must require a logged-in user and support both cookie- and token-based authentication (Bearer token). When using the token flow, clients have to pass an `Authorization: Bearer <token>` header on every request; omitting the header or using a different format causes the request to fail before the upload handler runs.
 2. **Image handling** – Save the uploaded file to the WordPress Media Library. Store the attachment ID (or resulting URL) in user meta so the avatar appears in `avatar_urls` when requesting the user profile.
 3. **Response body** – Return a JSON object containing the updated user information, e.g.
    ```json
@@ -30,3 +30,8 @@ The mobile app now calls `POST /wp-json/gn/v1/profile/avatar` to upload a member
 - Ensure the route respects WordPress capability checks (e.g. `current_user_can( 'upload_files' )`).
 
 With this endpoint in place the mobile app will automatically update WordPress whenever a member changes their photo.
+
+## Client integration notes
+
+- Fetch the bearer token from the `POST /wp-json/gn/v1/login` response when establishing a session without cookies, store it client-side, and attach it to avatar uploads while it remains valid (tokens expire after roughly 15 minutes, so refresh it as needed).
+- Construct the React Native `fetch`/`axios` request with an `Authorization` header of exactly `Bearer ${token}` to satisfy the plugin's `TokenAuthenticator` regex.
