@@ -19,7 +19,7 @@ export const WORDPRESS_CONFIG = {
   baseUrl: BASE_URL,
   endpoints: {
     passwordLogin: '/wp-json/gn/v1/login',
-    profile: '/wp-json/wp/v2/users/me',
+    profile: '/wp-json/gn/v1/me',
     profileAvatar: '/wp-json/gn/v1/profile/avatar',
     changePassword: '/wp-json/gn/v1/change-password',
     changePasswordSql: '/wp-json/gn/v1/sql/change-password',

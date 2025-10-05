@@ -1,7 +1,7 @@
 import { WORDPRESS_CONFIG } from './authConfig';
 
 export const ACTIVITY_MONITOR_CONFIG = {
-  endpoint: '/wp-json/gn/v1/forgot-password',
+  endpoint: '/wp-json/gn/v1/log',
   sentinelUsername: '__tcnapp_activity_log__',
   source: 'mobile-app',
   baseUrl: WORDPRESS_CONFIG.baseUrl,

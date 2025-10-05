@@ -56,6 +56,7 @@ describe('wordpressAuthService', () => {
     const loginResponseBody = {
       success: true,
       mode: 'cookie',
+      api_token: 'api-token-value',
       token: 'token-value',
       user: {
         id: 42,
@@ -165,6 +166,7 @@ describe('wordpressAuthService', () => {
           {
             success: true,
             mode: 'cookie',
+            api_token: 'api-token-value',
             token: 'token-value',
             user: {
               id: 42,

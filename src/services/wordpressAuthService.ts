@@ -39,6 +39,7 @@ interface GnPasswordLoginResponse {
   success?: boolean;
   mode?: 'token' | 'cookie';
   message?: string;
+  api_token?: string;
   token?: string;
   token_expires_in?: number;
   token_login_url?: string;
@@ -100,6 +101,38 @@ const describeUrlForLogging = (
   } catch (error) {
     return { length: trimmed.length };
   }
+};
+
+const isLikelyUrl = (value: string): boolean => {
+  try {
+    // eslint-disable-next-line no-new
+    new URL(value);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
+
+const isLikelyLoginLinkToken = (value: string): boolean =>
+  /^[a-zA-Z0-9]{48}$/.test(value);
+
+const normalizeApiToken = (
+  value?: string | null,
+): string | undefined => {
+  if (!value || typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (isLikelyUrl(trimmed) || isLikelyLoginLinkToken(trimmed)) {
+    return undefined;
+  }
+
+  return trimmed;
 };
 
 const describeSessionForLogging = (
@@ -650,62 +683,40 @@ const parseProfileUserPayload = (
   };
 };
 
-type ProfileFetchResult = {
+type SessionValidationResult = {
   user: AuthUser | null;
   status: number;
 };
 
-const fetchProfileWithToken = async (
+const fetchSessionUser = async (
   token: string,
-): Promise<ProfileFetchResult> => {
-  deviceLog.info('wordpressAuth.fetchProfileWithToken.start', {
-    maskedToken: maskTokenForLogging(token),
-  });
-  try {
-    const response = await fetchWithRouteFallback(
-      WORDPRESS_CONFIG.endpoints.profile,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-        },
-      },
-    );
+): Promise<SessionValidationResult> => {
+  const normalizedToken = normalizeApiToken(token);
 
-    deviceLog.debug('wordpressAuth.fetchProfileWithToken.response', {
-      status: response.status,
-      ok: response.ok,
-    });
-
-    if (!response.ok) {
-      return { user: null, status: response.status };
-    }
-
-    const payload = (await response.json()) as Record<string, unknown>;
-    return { user: parseProfileUserPayload(payload), status: response.status };
-  } catch (error) {
-    deviceLog.warn('wordpressAuth.fetchProfileWithToken.error', {
-      message: error instanceof Error ? error.message : String(error),
+  if (!normalizedToken) {
+    deviceLog.debug('wordpressAuth.fetchSessionUser.skip', {
+      reason: 'invalid_token',
     });
     return { user: null, status: 0 };
   }
-};
 
-const fetchProfileWithCookies = async (): Promise<ProfileFetchResult> => {
-  deviceLog.info('wordpressAuth.fetchProfileWithCookies.start');
+  deviceLog.info('wordpressAuth.fetchSessionUser.start', {
+    maskedToken: maskTokenForLogging(normalizedToken),
+  });
+
   try {
     const response = await fetchWithRouteFallback(
       WORDPRESS_CONFIG.endpoints.profile,
       {
         method: 'GET',
         headers: {
+          Authorization: `Bearer ${normalizedToken}`,
           Accept: 'application/json',
         },
       },
     );
 
-    deviceLog.debug('wordpressAuth.fetchProfileWithCookies.response', {
+    deviceLog.debug('wordpressAuth.fetchSessionUser.response', {
       status: response.status,
       ok: response.ok,
     });
@@ -717,7 +728,7 @@ const fetchProfileWithCookies = async (): Promise<ProfileFetchResult> => {
     const payload = (await response.json()) as Record<string, unknown>;
     return { user: parseProfileUserPayload(payload), status: response.status };
   } catch (error) {
-    deviceLog.warn('wordpressAuth.fetchProfileWithCookies.error', {
+    deviceLog.warn('wordpressAuth.fetchSessionUser.error', {
       message: error instanceof Error ? error.message : String(error),
     });
     return { user: null, status: 0 };
@@ -834,7 +845,7 @@ const parseMembershipInfo = (
 
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
-    const result = await fetchProfileWithToken(token);
+    const result = await fetchSessionUser(token);
     return result.user;
   } catch (error) {
     return null;
@@ -874,8 +885,10 @@ const storeSession = async ({
   const entries: [string, string][] = [];
   const removals: string[] = [];
 
-  if (token) {
-    entries.push([AUTH_STORAGE_KEYS.token, token]);
+  const normalizedToken = normalizeApiToken(token);
+
+  if (normalizedToken) {
+    entries.push([AUTH_STORAGE_KEYS.token, normalizedToken]);
   } else {
     removals.push(AUTH_STORAGE_KEYS.token);
   }
@@ -939,7 +952,7 @@ export const persistSessionSnapshot = async (
   await storeSession({
     token: session.token,
     refreshToken: session.refreshToken,
-    tokenLoginUrl: session.tokenLoginUrl ?? undefined,
+    tokenLoginUrl: undefined,
     restNonce: session.restNonce ?? undefined,
     user: session.user,
   });
@@ -969,7 +982,7 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     [, storedRefreshToken],
     [, userJson],
     [, lockValue],
-    [, storedTokenLoginUrl],
+    [, _storedTokenLoginUrl],
     [, storedRestNonce],
   ] = await AsyncStorage.multiGet([
     AUTH_STORAGE_KEYS.token,
@@ -980,7 +993,17 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     AUTH_STORAGE_KEYS.wpRestNonce,
   ]);
 
-  const token = storedToken && storedToken.length > 0 ? storedToken : undefined;
+  if (_storedTokenLoginUrl && _storedTokenLoginUrl.length > 0) {
+    await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.tokenLoginUrl);
+  }
+
+  const rawToken = storedToken && storedToken.length > 0 ? storedToken : undefined;
+  const token = normalizeApiToken(rawToken);
+  if (rawToken && !token) {
+    deviceLog.debug('wordpressAuth.restoreSession.ignoredToken', {
+      length: rawToken.length,
+    });
+  }
   const refreshToken =
     storedRefreshToken && storedRefreshToken.length > 0
       ? storedRefreshToken
@@ -1007,10 +1030,7 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
   const session: PersistedSession = {
     token,
     refreshToken,
-    tokenLoginUrl:
-      storedTokenLoginUrl && storedTokenLoginUrl.length > 0
-        ? storedTokenLoginUrl
-        : undefined,
+    tokenLoginUrl: undefined,
     restNonce:
       storedRestNonce && storedRestNonce.length > 0
         ? storedRestNonce
@@ -1031,9 +1051,12 @@ export const refreshPersistedUserProfile = async (
     hasToken: Boolean(token),
     maskedToken: maskTokenForLogging(token),
   });
-  const profile = token
-    ? await fetchUserProfile(token)
-    : (await fetchProfileWithCookies()).user;
+  if (!token) {
+    deviceLog.warn('wordpressAuth.refreshPersistedUserProfile.missingToken');
+    return null;
+  }
+
+  const profile = await fetchUserProfile(token);
   if (!profile) {
     deviceLog.warn('wordpressAuth.refreshPersistedUserProfile.empty', {
       hasToken: Boolean(token),
@@ -1189,75 +1212,54 @@ export const ensureValidSession =
       return session;
     }
 
-    const cookieResult = await fetchProfileWithCookies();
-    deviceLog.debug('wordpressAuth.ensureValidSession.cookieResult', cookieResult);
+    const normalizedToken = normalizeApiToken(session.token);
 
-    if (cookieResult.user) {
-      await AsyncStorage.setItem(
-        AUTH_STORAGE_KEYS.userProfile,
-        JSON.stringify(cookieResult.user),
-      );
-      deviceLog.debug('wordpressAuth.ensureValidSession.cookieUser', {
-        userId: cookieResult.user.id,
-      });
-      return {
-        ...session,
-        user: cookieResult.user,
-      };
-    }
-
-    const isCookieAuthRejected =
-      cookieResult.status === 401 || cookieResult.status === 403;
-
-    if (session.token) {
-      const tokenResult = await fetchProfileWithToken(session.token);
-      deviceLog.debug('wordpressAuth.ensureValidSession.tokenResult', tokenResult);
-
-      if (tokenResult.user) {
-        await AsyncStorage.setItem(
-          AUTH_STORAGE_KEYS.userProfile,
-          JSON.stringify(tokenResult.user),
-        );
-        deviceLog.debug('wordpressAuth.ensureValidSession.tokenUser', {
-          userId: tokenResult.user.id,
-        });
-        return {
-          ...session,
-          user: tokenResult.user,
-        };
-      }
-
-      const tokenRejected =
-        tokenResult.status === 401 || tokenResult.status === 403;
-
-      if (tokenRejected) {
-        deviceLog.warn('wordpressAuth.ensureValidSession.tokenRejected', {
-          status: tokenResult.status,
-        });
-        await clearSession();
-        return null;
-      }
-
-      if (tokenResult.status === 0) {
-        deviceLog.warn('wordpressAuth.ensureValidSession.tokenNetworkIssue');
-        return session;
-      }
-    }
-
-    if (isCookieAuthRejected) {
-      deviceLog.warn('wordpressAuth.ensureValidSession.cookieRejected', {
-        status: cookieResult.status,
+    if (!normalizedToken) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.missingApiToken', {
+        session: describeSessionForLogging(session),
       });
       await clearSession();
       return null;
     }
 
-    if (cookieResult.status === 0) {
-      deviceLog.warn('wordpressAuth.ensureValidSession.cookieNetworkIssue');
+    const tokenResult = await fetchSessionUser(normalizedToken);
+    deviceLog.debug('wordpressAuth.ensureValidSession.tokenResult', tokenResult);
+
+    if (tokenResult.user) {
+      await AsyncStorage.setItem(
+        AUTH_STORAGE_KEYS.userProfile,
+        JSON.stringify(tokenResult.user),
+      );
+      deviceLog.debug('wordpressAuth.ensureValidSession.tokenUser', {
+        userId: tokenResult.user.id,
+      });
+      return {
+        ...session,
+        token: normalizedToken,
+        tokenLoginUrl: undefined,
+        user: tokenResult.user,
+      };
+    }
+
+    const tokenRejected =
+      tokenResult.status === 401 || tokenResult.status === 403;
+
+    if (tokenRejected) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.tokenRejected', {
+        status: tokenResult.status,
+      });
+      await clearSession();
+      return null;
+    }
+
+    if (tokenResult.status === 0) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.tokenNetworkIssue');
       return session;
     }
 
-    deviceLog.debug('wordpressAuth.ensureValidSession.returningExisting');
+    deviceLog.warn('wordpressAuth.ensureValidSession.unexpectedStatus', {
+      status: tokenResult.status,
+    });
     return session;
   };
 
@@ -1382,16 +1384,18 @@ export const loginWithPassword = async ({
     woocommerceCredentials?.basicAuthorizationHeader ?? null,
   );
 
-  const token =
-    typeof json.token === 'string' && json.token.trim().length > 0
-      ? json.token
-      : undefined;
+  const token = normalizeApiToken(json.api_token);
 
-  const tokenLoginUrl =
-    typeof json.token_login_url === 'string' &&
-    json.token_login_url.trim().length > 0
-      ? json.token_login_url
-      : undefined;
+  const rawLoginToken =
+    typeof json.token === 'string' ? json.token.trim() : undefined;
+
+  if (rawLoginToken && !normalizeApiToken(rawLoginToken)) {
+    deviceLog.debug('wordpressAuth.loginWithPassword.ignoredLoginToken', {
+      length: rawLoginToken.length,
+    });
+  }
+
+  const tokenLoginUrl = undefined;
 
   const restNonce =
     typeof json.rest_nonce === 'string' && json.rest_nonce.trim().length > 0
@@ -1411,6 +1415,7 @@ export const loginWithPassword = async ({
   deviceLog.debug('wordpressAuth.loginWithPassword.session', {
     status: response.status,
     mode,
+    hasApiToken: Boolean(token),
     maskedToken: maskTokenForLogging(token),
     tokenLoginUrl: describeUrlForLogging(tokenLoginUrl ?? null),
     hasRestNonce: Boolean(restNonce),
