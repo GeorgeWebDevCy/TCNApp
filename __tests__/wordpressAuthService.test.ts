@@ -3,7 +3,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../src/config/authConfig';
 import {
   __unsafeResetWordPressCookieCacheForTests,
+  __unsafeResetWooCommerceAuthHeaderCacheForTests,
   clearStoredWordPressCookies,
+  clearStoredWooCommerceAuthHeader,
 } from '../src/services/wordpressCookieService';
 import {
   loginWithPassword,
@@ -45,7 +47,9 @@ describe('wordpressAuthService', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     await clearStoredWordPressCookies();
+    await clearStoredWooCommerceAuthHeader();
     __unsafeResetWordPressCookieCacheForTests();
+    __unsafeResetWooCommerceAuthHeaderCacheForTests();
   });
 
   it('retries WordPress requests using rest_route when the GN Password Login API route is missing', async () => {
@@ -57,6 +61,16 @@ describe('wordpressAuthService', () => {
         id: 42,
         email: 'member@example.com',
         display: 'Member Example',
+        woocommerce: {
+          consumer_key: 'ck_live_value',
+          consumer_secret: 'cs_live_value',
+          basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+        },
+      },
+      woocommerce: {
+        consumer_key: 'ck_live_value',
+        consumer_secret: 'cs_live_value',
+        basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
       },
     };
     const setCookieHeader =
@@ -99,6 +113,12 @@ describe('wordpressAuthService', () => {
             firstName: null,
             lastName: null,
             membership: null,
+            woocommerceCredentials: {
+              consumerKey: 'ck_live_value',
+              consumerSecret: 'cs_live_value',
+              basicAuthorizationHeader:
+                'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+            },
           }),
         ],
       ]),
@@ -107,6 +127,11 @@ describe('wordpressAuthService', () => {
     expect(AsyncStorage.setItem).toHaveBeenCalledWith(
       AUTH_STORAGE_KEYS.wordpressCookies,
       expect.stringContaining('wordpress_logged_in_hash=logged-in'),
+    );
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      AUTH_STORAGE_KEYS.woocommerceAuthHeader,
+      'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
     );
   });
 
@@ -125,6 +150,60 @@ describe('wordpressAuthService', () => {
       loginWithPassword({ username: 'member', password: 'bad-password' }),
     ).rejects.toThrow(
       'There has been a critical error on this website. Learn more about troubleshooting WordPress.',
+    );
+  });
+
+  it('applies the WooCommerce Basic authorization header to subsequent requests after login', async () => {
+    const setCookieHeader =
+      'wordpress_logged_in_hash=logged-in; path=/; secure; httponly';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(
+          200,
+          {
+            success: true,
+            mode: 'cookie',
+            token: 'token-value',
+            user: {
+              id: 42,
+              email: 'member@example.com',
+              display: 'Member Example',
+              woocommerce: {
+                consumer_key: 'ck_live_value',
+                consumer_secret: 'cs_live_value',
+                basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+              },
+            },
+            woocommerce: {
+              consumer_key: 'ck_live_value',
+              consumer_secret: 'cs_live_value',
+              basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+            },
+          },
+          {
+            'set-cookie': setCookieHeader,
+          },
+        ),
+      )
+      .mockResolvedValueOnce(createJsonResponse(200, { success: true }));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await loginWithPassword({ username: 'member', password: 'passw0rd' });
+
+    await registerAccount({
+      username: 'newmember',
+      email: 'newmember@example.com',
+      password: 'aSecurePassword123',
+    });
+
+    const registerRequestInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(registerRequestInit?.headers).toEqual(
+      expect.objectContaining({
+        Authorization: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
+      }),
     );
   });
 

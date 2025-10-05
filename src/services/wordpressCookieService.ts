@@ -7,6 +7,7 @@ type HeaderRecord = Record<string, string>;
 const WORDPRESS_COOKIE_PATTERN = /(wordpress_[^=]+)=([^;]*)/gi;
 
 let cachedCookieHeader: string | null | undefined;
+let cachedWooCommerceAuthHeader: string | null | undefined;
 
 const normalizeHeaders = (headers?: HeadersInit): HeaderRecord => {
   if (!headers) {
@@ -33,6 +34,9 @@ const normalizeHeaders = (headers?: HeadersInit): HeaderRecord => {
 
 const hasCookieHeader = (headers: HeaderRecord): boolean =>
   Object.keys(headers).some(key => key.toLowerCase() === 'cookie');
+
+const hasAuthorizationHeader = (headers: HeaderRecord): boolean =>
+  Object.keys(headers).some(key => key.toLowerCase() === 'authorization');
 
 const parseCookieHeader = (header?: string | null): Map<string, string> => {
   const cookies = new Map<string, string>();
@@ -84,6 +88,35 @@ const getStoredCookieHeader = async (): Promise<string | null> => {
   return cachedCookieHeader;
 };
 
+const getStoredWooCommerceAuthHeader = async (): Promise<string | null> => {
+  if (typeof cachedWooCommerceAuthHeader !== 'undefined') {
+    return cachedWooCommerceAuthHeader;
+  }
+
+  const stored = await AsyncStorage.getItem(
+    AUTH_STORAGE_KEYS.woocommerceAuthHeader,
+  );
+  cachedWooCommerceAuthHeader = stored && stored.trim().length > 0 ? stored : null;
+
+  return cachedWooCommerceAuthHeader;
+};
+
+export const persistWooCommerceAuthHeader = async (
+  header: string | null,
+): Promise<void> => {
+  const normalized = header && header.trim().length > 0 ? header : null;
+  cachedWooCommerceAuthHeader = normalized;
+
+  if (normalized) {
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.woocommerceAuthHeader,
+      normalized,
+    );
+  } else {
+    await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.woocommerceAuthHeader);
+  }
+};
+
 const persistCookieHeader = async (header: string | null): Promise<void> => {
   const normalized = header && header.trim().length > 0 ? header : null;
   cachedCookieHeader = normalized;
@@ -104,6 +137,13 @@ export const buildWordPressRequestInit = async (
     const storedHeader = await getStoredCookieHeader();
     if (storedHeader) {
       headers.Cookie = storedHeader;
+    }
+  }
+
+  if (!hasAuthorizationHeader(headers)) {
+    const wooAuthHeader = await getStoredWooCommerceAuthHeader();
+    if (wooAuthHeader) {
+      headers.Authorization = wooAuthHeader;
     }
   }
 
@@ -165,4 +205,13 @@ export const clearStoredWordPressCookies = async (): Promise<void> => {
 // Exposed for tests to reset in-memory state without touching AsyncStorage directly.
 export const __unsafeResetWordPressCookieCacheForTests = () => {
   cachedCookieHeader = undefined;
+};
+
+export const clearStoredWooCommerceAuthHeader = async (): Promise<void> => {
+  cachedWooCommerceAuthHeader = null;
+  await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.woocommerceAuthHeader);
+};
+
+export const __unsafeResetWooCommerceAuthHeaderCacheForTests = () => {
+  cachedWooCommerceAuthHeader = undefined;
 };

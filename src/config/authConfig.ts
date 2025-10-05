@@ -51,4 +51,5 @@ export const AUTH_STORAGE_KEYS = {
   tokenLoginUrl: '@tcnapp/wp-token-login-url',
   wpRestNonce: '@tcnapp/wp-rest-nonce',
   wordpressCookies: '@tcnapp/wp-cookies',
+  woocommerceAuthHeader: '@tcnapp/woocommerce-basic-auth',
 };

@@ -3,6 +3,8 @@ import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../config/authConfig';
 import {
   buildWordPressRequestInit,
   clearStoredWordPressCookies,
+  clearStoredWooCommerceAuthHeader,
+  persistWooCommerceAuthHeader,
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
 import {
@@ -11,6 +13,7 @@ import {
   MembershipBenefit,
   MembershipInfo,
   RegisterOptions,
+  WooCommerceCredentialBundle,
 } from '../types/auth';
 
 export interface PersistedSession {
@@ -28,6 +31,7 @@ interface GnPasswordLoginUserPayload {
   email?: string;
   nicename?: string;
   display?: string;
+  woocommerce?: GnPasswordLoginWooCommercePayload | null;
 }
 
 interface GnPasswordLoginResponse {
@@ -42,6 +46,21 @@ interface GnPasswordLoginResponse {
   user?: GnPasswordLoginUserPayload | null;
   code?: string;
   data?: { status?: number };
+  woocommerce?: GnPasswordLoginWooCommercePayload | null;
+}
+
+interface GnPasswordLoginWooCommercePayload {
+  consumer_key?: unknown;
+  consumer_secret?: unknown;
+  basic_auth?: unknown;
+  basic_auth_header?: unknown;
+  basic_authentication?: unknown;
+  basic_authorization?: unknown;
+  basic_authorization_header?: unknown;
+  basicAuthorization?: unknown;
+  basicAuthorizationHeader?: unknown;
+  authorization?: unknown;
+  auth_header?: unknown;
 }
 
 const normalizeBaseUrl = (baseUrl: string): string =>
@@ -363,6 +382,120 @@ const getString = (value: unknown): string | null => {
   return null;
 };
 
+const encodeBase64 = (value: string): string | null => {
+  try {
+    if (typeof globalThis !== 'undefined') {
+      const scope = globalThis as {
+        btoa?: (input: string) => string;
+        Buffer?: {
+          from: (input: string, encoding?: string) => {
+            toString: (encoding: string) => string;
+          };
+        };
+      };
+
+      if (typeof scope.btoa === 'function') {
+        return scope.btoa(value);
+      }
+
+      const maybeBuffer = scope.Buffer;
+      if (maybeBuffer && typeof maybeBuffer.from === 'function') {
+        return maybeBuffer.from(value, 'utf8').toString('base64');
+      }
+    }
+  } catch (error) {
+    return null;
+  }
+
+  return null;
+};
+
+const normalizeBasicAuthorizationHeader = (
+  header?: string | null,
+): string | null => {
+  if (!header || typeof header !== 'string') {
+    return null;
+  }
+
+  const trimmed = header.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return trimmed.toLowerCase().startsWith('basic ')
+    ? trimmed
+    : `Basic ${trimmed}`;
+};
+
+const createWooCommerceCredentialBundle = (
+  consumerKey: string,
+  consumerSecret: string,
+  basicAuthorizationHeader?: string | null,
+): WooCommerceCredentialBundle | null => {
+  const trimmedKey = consumerKey.trim();
+  const trimmedSecret = consumerSecret.trim();
+
+  if (!trimmedKey || !trimmedSecret) {
+    return null;
+  }
+
+  const normalizedHeader =
+    normalizeBasicAuthorizationHeader(basicAuthorizationHeader) ||
+    (() => {
+      const encoded = encodeBase64(`${trimmedKey}:${trimmedSecret}`);
+      return encoded ? `Basic ${encoded}` : null;
+    })();
+
+  return {
+    consumerKey: trimmedKey,
+    consumerSecret: trimmedSecret,
+    basicAuthorizationHeader: normalizedHeader ?? undefined,
+  };
+};
+
+const parseWooCommerceCredentialBundle = (
+  source: unknown,
+): WooCommerceCredentialBundle | null => {
+  if (!source || typeof source !== 'object') {
+    return null;
+  }
+
+  const record = source as Record<string, unknown>;
+  const consumerKey =
+    getString(record.consumer_key) ??
+    getString(record.consumerKey) ??
+    getString(record.key) ??
+    null;
+  const consumerSecret =
+    getString(record.consumer_secret) ??
+    getString(record.consumerSecret) ??
+    getString(record.secret) ??
+    null;
+  const basicAuth =
+    getString(record.basic_auth) ??
+    getString(record.basicAuth) ??
+    getString(record.basic_auth_header) ??
+    getString(record.basicAuthHeader) ??
+    getString(record.basic_authentication) ??
+    getString(record.basicAuthorization) ??
+    getString(record.basicAuthorizationHeader) ??
+    getString(record.basic_authorization) ??
+    getString(record.basic_authorization_header) ??
+    getString(record.authorization) ??
+    getString(record.auth_header) ??
+    null;
+
+  if (!consumerKey || !consumerSecret) {
+    return null;
+  }
+
+  return createWooCommerceCredentialBundle(
+    consumerKey,
+    consumerSecret,
+    basicAuth,
+  );
+};
+
 const parseProfileUserPayload = (
   payload: Record<string, unknown>,
 ): AuthUser => {
@@ -662,6 +795,20 @@ const storeSession = async ({
     await AsyncStorage.multiRemove(removals);
   }
 
+  const wooAuthHeader = user?.woocommerceCredentials
+    ? (
+        user.woocommerceCredentials.basicAuthorizationHeader ??
+        createWooCommerceCredentialBundle(
+          user.woocommerceCredentials.consumerKey,
+          user.woocommerceCredentials.consumerSecret,
+          user.woocommerceCredentials.basicAuthorizationHeader ?? null,
+        )?.basicAuthorizationHeader ??
+        null
+      )
+    : null;
+
+  await persistWooCommerceAuthHeader(wooAuthHeader);
+
   await setSessionLock(false);
 };
 
@@ -696,6 +843,7 @@ export const clearSession = async () => {
     AUTH_STORAGE_KEYS.wpRestNonce,
   ]);
   await clearStoredWordPressCookies();
+  await clearStoredWooCommerceAuthHeader();
 };
 
 export const restoreSession = async (): Promise<PersistedSession | null> => {
@@ -1006,6 +1154,23 @@ export const loginWithPassword = async ({
       membership: null,
     };
   }
+
+  const woocommerceCredentials =
+    parseWooCommerceCredentialBundle(payload?.woocommerce ?? null) ??
+    parseWooCommerceCredentialBundle(json.woocommerce ?? null) ??
+    createWooCommerceCredentialBundle(
+      WORDPRESS_CONFIG.woocommerce.consumerKey,
+      WORDPRESS_CONFIG.woocommerce.consumerSecret,
+    ) ??
+    null;
+
+  if (user) {
+    user.woocommerceCredentials = woocommerceCredentials;
+  }
+
+  await persistWooCommerceAuthHeader(
+    woocommerceCredentials?.basicAuthorizationHeader ?? null,
+  );
 
   const token =
     typeof json.token === 'string' && json.token.trim().length > 0

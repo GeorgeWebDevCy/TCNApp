@@ -25,6 +25,12 @@ export interface MembershipPlan {
   metadata?: Record<string, unknown>;
 }
 
+export interface WooCommerceCredentialBundle {
+  consumerKey: string;
+  consumerSecret: string;
+  basicAuthorizationHeader?: string | null;
+}
+
 export interface AuthUser {
   id: number;
   email: string;
@@ -33,6 +39,7 @@ export interface AuthUser {
   lastName?: string | null;
   avatarUrl?: string;
   membership?: MembershipInfo | null;
+  woocommerceCredentials?: WooCommerceCredentialBundle | null;
 }
 
 export interface AuthState {
