@@ -77,6 +77,7 @@ export interface ResetPasswordOptions {
   identifier: string;
   verificationCode: string;
   newPassword: string;
+  resetKey?: string;
 }
 
 export interface AuthContextValue {

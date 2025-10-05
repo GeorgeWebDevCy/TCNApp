@@ -11,6 +11,11 @@ import {
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
 import {
+  getSecureValue,
+  removeSecureValue,
+  setSecureValue,
+} from './secureTokenStorage';
+import {
   AuthUser,
   LoginOptions,
   MembershipBenefit,
@@ -914,16 +919,12 @@ const storeSession = async ({
 
   const normalizedToken = normalizeApiToken(token);
 
-  if (normalizedToken) {
-    entries.push([AUTH_STORAGE_KEYS.token, normalizedToken]);
-  } else {
-    removals.push(AUTH_STORAGE_KEYS.token);
-  }
+  await setSecureValue(AUTH_STORAGE_KEYS.token, normalizedToken);
 
-  if (refreshToken) {
-    entries.push([AUTH_STORAGE_KEYS.refreshToken, refreshToken]);
+  if (refreshToken && refreshToken.trim().length > 0) {
+    await setSecureValue(AUTH_STORAGE_KEYS.refreshToken, refreshToken);
   } else {
-    removals.push(AUTH_STORAGE_KEYS.refreshToken);
+    await removeSecureValue(AUTH_STORAGE_KEYS.refreshToken);
   }
 
   if (user) {
@@ -992,6 +993,10 @@ export const persistSessionSnapshot = async (
 };
 
 export const clearSession = async () => {
+  await Promise.all([
+    removeSecureValue(AUTH_STORAGE_KEYS.token),
+    removeSecureValue(AUTH_STORAGE_KEYS.refreshToken),
+  ]);
   await AsyncStorage.multiRemove([
     AUTH_STORAGE_KEYS.token,
     AUTH_STORAGE_KEYS.refreshToken,
@@ -1008,37 +1013,34 @@ export const clearSession = async () => {
 };
 
 export const restoreSession = async (): Promise<PersistedSession | null> => {
-  const [
-    [, storedToken],
-    [, storedRefreshToken],
-    [, userJson],
-    [, lockValue],
-    [, _storedTokenLoginUrl],
-    [, storedRestNonce],
-  ] = await AsyncStorage.multiGet([
-    AUTH_STORAGE_KEYS.token,
-    AUTH_STORAGE_KEYS.refreshToken,
-    AUTH_STORAGE_KEYS.userProfile,
-    AUTH_STORAGE_KEYS.sessionLock,
-    AUTH_STORAGE_KEYS.tokenLoginUrl,
-    AUTH_STORAGE_KEYS.wpRestNonce,
+  const [rawToken, rawRefreshToken, storedTuples] = await Promise.all([
+    getSecureValue(AUTH_STORAGE_KEYS.token),
+    getSecureValue(AUTH_STORAGE_KEYS.refreshToken),
+    AsyncStorage.multiGet([
+      AUTH_STORAGE_KEYS.userProfile,
+      AUTH_STORAGE_KEYS.sessionLock,
+      AUTH_STORAGE_KEYS.tokenLoginUrl,
+      AUTH_STORAGE_KEYS.wpRestNonce,
+    ]),
   ]);
 
-  if (_storedTokenLoginUrl && _storedTokenLoginUrl.length > 0) {
+  const storedValues = Object.fromEntries(storedTuples);
+  const userJson = storedValues[AUTH_STORAGE_KEYS.userProfile];
+  const lockValue = storedValues[AUTH_STORAGE_KEYS.sessionLock];
+  const storedTokenLoginUrl = storedValues[AUTH_STORAGE_KEYS.tokenLoginUrl];
+  const storedRestNonce = storedValues[AUTH_STORAGE_KEYS.wpRestNonce];
+
+  if (storedTokenLoginUrl && storedTokenLoginUrl.length > 0) {
     await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.tokenLoginUrl);
   }
 
-  const rawToken = storedToken && storedToken.length > 0 ? storedToken : undefined;
-  const token = normalizeApiToken(rawToken);
+  const token = normalizeApiToken(rawToken ?? undefined);
   if (rawToken && !token) {
     deviceLog.debug('wordpressAuth.restoreSession.ignoredToken', {
       length: rawToken.length,
     });
   }
-  const refreshToken =
-    storedRefreshToken && storedRefreshToken.length > 0
-      ? storedRefreshToken
-      : undefined;
+  const refreshToken = rawRefreshToken ?? undefined;
 
   if (!token && !userJson) {
     deviceLog.debug('wordpressAuth.restoreSession.empty');
@@ -1492,7 +1494,7 @@ export const updatePassword = async ({
   token,
   currentPassword,
   newPassword,
-  confirmPassword,
+  confirmPassword: _confirmPassword,
   tokenLoginUrl,
   restNonce,
   userId,
@@ -1509,7 +1511,6 @@ export const updatePassword = async ({
 }): Promise<void> => {
   const trimmedCurrent = currentPassword.trim();
   const trimmedNew = newPassword.trim();
-  const trimmedConfirm = (confirmPassword ?? newPassword).trim();
   const resolvedUserId =
     typeof userId === 'number' && Number.isFinite(userId) ? userId : null;
   const normalizedIdentifier =
@@ -1543,8 +1544,7 @@ export const updatePassword = async ({
         },
         body: JSON.stringify({
           current_password: trimmedCurrent,
-          new_password: trimmedNew,
-          confirm_password: trimmedConfirm,
+          password: trimmedNew,
         }),
       },
     );
@@ -1574,8 +1574,7 @@ export const updatePassword = async ({
     const payload: Record<string, unknown> = {
       user_id: resolvedUserId,
       current_password: trimmedCurrent,
-      new_password: trimmedNew,
-      confirm_password: trimmedConfirm,
+      password: trimmedNew,
     };
 
     if (normalizedIdentifier) {
@@ -1829,14 +1828,20 @@ export const resetPasswordWithCode = async ({
   identifier,
   verificationCode,
   newPassword,
+  resetKey,
 }: {
   identifier: string;
   verificationCode: string;
   newPassword: string;
+  resetKey?: string;
 }): Promise<string | undefined> => {
   const trimmedIdentifier = identifier.trim();
   const trimmedCode = verificationCode.trim();
   const trimmedPassword = newPassword.trim();
+  const trimmedKey =
+    typeof resetKey === 'string' && resetKey.trim().length > 0
+      ? resetKey.trim()
+      : undefined;
 
   if (!trimmedIdentifier || !trimmedCode || !trimmedPassword) {
     throw new Error('Unable to reset password.');
@@ -1854,6 +1859,10 @@ export const resetPasswordWithCode = async ({
     password: trimmedPassword,
     new_password: trimmedPassword,
   };
+
+  if (trimmedKey) {
+    payload.key = trimmedKey;
+  }
 
   const response = await fetchWithRouteFallback(
     WORDPRESS_CONFIG.endpoints.directPasswordReset,
