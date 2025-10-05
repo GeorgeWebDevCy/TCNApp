@@ -165,13 +165,13 @@ export const fetchMembershipPlans = async (
 };
 
 export const createMembershipPaymentSession = async (
-  planId: string,
+  plan: string,
   token?: string,
 ): Promise<PaymentSessionResponse> => {
   const requestInit = await buildWordPressRequestInit({
     method: 'POST',
     headers: buildHeaders(token),
-    body: JSON.stringify({ planId }),
+    body: JSON.stringify({ plan }),
   });
   const response = await fetch(
     `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.createPaymentSession}`,
@@ -192,13 +192,21 @@ export const createMembershipPaymentSession = async (
 };
 
 export const confirmMembershipUpgrade = async (
-  planId: string,
+  plan: string,
   token?: string,
+  paymentIntentId?: string | null,
 ): Promise<ConfirmUpgradeResponse> => {
   const requestInit = await buildWordPressRequestInit({
     method: 'POST',
     headers: buildHeaders(token),
-    body: JSON.stringify({ planId }),
+    body: JSON.stringify({
+      plan,
+      ...(paymentIntentId
+        ? {
+            payment_intent: paymentIntentId,
+          }
+        : {}),
+    }),
   });
   const response = await fetch(
     `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.confirm}`,
