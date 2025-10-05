@@ -58,8 +58,16 @@ export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   },
 ];
 
+type WordPressMembershipPlan = MembershipPlan & {
+  amount_minor?: number;
+  amountMinor?: number;
+  fee?: number;
+  formatted_fee?: string;
+  [key: string]: unknown;
+};
+
 type MembershipPlansResponse = {
-  plans?: MembershipPlan[];
+  plans?: WordPressMembershipPlan[];
 } & Record<string, unknown>;
 
 type PaymentSessionResponse = StripePaymentSession & {
@@ -101,6 +109,33 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   return (payload as T) ?? ({} as T);
 };
 
+const normalizePlanPrice = (plan: WordPressMembershipPlan): MembershipPlan => {
+  const amountMinor =
+    typeof plan.amount_minor === 'number'
+      ? plan.amount_minor
+      : typeof plan.amountMinor === 'number'
+        ? plan.amountMinor
+        : undefined;
+
+  const rawPrice = typeof plan.price === 'number' ? plan.price : 0;
+
+  const normalizedPrice =
+    typeof amountMinor === 'number'
+      ? amountMinor
+      : rawPrice > 0 && rawPrice < 1000
+        ? Math.round(rawPrice * 100)
+        : rawPrice;
+
+  return {
+    ...plan,
+    price: normalizedPrice,
+  };
+};
+
+const normalizePlans = (
+  plans: WordPressMembershipPlan[],
+): MembershipPlan[] => plans.map(normalizePlanPrice);
+
 export const fetchMembershipPlans = async (
   token?: string,
 ): Promise<MembershipPlan[]> => {
@@ -119,11 +154,11 @@ export const fetchMembershipPlans = async (
   >(response);
 
   if (Array.isArray(payload)) {
-    return payload;
+    return normalizePlans(payload as WordPressMembershipPlan[]);
   }
 
   if (Array.isArray(payload.plans)) {
-    return payload.plans as MembershipPlan[];
+    return normalizePlans(payload.plans as WordPressMembershipPlan[]);
   }
 
   return [];
