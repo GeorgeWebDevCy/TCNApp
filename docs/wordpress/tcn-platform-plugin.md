@@ -17,7 +17,7 @@ Toggle modules under **TCN Platform → Modules**. The Membership & MLM module s
 - WooCommerce 7.0+
 - PHP 7.4+
 - MySQL 5.7+ / MariaDB 10.3+
-- HTTPS (strongly recommended; REST login endpoints reject non-SSL requests unless `Allow HTTP During Development` is enabled while `WP_DEBUG` is true)
+- HTTPS (strongly recommended; REST login endpoints reject non-SSL requests unless `Allow Dev HTTP` is enabled while `WP_DEBUG` is true)
 
 ## 🚀 Installation
 
@@ -34,7 +34,7 @@ Toggle modules under **TCN Platform → Modules**. The Membership & MLM module s
 
 ### Password Login API Settings
 - **Allowed CORS Origin** – Exact origin (scheme + host + optional port) allowed to call `gn/v1` endpoints cross-origin. Leave blank to restrict to same-origin requests.
-- **Allow HTTP During Development** – Permits non-HTTPS requests when `WP_DEBUG` is true. Only enable for local development environments.
+- **Allow Dev HTTP** – Permits non-HTTPS requests when `WP_DEBUG` is true. Only enable for local development environments.
 
 These settings persist in the `gn_login_api_settings` option. A compatibility shim keeps `GN_Password_Login_API` usable for legacy code.
 
@@ -43,6 +43,17 @@ These settings persist in the `gn_login_api_settings` option. A compatibility sh
 - Review REST API usage and plugin events from **TCN Platform → Activity Log**.
 - The log captures calls to `gn/v1/*` and `tcn-mlm/v1/*` namespaces, redacting sensitive payload fields like passwords and tokens.
 - Activation, deactivation, settings changes, and manual log clears are also recorded so administrators can audit configuration changes.
+
+## 🧾 Deployment Checklists
+
+- Head to **TCN Platform → Deployment Checklists** for a curated set of preflight checks and troubleshooting tips covering the Password Login API routes.
+- Each section summarises endpoint verification, HTTPS and CORS settings, bearer token expectations, avatar upload requirements, and cURL recipes you can run directly from the server.
+- Authentication quick hits captured on the checklist keep the mobile app and server aligned:
+  - Protected endpoints expect an `Authorization: Bearer` token unless the route explicitly calls itself public.
+  - Retrieve bearer tokens from `POST /wp-json/gn/v1/login` with a valid WordPress username and password.
+  - Ensure the authenticated account stays active and is not blocked by membership or capability plugins before issuing tokens.
+  - When Cloudflare or another proxy sits in front of the site, verify the `Authorization` header survives to PHP unchanged.
+- Quick “App” and “Plugin/Server” lists make it easy to confirm both sides of the integration before shipping builds to QA or production.
 
 ## 💼 Membership & MLM Highlights
 
@@ -75,11 +86,11 @@ All endpoints live under `wp-json/gn/v1`:
 
 | Route | Method | Description |
 | ----- | ------ | ----------- |
-| `/login` | POST | Authenticate via username/email + password. Supports `mode=cookie` for same-origin flows or returns a one-time token for cross-origin login hand-offs. Includes rate limiting and token locking via filters. |
+| `/login` | POST | Authenticate via username/email + password. Always issues seven-day token hand-offs for `/wp-login.php?action=gn_token_login` redemption. Includes rate limiting and token locking via filters. |
 | `/register` | POST | Register a new user with validation for username, email, and password strength. Fires `gn_password_api_user_registered`. |
 | `/forgot-password` | POST | Start core WordPress reset workflow without leaking user existence. |
 | `/reset-password` | POST | Complete a reset using a verification code (custom or stored). |
-| `/change-password` | POST | Authenticated password change with verification of the current password. |
+| `/change-password` | POST | Authenticated password change that requires the current password plus `Authorization: Bearer {api_token}` (or an active session). |
 
 Additional helpers:
 - `GN_Password_Login_API::issue_reset_verification_code( $user_id, $ttl )` for generating short-lived verification codes.
@@ -97,6 +108,107 @@ The legacy class name `GN_Password_Login_API` is aliased to the new service for 
 - Namespaced PHP classes live under `includes/` and autoload via `includes/Autoloader.php`.
 
 ## 📝 Release Notes
+
+### 0.3.55
+- Expand the deployment checklist authentication guidance to reinforce bearer token expectations, token retrieval, account status checks, and proxy header forwarding.
+
+### 0.3.54
+- Refresh the deployment checklist copy to match the latest HTTPS and CORS guidance, highlighting the “Allow Dev HTTP” toggle and explicit origin recommendations.
+- Rename the HTTPS development toggle in settings to “Allow Dev HTTP” so the UI and documentation use the same label.
+
+### 0.3.53
+- Add a Deployment Checklists admin page that consolidates endpoint verification steps, HTTPS/CORS guidance, REST payload expectations, and server-side cURL examples for `/gn/v1/login`, `/gn/v1/change-password`, and `/gn/v1/profile/avatar`.
+- Style the new panel alongside existing admin screens so troubleshooting guides are easy to read directly inside WordPress.
+
+### 0.3.52
+- Ensure `/change-password` resolves the authenticated user when requests rely solely on `Authorization: Bearer` tokens so mobile clients can rotate credentials without a browser cookie.
+- Refresh the API tester preset and docs to call out the bearer token requirement, payload fields, and multipart form expectations for avatar updates.
+- Extend the token authenticator tests to cover direct bearer headers and reject Basic credentials that bypass the security layer.
+
+### 0.3.51
+- Accept bearer tokens passed through `REDIRECT_HTTP_AUTHORIZATION` or `AUTHORIZATION` when FastCGI/proxy setups strip the standard header so API clients keep authenticating successfully.
+- Add a lightweight test harness that exercises the new header fallbacks to prevent regressions.
+
+### 0.3.50
+- Add a dedicated App User role with upload permissions and automatically assign it to API-registered customers to unblock avatar uploads.
+
+### 0.3.49
+- Remove the cookie-based login mode so Password Login API responses always issue one-time hand-off tokens.
+
+### 0.3.48
+- Accept long-lived Password Login API bearer tokens in addition to one-time hand-off tokens so REST requests authenticated from the mobile app can reuse the stored `api_token` without falling back to cookie flows.
+- Document the shared API token prefix in code to keep authenticator lookups aligned.
+
+### 0.3.47
+- Switch the mobile login flow to rely on `mode=token` hand-offs and extend the login token lifetime to a full week so members can finish authentication even if the browser redirect is delayed.
+
+### 0.3.46
+- Enhancement: Expand the API tester presets to cover every REST endpoint, including `/gn/v1/me` and `/gn/v1/log`, so admins can prefill requests for authentication, membership, MLM, and WooCommerce bridges.
+
+### 0.3.45
+- Feature: Issue week-long bearer tokens on login responses, expose a `/gn/v1/me` profile endpoint, and add a `/gn/v1/log` ingestor for mobile diagnostics.
+
+### 0.3.44
+- Feature: Add a Download Log button that exports the complete Activity Log to a timestamped text file for offline auditing.
+
+### 0.3.43
+- Maintenance: Bump the plugin version for the 0.3.43 release.
+
+### 0.3.42
+- Relax the avatar upload permission gate so members without the `upload_files` capability can update their own profile photo while continuing to block cross-account uploads.
+
+### 0.3.41
+- Centralise Password Login bearer token validation and reuse it across profile, membership, and password-change REST endpoints so mobile clients can authenticate with either tokens or session cookies.
+- Return REST-friendly `WP_Error` responses when tokens are invalid or expired to keep API feedback consistent.
+
+### 0.3.40
+- Surface the `WOOCOMMERCE_CONSUMER_KEY`/`WOOCOMMERCE_CONSUMER_SECRET` bundle in Password Login API responses so authenticated clients can automatically sign WooCommerce bridge requests.
+
+### 0.3.39
+- Expand the Activity Log canvas so the DataTable, payload badges, and context panels have room to display wide REST parameters without forcing horizontal scrolling.
+
+### 0.3.38
+- Add a `/gn/v1/profile/avatar` REST endpoint that uploads profile photos to the Media Library, stores avatar metadata, and returns the refreshed `/wp/v2/users/me` payload used by the mobile app.
+- Extend the docs and API tester presets so administrators can review the multipart upload requirements, headers, and sample responses for the avatar route.
+
+### 0.3.37
+- Sync the WordPress.org `readme.txt` with the detailed project README so plugin documentation stays consistent across distribution channels.
+
+### 0.3.36
+- Polish every admin screen with elevated cards, section panels, and richer typography so settings, logs, and the API tester feel cohesive and easier to scan.
+
+### 0.3.35
+- Fall back to a direct WordPress product lookup when WooCommerce's product helper returns nothing so membership mapping always lists existing catalogue items.
+
+### 0.3.34
+- Prevent a fatal error on the settings screen when WooCommerce is unavailable by guarding membership product status lookups.
+
+### 0.3.33
+- Fix the membership product dropdown to honour every registered WooCommerce status so private or custom-state products appear instead of showing the "create products" warning.
+
+### 0.3.32
+- Register membership level labels and benefits with WPML so multilingual storefronts can translate TCN settings directly from the String Translation UI.
+
+### 0.3.31
+- Expose commission controls on the admin settings screen so administrators can adjust direct and passive payouts per membership tier without editing code, keeping compensation programmes aligned with organisational changes.
+
+### 0.3.30
+- Allow administrators to map WooCommerce products to membership levels from the settings screen, persist the selections in plugin options, and keep the `_tcn_membership_level` meta in sync for reliable upgrades even when product slugs change.
+
+### 0.3.29
+- Lock the Activity Log and API Tester admin pages behind a non-public password challenge that expires every 24 hours per administrator session.
+
+### 0.3.28
+- Normalise WooCommerce-derived membership fees so THB prices retain the expected zeros when thousand separators are configured.
+
+### 0.3.27
+- Read membership pricing directly from WooCommerce product meta so third-party price filters no longer downscale the fees surfaced to the mobile app.
+
+### 0.3.26
+- Restore numeric membership pricing in the mobile plans endpoint and expose formatted amounts so the app no longer renders "THBNaN" labels.
+
+### 0.3.25
+- Ensure the membership plans endpoint returns the correct WooCommerce product IDs by falling back to the official product slugs for each tier.
 
 ### 0.3.24
 - Add an exhaustive reference manual that documents every public class method and REST endpoint, including WooCommerce routes, with example payloads tailored for the built-in API tester.
