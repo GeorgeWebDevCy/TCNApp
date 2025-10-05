@@ -964,13 +964,21 @@ export const uploadProfileAvatar = async (
 ): Promise<AuthUser> => {
   const formData = buildAvatarFormData(options);
   const endpoint = resolveAvatarEndpoint();
+  const session = await restoreSession();
+  const token = session?.token?.trim();
+
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+  };
+
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
 
   try {
     const response = await fetchWithRouteFallback(endpoint, {
       method: 'POST',
-      headers: {
-        Accept: 'application/json',
-      },
+      headers,
       body: formData,
     });
 
