@@ -147,9 +147,9 @@ The application bootstraps the `OneSignalProvider`, initializes the SDK during s
 
 ## Mobile App Authentication
 
-The React Native app now ships with a modular login flow connected to WordPress:
+The React Native app now ships with a modular login flow connected to the **TCN Platform** WordPress plugin, which bundles the network marketing engine and Password Login REST API into a single deployable package.
 
-- **Password login**: Uses the [GN Password Login API](https://github.com/GeorgeWebDevCy/gn-password-login-api) plugin (`POST /wp-json/gn/v1/login`) to validate credentials over REST. If you install plugin v1.0.1 make sure to [apply the bundled CORS hook fix](docs/wordpress/gn-password-login-api-cors.md) so WordPress passes all arguments to the plugin's custom filter.
+- **Password login**: Uses the [`/wp-json/gn/v1/login` endpoint](docs/wordpress/tcn-platform-plugin.md#-password-login-api-endpoints) exposed by the plugin's Password Login API module to validate credentials over REST. Enable HTTPS and configure the allowed origin so devices can authenticate without browser fallbacks.
 - **PIN login**: Stores a salted hash locally so returning users can unlock without credentials.
 - **Biometric login**: Leverages native biometrics (Face ID / Touch ID / etc.) as a fast path once a session exists.
 - **Account actions**: "Forgot password" and "Register" links point to the WordPress site and can be customised.
@@ -253,19 +253,17 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 
 ---
 
-## 🛡️ WordPress Backend Requirements
-
-- Install and configure the [TCN Consumer Network MLM](https://github.com/GeorgeWebDevCy/tcn-mlm) plugin alongside WooCommerce to manage membership tiers, commissions, and expose the REST endpoints (`gn/v1/memberships/*`, membership metadata on `/wp-json/wp/v2/users/me`) consumed by the mobile upgrade flows.
-- Install and configure the GN Password Login API plugin so `/wp-json/gn/v1/login` is reachable for REST authentication, and ensure `/wp-json/wp/v2/users/me` remains accessible for profile hydration when tokens are available.【F:src/config/authConfig.ts†L1-L17】【F:src/services/wordpressAuthService.ts†L1-L220】
+- Install and configure the [TCN Platform WordPress plugin](docs/wordpress/tcn-platform-plugin.md), which now packages both the membership/MLM engine and the Password Login REST API consumed by the mobile client. The plugin seeds WooCommerce membership products, exposes `tcn-mlm/v1/*` endpoints for genealogy and commissions, and keeps bearer-token authentication aligned with the mobile flows.【F:src/config/authConfig.ts†L1-L17】【F:src/services/wordpressAuthService.ts†L1-L220】
+- Keep WooCommerce active and confirm the plugin's **Membership & MLM** module remains enabled so membership catalogue data stays in sync with the app.
+- Configure the plugin's **Password Login API** module (allowed origin, HTTPS enforcement, optional dev HTTP override) to match the environments your devices use.
+- Ensure `/wp-json/wp/v2/users/me` remains accessible for profile hydration when tokens are available and grant members permission to upload avatars, matching the plugin's Activity Log guidance.【F:src/services/wordpressAuthService.ts†L29-L61】
 - Ensure CORS and HTTPS are enabled so the React Native app can reach the WordPress API from devices and simulators.
-- Grant users permission to call the profile endpoint so their display name and avatar can be hydrated after login.【F:src/services/wordpressAuthService.ts†L29-L61】
 
 ---
 
 ## 🔗 Related Repositories
 
-- [TCN Consumer Network MLM](https://github.com/GeorgeWebDevCy/tcn-mlm): WordPress plugin that powers membership catalogue data, upgrade confirmations, and commission tracking for the TCN network, exposing the REST endpoints consumed by the mobile app.
-- [GN Password Login API](https://github.com/GeorgeWebDevCy/gn-password-login-api): Companion authentication plugin that provides the `/wp-json/gn/v1/login` endpoint used by the React Native client.
+- [TCN Platform WordPress Plugin](docs/wordpress/tcn-platform-plugin.md): Unified membership/MLM and Password Login API package that powers the WooCommerce backend consumed by this app.
 
 ---
 

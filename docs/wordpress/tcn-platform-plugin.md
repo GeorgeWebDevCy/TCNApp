@@ -109,6 +109,15 @@ The legacy class name `GN_Password_Login_API` is aliased to the new service for 
 
 ## 📝 Release Notes
 
+### 0.3.59
+- Mirror the `jwt-auth/v1` REST endpoints from the standalone JWT Authentication plugin so existing clients can obtain, refresh, and validate JWTs without additional dependencies.
+
+### 0.3.58
+- Reduce memory usage when enumerating membership products by querying WooCommerce IDs and metadata on demand instead of instantiating every product object up front.
+
+### 0.3.57
+- Automatically authenticate REST requests that supply bearer tokens so protected endpoints recognise the same API tokens issued by `/gn/v1/login`, including WooCommerce customer and order routes.
+
 ### 0.3.55
 - Expand the deployment checklist authentication guidance to reinforce bearer token expectations, token retrieval, account status checks, and proxy header forwarding.
 
