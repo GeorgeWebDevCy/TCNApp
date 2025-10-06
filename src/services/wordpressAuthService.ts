@@ -33,45 +33,6 @@ export interface PersistedSession {
   locked: boolean;
 }
 
-interface GnPasswordLoginUserPayload {
-  id?: number | string;
-  login?: string;
-  email?: string;
-  nicename?: string;
-  display?: string;
-  woocommerce?: GnPasswordLoginWooCommercePayload | null;
-}
-
-interface GnPasswordLoginResponse {
-  success?: boolean;
-  mode?: 'token' | 'cookie';
-  message?: string;
-  api_token?: string;
-  token?: string;
-  token_expires_in?: number;
-  token_login_url?: string;
-  rest_nonce?: string;
-  nonce?: string;
-  user?: GnPasswordLoginUserPayload | null;
-  code?: string;
-  data?: { status?: number };
-  woocommerce?: GnPasswordLoginWooCommercePayload | null;
-}
-
-interface GnPasswordLoginWooCommercePayload {
-  consumer_key?: unknown;
-  consumer_secret?: unknown;
-  basic_auth?: unknown;
-  basic_auth_header?: unknown;
-  basic_authentication?: unknown;
-  basic_authorization?: unknown;
-  basic_authorization_header?: unknown;
-  basicAuthorization?: unknown;
-  basicAuthorizationHeader?: unknown;
-  authorization?: unknown;
-  auth_header?: unknown;
-}
-
 const maskTokenForLogging = (token?: string | null): string | null => {
   if (!token) {
     return null;
@@ -120,9 +81,6 @@ const isLikelyUrl = (value: string): boolean => {
   }
 };
 
-const isLikelyLoginLinkToken = (value: string): boolean =>
-  /^[a-zA-Z0-9]{48}$/.test(value);
-
 const normalizeApiToken = (
   value?: string | null,
 ): string | undefined => {
@@ -140,63 +98,6 @@ const normalizeApiToken = (
   }
 
   return trimmed;
-};
-
-const normalizeTokenLoginUrl = (
-  value?: string | null,
-): string | undefined => {
-  if (!value || typeof value !== 'string') {
-    return undefined;
-  }
-
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return undefined;
-    }
-
-    return parsed.toString();
-  } catch (error) {
-    return undefined;
-  }
-};
-
-const buildTokenLoginUrlFromToken = (
-  token?: string | null,
-  userLogin?: string | null,
-): string | undefined => {
-  if (!token || typeof token !== 'string') {
-    return undefined;
-  }
-
-  const trimmedToken = token.trim();
-  if (!trimmedToken) {
-    return undefined;
-  }
-
-  const trimmedLogin =
-    typeof userLogin === 'string' && userLogin.trim().length > 0
-      ? userLogin.trim()
-      : undefined;
-
-  try {
-    const url = new URL('/wp-login.php', WORDPRESS_CONFIG.baseUrl);
-    url.searchParams.set('action', 'gn_token_login');
-    url.searchParams.set('token', trimmedToken);
-
-    if (trimmedLogin) {
-      url.searchParams.set('u', trimmedLogin);
-    }
-
-    return url.toString();
-  } catch (error) {
-    return undefined;
-  }
 };
 
 const describeSessionForLogging = (
@@ -1304,19 +1205,26 @@ export const ensureValidSession =
     return session;
   };
 
+interface JwtTokenResponse {
+  token?: string;
+  refresh_token?: string;
+  user_email?: string;
+  user_nicename?: string;
+  user_display_name?: string;
+  expires_in?: number;
+  message?: string;
+  code?: string;
+  data?: { status?: number };
+}
+
 export const loginWithPassword = async ({
-  username,
+  email,
   password,
-  remember = true,
 }: LoginOptions): Promise<PersistedSession> => {
-  const mode: 'token' = 'token';
   deviceLog.info('wordpressAuth.loginWithPassword.start', {
-    username,
-    mode,
-    remember,
+    email,
   });
-  // Authenticate against the GN Password Login API plugin endpoint so native clients can
-  // perform username/password logins over the WordPress REST API.
+
   const response = await fetchWithRouteFallback(
     WORDPRESS_CONFIG.endpoints.passwordLogin,
     {
@@ -1326,17 +1234,15 @@ export const loginWithPassword = async ({
         Accept: 'application/json',
       },
       body: JSON.stringify({
-        username,
+        username: email,
         password,
-        mode,
-        remember,
       }),
     },
   );
 
-  let json: GnPasswordLoginResponse;
+  let json: JwtTokenResponse;
   try {
-    json = (await response.json()) as GnPasswordLoginResponse;
+    json = (await response.json()) as JwtTokenResponse;
   } catch (error) {
     deviceLog.error('wordpressAuth.loginWithPassword.parseError', {
       message: error instanceof Error ? error.message : String(error),
@@ -1352,7 +1258,7 @@ export const loginWithPassword = async ({
     throw new Error('Unable to log in with WordPress credentials.');
   }
 
-  if (!response.ok || json.success !== true) {
+  if (!response.ok || !json.token) {
     const message =
       typeof json?.message === 'string' && json.message.trim().length > 0
         ? sanitizeErrorMessage(json.message)
@@ -1360,7 +1266,6 @@ export const loginWithPassword = async ({
     deviceLog.warn('wordpressAuth.loginWithPassword.failed', {
       status: response.status,
       ok: response.ok,
-      success: json.success ?? null,
       code: json.code ?? null,
       dataStatus: json.data?.status ?? null,
       message,
@@ -1368,123 +1273,82 @@ export const loginWithPassword = async ({
     throw new Error(message);
   }
 
-  const payload = json.user ?? null;
-  let user: AuthUser | null = null;
+  const token = normalizeApiToken(json.token);
 
-  if (payload) {
-    const idSource = payload.id;
-    const parsedId =
-      typeof idSource === 'number'
-        ? idSource
-        : typeof idSource === 'string'
-        ? Number.parseInt(idSource, 10)
-        : Number.NaN;
-
-    const email =
-      typeof payload.email === 'string' && payload.email.trim().length > 0
-        ? payload.email
-        : '';
-
-    const name =
-      (typeof payload.display === 'string' &&
-        payload.display.trim().length > 0 &&
-        payload.display) ||
-      (typeof payload.nicename === 'string' &&
-        payload.nicename.trim().length > 0 &&
-        payload.nicename) ||
-      (typeof payload.login === 'string' &&
-        payload.login.trim().length > 0 &&
-        payload.login) ||
-      email ||
-      username;
-
-    user = {
-      id: Number.isFinite(parsedId) ? parsedId : -1,
-      email,
-      name,
-      firstName: null,
-      lastName: null,
-      membership: null,
-    };
-  }
-
-  const woocommerceCredentials =
-    parseWooCommerceCredentialBundle(payload?.woocommerce ?? null) ??
-    parseWooCommerceCredentialBundle(json.woocommerce ?? null) ??
-    createWooCommerceCredentialBundle(
-      WORDPRESS_CONFIG.woocommerce.consumerKey,
-      WORDPRESS_CONFIG.woocommerce.consumerSecret,
-    ) ??
-    null;
-
-  if (user) {
-    user.woocommerceCredentials = woocommerceCredentials;
-  }
-
-  await persistWooCommerceAuthHeader(
-    woocommerceCredentials?.basicAuthorizationHeader ?? null,
-  );
-
-  const token = normalizeApiToken(json.api_token);
-
-  const rawLoginToken =
-    typeof json.token === 'string' ? json.token.trim() : undefined;
-
-  const normalizedUserLogin =
-    typeof payload?.login === 'string' && payload.login.trim().length > 0
-      ? payload.login.trim()
-      : undefined;
-
-  const normalizedTokenLoginUrl = normalizeTokenLoginUrl(
-    json.token_login_url,
-  );
-  const tokenLoginUrlFromToken = buildTokenLoginUrlFromToken(
-    rawLoginToken,
-    normalizedUserLogin ?? null,
-  );
-  const tokenLoginUrl =
-    normalizedTokenLoginUrl ?? tokenLoginUrlFromToken ?? undefined;
-
-  if (rawLoginToken && !normalizeApiToken(rawLoginToken)) {
-    deviceLog.debug('wordpressAuth.loginWithPassword.ignoredLoginToken', {
-      length: rawLoginToken.length,
-      usedForTokenLoginUrl:
-        Boolean(tokenLoginUrlFromToken) && !normalizedTokenLoginUrl,
+  if (!token) {
+    deviceLog.error('wordpressAuth.loginWithPassword.invalidToken', {
+      token: maskTokenForLogging(json.token ?? null),
     });
+    throw new Error('Unable to log in with WordPress credentials.');
   }
 
-  const restNonce =
-    typeof json.rest_nonce === 'string' && json.rest_nonce.trim().length > 0
-      ? json.rest_nonce.trim()
-      : typeof json.nonce === 'string' && json.nonce.trim().length > 0
-      ? json.nonce.trim()
+  const refreshToken =
+    typeof json.refresh_token === 'string' && json.refresh_token.trim().length > 0
+      ? json.refresh_token.trim()
       : undefined;
+
+  const profile = await fetchUserProfile(token);
+
+  const fallbackEmail =
+    (typeof json.user_email === 'string' && json.user_email.trim().length > 0
+      ? json.user_email.trim()
+      : null) ?? email;
+
+  const fallbackName =
+    (typeof json.user_display_name === 'string' &&
+      json.user_display_name.trim().length > 0
+      ? json.user_display_name.trim()
+      : typeof json.user_nicename === 'string' &&
+        json.user_nicename.trim().length > 0
+      ? json.user_nicename.trim()
+      : null) ?? fallbackEmail;
+
+  const user: AuthUser | null = profile
+    ? {
+        ...profile,
+        woocommerceCredentials:
+          profile.woocommerceCredentials ??
+          createWooCommerceCredentialBundle(
+            WORDPRESS_CONFIG.woocommerce.consumerKey,
+            WORDPRESS_CONFIG.woocommerce.consumerSecret,
+          ),
+      }
+    : {
+        id: -1,
+        email: fallbackEmail,
+        name: fallbackName,
+        firstName: null,
+        lastName: null,
+        membership: null,
+        woocommerceCredentials: createWooCommerceCredentialBundle(
+          WORDPRESS_CONFIG.woocommerce.consumerKey,
+          WORDPRESS_CONFIG.woocommerce.consumerSecret,
+        ),
+      };
 
   const session: PersistedSession = {
     token,
+    refreshToken,
     user,
-    tokenLoginUrl,
-    restNonce,
+    tokenLoginUrl: undefined,
+    restNonce: undefined,
     locked: false,
   };
 
   deviceLog.debug('wordpressAuth.loginWithPassword.session', {
     status: response.status,
-    mode,
     hasApiToken: Boolean(token),
     maskedToken: maskTokenForLogging(token),
-    tokenLoginUrl: describeUrlForLogging(tokenLoginUrl ?? null),
-    hasRestNonce: Boolean(restNonce),
-    restNonceLength: restNonce?.length ?? 0,
+    hasRefreshToken: Boolean(refreshToken),
     hasUser: Boolean(user),
-    wooCredentials: Boolean(woocommerceCredentials),
+    wooCredentials: Boolean(user?.woocommerceCredentials ?? null),
   });
 
   await storeSession(session);
   await markPasswordAuthenticated();
 
   deviceLog.success('wordpressAuth.loginWithPassword.success', {
-    username,
+    email,
     userId: user?.id ?? null,
   });
   return session;

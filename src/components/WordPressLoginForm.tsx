@@ -15,7 +15,7 @@ import { COLORS } from '../config/theme';
 interface WordPressLoginFormProps {
   loading?: boolean;
   error?: string | null;
-  onSubmit: (payload: { username: string; password: string }) => void;
+  onSubmit: (payload: { email: string; password: string }) => void;
   onForgotPassword: () => void;
   onRegister: () => void;
 }
@@ -27,7 +27,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
   onForgotPassword,
   onRegister,
 }) => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { t } = useLocalization();
 
@@ -36,10 +36,10 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
       return;
     }
 
-    onSubmit({ username, password });
+    onSubmit({ email, password });
   };
 
-  const disabled = loading || !username || !password;
+  const disabled = loading || !email || !password;
 
   return (
     <KeyboardAvoidingView
@@ -48,16 +48,17 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
       style={styles.container}
     >
       <View style={styles.formGroup}>
-        <Text style={styles.label}>{t('auth.forms.usernameLabel')}</Text>
+        <Text style={styles.label}>{t('auth.forms.emailLabel')}</Text>
         <TextInput
-          value={username}
-          onChangeText={setUsername}
+          value={email}
+          onChangeText={setEmail}
           autoCapitalize="none"
           autoCorrect={false}
-          textContentType="username"
-          autoComplete="username"
+          textContentType="emailAddress"
+          autoComplete="email"
+          keyboardType="email-address"
           style={styles.input}
-          placeholder={t('auth.forms.usernamePlaceholder')}
+          placeholder={t('auth.forms.emailPlaceholder')}
         />
       </View>
       <View style={styles.formGroup}>

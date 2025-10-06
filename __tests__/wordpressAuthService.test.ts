@@ -58,136 +58,61 @@ describe('wordpressAuthService', () => {
     __unsafeResetWooCommerceAuthHeaderCacheForTests();
   });
 
-  it('retries WordPress requests using rest_route when the GN Password Login API route is missing', async () => {
+  it('retries WordPress requests using rest_route when the JWT token route is missing', async () => {
     const loginResponseBody = {
-      success: true,
-      mode: 'token',
-      api_token: 'api-token-value',
-      token: 'token-value',
-      token_login_url:
-        'https://example.com/wp-login.php?action=gn_token_login&token=token-value&u=member',
-      user: {
-        id: 42,
-        email: 'member@example.com',
-        display: 'Member Example',
-        woocommerce: {
-          consumer_key: 'ck_live_value',
-          consumer_secret: 'cs_live_value',
-          basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
-        },
-      },
-      woocommerce: {
-        consumer_key: 'ck_live_value',
-        consumer_secret: 'cs_live_value',
-        basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
-      },
+      token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
+      user_email: 'member@example.com',
+      user_display_name: 'Member Example',
     };
-    const setCookieHeader =
-      'wordpress_logged_in_hash=logged-in; path=/; secure; httponly, wordpress_sec_hash=secure; path=/; secure; httponly';
 
-    const fetchMock = jest.fn().mockResolvedValue(createJsonResponse(500, {}));
+    const profileResponseBody = {
+      id: 42,
+      email: 'member@example.com',
+      name: 'Member Example',
+      avatar_urls: {},
+    };
 
-    fetchMock
+    const fetchMock = jest
+      .fn()
       .mockResolvedValueOnce(createJsonResponse(404, { code: 'rest_no_route' }))
-      .mockResolvedValueOnce(
-        createJsonResponse(200, loginResponseBody, {
-          'set-cookie': setCookieHeader,
-        }),
-      );
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody))
+      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
 
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await loginWithPassword({ username: 'member', password: 'passw0rd' });
+    await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      `${WORDPRESS_CONFIG.baseUrl}/wp-json/gn/v1/login`,
+      `${WORDPRESS_CONFIG.baseUrl}/wp-json/jwt-auth/v1/token`,
       expect.objectContaining({ method: 'POST' }),
     );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      `${WORDPRESS_CONFIG.baseUrl}/?rest_route=/gn/v1/login`,
+      `${WORDPRESS_CONFIG.baseUrl}/?rest_route=/jwt-auth/v1/token`,
       expect.objectContaining({ method: 'POST' }),
     );
 
-    const firstRequestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
-    const firstRequestBody = JSON.parse((firstRequestInit?.body as string) ?? '{}');
-
-    expect(firstRequestBody.mode).toBe('token');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({ method: 'GET' }),
+    );
 
     expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
       expect.arrayContaining([
         [
-          '@tcnapp/user-profile',
-          JSON.stringify({
-            id: 42,
-            email: 'member@example.com',
-            name: 'Member Example',
-            firstName: null,
-            lastName: null,
-            membership: null,
-            woocommerceCredentials: {
-              consumerKey: 'ck_live_value',
-              consumerSecret: 'cs_live_value',
-              basicAuthorizationHeader:
-                'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
-            },
-          }),
-        ],
-        [
-          AUTH_STORAGE_KEYS.tokenLoginUrl,
-          'https://example.com/wp-login.php?action=gn_token_login&token=token-value&u=member',
-        ],
-      ]),
-    );
-
-    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
-      AUTH_STORAGE_KEYS.wordpressCookies,
-    );
-
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      AUTH_STORAGE_KEYS.woocommerceAuthHeader,
-      'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
-    );
-  });
-
-  it('builds a token login URL from the login token when the API omits token_login_url', async () => {
-    const loginResponseBody = {
-      success: true,
-      mode: 'token',
-      token: 'abcdefghijklmnopqrstuvwxyzABCDEFGH123456',
-      user: {
-        id: 42,
-        email: 'member@example.com',
-        display: 'Member Example',
-        login: 'member',
-      },
-    };
-
-    const setCookieHeader =
-      'wordpress_logged_in_hash=logged-in; path=/; secure; httponly, wordpress_sec_hash=secure; path=/; secure; httponly';
-
-    const fetchMock = jest.fn().mockResolvedValue(
-      createJsonResponse(200, loginResponseBody, {
-        'set-cookie': setCookieHeader,
-      }),
-    );
-
-    global.fetch = fetchMock as unknown as typeof fetch;
-
-    await loginWithPassword({ username: 'member', password: 'passw0rd' });
-
-    const entries =
-      (AsyncStorage.multiSet as jest.Mock).mock.calls[0]?.[0] as
-        | [string, string][]
-        | undefined;
-
-    expect(entries).toEqual(
-      expect.arrayContaining([
-        [
-          AUTH_STORAGE_KEYS.tokenLoginUrl,
-          `${WORDPRESS_CONFIG.baseUrl}/wp-login.php?action=gn_token_login&token=${loginResponseBody.token}&u=member`,
+          AUTH_STORAGE_KEYS.userProfile,
+          JSON.stringify(
+            expect.objectContaining({
+              email: 'member@example.com',
+              name: 'Member Example',
+            }),
+          ),
         ],
       ]),
     );
@@ -195,8 +120,8 @@ describe('wordpressAuthService', () => {
 
   it('sanitizes HTML error responses from WordPress before surfacing them to the user', async () => {
     const fetchMock = jest.fn().mockResolvedValue(
-      createJsonResponse(500, {
-        success: false,
+      createJsonResponse(401, {
+        code: 'jwt_auth_invalid_credentials',
         message:
           '<p>There has been a critical error on this website.</p><p><a href="https://wordpress.org/documentation/article/faq-troubleshooting/">Learn more about troubleshooting WordPress.</a></p>',
       }),
@@ -205,53 +130,44 @@ describe('wordpressAuthService', () => {
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await expect(
-      loginWithPassword({ username: 'member', password: 'bad-password' }),
+      loginWithPassword({
+        email: 'member@example.com',
+        password: 'bad-password',
+      }),
     ).rejects.toThrow(
       'There has been a critical error on this website. Learn more about troubleshooting WordPress.',
     );
   });
 
   it('applies the API token authorization header to subsequent requests after login', async () => {
-    const setCookieHeader =
-      'wordpress_logged_in_hash=logged-in; path=/; secure; httponly';
-
     const fetchMock = jest
       .fn()
       .mockResolvedValueOnce(
         createJsonResponse(
           200,
           {
-            success: true,
-            mode: 'token',
-            api_token:
-              'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
-            token: 'token-value',
-            user: {
-              id: 42,
-              email: 'member@example.com',
-              display: 'Member Example',
-              woocommerce: {
-                consumer_key: 'ck_live_value',
-                consumer_secret: 'cs_live_value',
-                basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
-              },
-            },
-            woocommerce: {
-              consumer_key: 'ck_live_value',
-              consumer_secret: 'cs_live_value',
-              basic_auth: 'Basic Y2tfbGl2ZV92YWx1ZTpjc19saXZlX3ZhbHVl',
-            },
-          },
-          {
-            'set-cookie': setCookieHeader,
+            token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
+            user_email: 'member@example.com',
+            user_display_name: 'Member Example',
           },
         ),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+          avatar_urls: {},
+        }),
       )
       .mockResolvedValueOnce(createJsonResponse(200, { success: true }));
 
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await loginWithPassword({ username: 'member', password: 'passw0rd' });
+    await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
 
     await registerAccount({
       username: 'newmember',
@@ -259,7 +175,7 @@ describe('wordpressAuthService', () => {
       password: 'aSecurePassword123',
     });
 
-    const registerRequestInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    const registerRequestInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
     expect(registerRequestInit?.headers).toEqual(
       expect.objectContaining({
         Authorization:
