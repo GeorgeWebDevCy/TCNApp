@@ -79,10 +79,10 @@ export const LoginScreen: React.FC = () => {
   }, [activeTab, hasStoredPin]);
 
   const handlePasswordSubmit = useCallback(
-    async ({ username, password }: { username: string; password: string }) => {
+    async ({ email, password }: { email: string; password: string }) => {
       setLastAttempt('password');
       resetError();
-      await loginWithPassword({ username, password });
+      await loginWithPassword({ email, password });
     },
     [loginWithPassword, resetError],
   );

@@ -54,7 +54,7 @@ export interface AuthState {
 }
 
 export interface LoginOptions {
-  username: string;
+  email: string;
   password: string;
   mode?: 'token';
   remember?: boolean;

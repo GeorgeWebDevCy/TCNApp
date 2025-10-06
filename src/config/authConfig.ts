@@ -18,7 +18,9 @@ const WOOCOMMERCE_CONSUMER_SECRET_VALUE = sanitizeEnvValue(
 export const WORDPRESS_CONFIG = {
   baseUrl: BASE_URL,
   endpoints: {
-    passwordLogin: '/wp-json/gn/v1/login',
+    passwordLogin: '/wp-json/jwt-auth/v1/token',
+    refreshToken: '/wp-json/jwt-auth/v1/token/refresh',
+    validateToken: '/wp-json/jwt-auth/v1/token/validate',
     profile: '/wp-json/gn/v1/me',
     profileAvatar: '/wp-json/gn/v1/profile/avatar',
     changePassword: '/wp-json/gn/v1/change-password',
