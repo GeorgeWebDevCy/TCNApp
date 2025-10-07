@@ -31,7 +31,32 @@ The mobile app now calls `POST /wp-json/gn/v1/profile/avatar` to upload a member
 
 With this endpoint in place the mobile app will automatically update WordPress whenever a member changes their photo.
 
+## WordPress plugin requirements
+
+The REST endpoints described above live in the TCN Platform plugin. After pulling the
+mobile changes you should verify the following behaviours in the plugin code base:
+
+1. **Route registration** – Ensure both `POST /wp-json/gn/v1/profile/avatar` and
+   `DELETE /wp-json/gn/v1/profile/avatar` are registered during `rest_api_init`.
+   The delete handler must clear any user meta that stores the custom avatar ID and
+   return the refreshed profile payload. When no avatar is associated with the member,
+   the response should mirror the default WordPress avatar URLs so the client falls
+   back to initials.
+2. **Shared response helper** – Reuse the same helper that powers the existing
+   `/wp-json/gn/v1/me` (or core `/wp/v2/users/me`) endpoint when responding to both
+   routes. This keeps the JSON shape identical to what the mobile app expects after a
+   change or deletion.
+3. **Capability checks** – Confirm the routes are protected by appropriate
+   capability checks (e.g. `current_user_can( 'upload_files' )`) and that they honour
+   the token authenticator used elsewhere in the plugin.
+
+If these pieces are already present in production you do not need additional plugin
+work. Otherwise, ship the updates above so avatar uploads and removals stay in sync
+between WordPress and the mobile app.
+
 ## Client integration notes
 
 - Fetch the bearer token from the `POST /wp-json/gn/v1/login` response when establishing a session without cookies, store it client-side, and attach it to avatar uploads while it remains valid (tokens expire after roughly 15 minutes, so refresh it as needed).
 - Construct the React Native `fetch`/`axios` request with an `Authorization` header of exactly `Bearer ${token}` to satisfy the plugin's `TokenAuthenticator` regex.
+- Hydrate the profile card from the `avatar_urls` field returned by `/wp-json/gn/v1/me`. When the API omits this map the client falls back to showing the member's initials.
+- Implement a companion `DELETE /wp-json/gn/v1/profile/avatar` handler that clears the stored avatar metadata and returns the refreshed profile payload so the app can revert to WordPress' default avatar when members remove their photo.

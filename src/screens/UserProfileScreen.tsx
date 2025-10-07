@@ -35,6 +35,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     registerPin,
     removePin,
     updateProfileAvatar,
+    deleteProfileAvatar,
   } = useAuthContext();
   const { t, translateError } = useLocalization();
   const {
@@ -115,6 +116,45 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       setAvatarSubmitting(false);
     }
   }, [t, translateError, updateProfileAvatar]);
+
+  const performRemoveAvatar = useCallback(async () => {
+    try {
+      setAvatarSubmitting(true);
+      await deleteProfileAvatar();
+      Alert.alert(
+        t('profile.avatar.removeSuccessTitle'),
+        t('profile.avatar.removeSuccessMessage'),
+      );
+    } catch (error) {
+      const translated = translateError(
+        error instanceof Error ? error.message : null,
+      );
+      Alert.alert(
+        t('profile.avatar.errorTitle'),
+        translated ?? t('profile.avatar.removeErrorMessage'),
+      );
+    } finally {
+      setAvatarSubmitting(false);
+    }
+  }, [deleteProfileAvatar, t, translateError]);
+
+  const handleRemoveAvatar = useCallback(() => {
+    Alert.alert(
+      t('profile.avatar.removeConfirmTitle'),
+      t('profile.avatar.removeConfirmMessage'),
+      [
+        {
+          text: t('profile.avatar.removeConfirmCancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('profile.avatar.removeConfirmAction'),
+          style: 'destructive',
+          onPress: performRemoveAvatar,
+        },
+      ],
+    );
+  }, [performRemoveAvatar, t]);
 
   const handlePasswordSubmit = useCallback(async () => {
     setPasswordError(null);
@@ -356,20 +396,43 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
               <Text style={styles.avatarEmail}>{user.email}</Text>
             ) : null}
             <Text style={styles.avatarHint}>{t('profile.avatar.subtitle')}</Text>
-            <Pressable
-              onPress={handleChangeAvatar}
-              style={styles.avatarButton}
-              accessibilityRole="button"
-              disabled={avatarSubmitting}
-            >
-              {avatarSubmitting ? (
-                <ActivityIndicator color={COLORS.textOnPrimary} />
-              ) : (
-                <Text style={styles.avatarButtonText}>
-                  {t('profile.avatar.changeButton')}
-                </Text>
-              )}
-            </Pressable>
+            <View style={styles.avatarActions}>
+              <Pressable
+                onPress={handleChangeAvatar}
+                style={styles.avatarButton}
+                accessibilityRole="button"
+                disabled={avatarSubmitting}
+              >
+                {avatarSubmitting ? (
+                  <ActivityIndicator color={COLORS.textOnPrimary} />
+                ) : (
+                  <Text style={styles.avatarButtonText}>
+                    {t('profile.avatar.changeButton')}
+                  </Text>
+                )}
+              </Pressable>
+              {user?.avatarUrl ? (
+                <Pressable
+                  onPress={handleRemoveAvatar}
+                  style={[styles.avatarButton, styles.avatarSecondaryButton]}
+                  accessibilityRole="button"
+                  disabled={avatarSubmitting}
+                >
+                  {avatarSubmitting ? (
+                    <ActivityIndicator color={COLORS.primary} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.avatarButtonText,
+                        styles.avatarSecondaryButtonText,
+                      ]}
+                    >
+                      {t('profile.avatar.removeButton')}
+                    </Text>
+                  )}
+                </Pressable>
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -757,17 +820,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
   },
-  avatarButton: {
+  avatarActions: {
+    flexDirection: 'row',
+    gap: 8,
     marginTop: 8,
+  },
+  avatarButton: {
     alignSelf: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: COLORS.primary,
   },
+  avatarSecondaryButton: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderWidth: 1,
+    borderColor: COLORS.mutedBorder,
+  },
   avatarButtonText: {
     color: COLORS.textOnPrimary,
     fontWeight: '600',
+  },
+  avatarSecondaryButtonText: {
+    color: COLORS.textSecondary,
   },
   title: {
     fontSize: 24,

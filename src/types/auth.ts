@@ -105,4 +105,5 @@ export interface AuthContextValue {
     fileName?: string;
     mimeType?: string;
   }) => Promise<AuthUser>;
+  deleteProfileAvatar: () => Promise<AuthUser>;
 }
