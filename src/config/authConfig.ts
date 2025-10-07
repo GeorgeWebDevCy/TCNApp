@@ -1,4 +1,5 @@
 import {
+  WORDPRESS_BASE_URL,
   WOOCOMMERCE_CONSUMER_KEY,
   WOOCOMMERCE_CONSUMER_SECRET,
 } from '@env';
@@ -6,7 +7,13 @@ import {
 const sanitizeEnvValue = (value?: string): string =>
   value && typeof value === 'string' ? value.trim() : '';
 
-const BASE_URL = 'https://dominicb72.sg-host.com';
+const sanitizeBaseUrl = (value?: string): string => {
+  const sanitized = sanitizeEnvValue(value);
+  return sanitized.replace(/\/+$/u, '');
+};
+
+const BASE_URL =
+  sanitizeBaseUrl(WORDPRESS_BASE_URL) || 'https://dominicb72.sg-host.com';
 
 const WOOCOMMERCE_CONSUMER_KEY_VALUE = sanitizeEnvValue(
   WOOCOMMERCE_CONSUMER_KEY,
@@ -24,7 +31,6 @@ export const WORDPRESS_CONFIG = {
     profile: '/wp-json/gn/v1/me',
     profileAvatar: '/wp-json/gn/v1/profile/avatar',
     changePassword: '/wp-json/gn/v1/change-password',
-    changePasswordSql: '/wp-json/gn/v1/sql/change-password',
     passwordReset: '/wp-json/gn/v1/forgot-password',
     directPasswordReset: '/wp-json/gn/v1/reset-password',
     register: '/wp-json/gn/v1/register',
