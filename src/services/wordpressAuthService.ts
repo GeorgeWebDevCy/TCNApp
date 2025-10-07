@@ -643,6 +643,19 @@ const parseWooCommerceCredentialBundle = (
   );
 };
 
+const appendAvatarCacheBuster = (url: string): string => {
+  const timestamp = Date.now().toString();
+
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set('tcn_cache', timestamp);
+    return parsed.toString();
+  } catch (error) {
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}tcn_cache=${timestamp}`;
+  }
+};
+
 // Helper to select an avatar URL from a WordPress avatar_urls map.
 // Handles numeric keys reindexed by array_merge as well as known sizes and 'full'.
 const pickAvatarUrlFromMap = (value: unknown): string | null => {
@@ -726,6 +739,8 @@ const parseProfileUserPayload = (
 
   const avatarUrls = payload.avatar_urls as Record<string, unknown> | undefined;
   const resolvedAvatarUrl = avatarUrls ? pickAvatarUrlFromMap(avatarUrls) : null;
+  const cacheBustedAvatarUrl =
+    resolvedAvatarUrl != null ? appendAvatarCacheBuster(resolvedAvatarUrl) : null;
 
   return {
     id: Number.isFinite(parsedId) ? parsedId : -1,
@@ -733,7 +748,7 @@ const parseProfileUserPayload = (
     name: resolvedName,
     firstName: getString(firstNameSource),
     lastName: getString(lastNameSource),
-    avatarUrl: resolvedAvatarUrl ?? undefined,
+    avatarUrl: cacheBustedAvatarUrl ?? undefined,
     membership,
   };
 };
@@ -857,13 +872,16 @@ const parseLoginUserPayload = (
     avatarSource = fromMap;
   }
 
+  const cacheBustedAvatarSource =
+    avatarSource != null ? appendAvatarCacheBuster(avatarSource) : null;
+
   return {
     id: Number.isFinite(parsedId) ? parsedId : -1,
     email: resolvedEmail,
     name: resolvedName,
     firstName: getString(firstNameSource),
     lastName: getString(lastNameSource),
-    avatarUrl: avatarSource ?? undefined,
+    avatarUrl: cacheBustedAvatarSource ?? undefined,
     membership,
     woocommerceCredentials: wooCredentials,
   };
