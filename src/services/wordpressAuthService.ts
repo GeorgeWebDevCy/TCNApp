@@ -81,6 +81,42 @@ const isLikelyUrl = (value: string): boolean => {
   }
 };
 
+const extractTokenFromUrl = (value: string): string | undefined => {
+  try {
+    const parsed = new URL(value);
+    const candidateKeys = [
+      'token',
+      'jwt',
+      'jwt_token',
+      'access_token',
+      'auth_token',
+      'bearer',
+      'api_token',
+    ];
+
+    for (const key of candidateKeys) {
+      const paramValue = parsed.searchParams.get(key);
+      if (paramValue && paramValue.trim().length > 0) {
+        return paramValue.trim();
+      }
+    }
+
+    if (parsed.hash) {
+      const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
+      for (const key of candidateKeys) {
+        const paramValue = hashParams.get(key);
+        if (paramValue && paramValue.trim().length > 0) {
+          return paramValue.trim();
+        }
+      }
+    }
+  } catch (error) {
+    return undefined;
+  }
+
+  return undefined;
+};
+
 const normalizeApiToken = (
   value?: string | null,
 ): string | undefined => {
@@ -94,6 +130,10 @@ const normalizeApiToken = (
   }
 
   if (isLikelyUrl(trimmed)) {
+    const extracted = extractTokenFromUrl(trimmed);
+    if (extracted) {
+      return normalizeApiToken(extracted);
+    }
     return undefined;
   }
 
@@ -613,6 +653,99 @@ const parseProfileUserPayload = (
     lastName: getString(lastNameSource),
     avatarUrl: avatarUrls?.['96'] ?? avatarUrls?.['48'],
     membership,
+  };
+};
+
+const parseLoginUserPayload = (
+  payload: Record<string, unknown> | null | undefined,
+): AuthUser | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const source = payload as Record<string, unknown>;
+  const idSource =
+    source.id ??
+    source.ID ??
+    source.user_id ??
+    source.userId ??
+    source.uid ??
+    null;
+  const parsedId =
+    typeof idSource === 'number'
+      ? idSource
+      : typeof idSource === 'string'
+      ? Number.parseInt(idSource, 10)
+      : Number.NaN;
+
+  const emailSource =
+    source.email ??
+    source.user_email ??
+    source.login ??
+    source.user_login ??
+    source.username ??
+    source.nicename ??
+    source.user_nicename ??
+    null;
+  const resolvedEmail =
+    typeof emailSource === 'string'
+      ? emailSource
+      : emailSource != null
+      ? String(emailSource)
+      : '';
+
+  const nameSource =
+    source.name ??
+    source.display ??
+    source.display_name ??
+    source.user_display_name ??
+    source.nicename ??
+    source.user_nicename ??
+    resolvedEmail;
+  const resolvedName =
+    typeof nameSource === 'string' && nameSource.trim().length > 0
+      ? nameSource
+      : resolvedEmail;
+
+  const firstNameSource =
+    source.first_name ??
+    source.firstName ??
+    source.user_first_name ??
+    null;
+  const lastNameSource =
+    source.last_name ??
+    source.lastName ??
+    source.user_last_name ??
+    null;
+
+  const membership = parseMembershipInfo(
+    (source.membership as Record<string, unknown> | undefined) ??
+      ((source.meta as Record<string, unknown> | undefined)?.membership as
+        | Record<string, unknown>
+        | undefined) ??
+      undefined,
+  );
+
+  const wooCredentials =
+    parseWooCommerceCredentialBundle(
+      source.woocommerce_credentials ?? source.woocommerceCredentials,
+    ) ?? null;
+
+  const avatarSource =
+    getString(source.avatar) ??
+    getString(source.avatar_url) ??
+    getString(source.avatarUrl) ??
+    undefined;
+
+  return {
+    id: Number.isFinite(parsedId) ? parsedId : -1,
+    email: resolvedEmail,
+    name: resolvedName,
+    firstName: getString(firstNameSource),
+    lastName: getString(lastNameSource),
+    avatarUrl: avatarSource ?? undefined,
+    membership,
+    woocommerceCredentials: wooCredentials,
   };
 };
 
@@ -1215,15 +1348,37 @@ interface JwtTokenResponse {
   message?: string;
   code?: string;
   data?: { status?: number };
+  token_login_url?: string;
+  tokenLoginUrl?: string;
+  rest_nonce?: string;
+  restNonce?: string;
+  mode?: string;
+  user?: Record<string, unknown> | null;
+  success?: boolean;
 }
 
 export const loginWithPassword = async ({
   email,
   password,
+  mode,
+  remember,
 }: LoginOptions): Promise<PersistedSession> => {
   deviceLog.info('wordpressAuth.loginWithPassword.start', {
     email,
   });
+
+  const requestBody: Record<string, unknown> = {
+    username: email,
+    password,
+  };
+
+  if (mode) {
+    requestBody.mode = mode;
+  }
+
+  if (typeof remember === 'boolean') {
+    requestBody.remember = remember;
+  }
 
   const response = await fetchWithRouteFallback(
     WORDPRESS_CONFIG.endpoints.passwordLogin,
@@ -1233,10 +1388,7 @@ export const loginWithPassword = async ({
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
-      body: JSON.stringify({
-        username: email,
-        password,
-      }),
+      body: JSON.stringify(requestBody),
     },
   );
 
@@ -1258,7 +1410,12 @@ export const loginWithPassword = async ({
     throw new Error('Unable to log in with WordPress credentials.');
   }
 
-  if (!response.ok || !json.token) {
+  const hasResponseToken =
+    typeof json.token === 'string' && json.token.trim().length > 0;
+  const rawTokenLoginUrl =
+    getString(json.token_login_url) ?? getString(json.tokenLoginUrl);
+
+  if (!response.ok || (!hasResponseToken && !rawTokenLoginUrl)) {
     const message =
       typeof json?.message === 'string' && json.message.trim().length > 0
         ? sanitizeErrorMessage(json.message)
@@ -1269,13 +1426,22 @@ export const loginWithPassword = async ({
       code: json.code ?? null,
       dataStatus: json.data?.status ?? null,
       message,
+      hasTokenLoginUrl: Boolean(rawTokenLoginUrl),
     });
     throw new Error(message);
   }
 
-  const token = normalizeApiToken(json.token);
+  const token = normalizeApiToken(json.token ?? undefined);
+  const tokenLoginUrl = rawTokenLoginUrl ?? undefined;
+  const restNonce =
+    getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
 
-  if (!token) {
+  if (!token && tokenLoginUrl) {
+    deviceLog.info('wordpressAuth.loginWithPassword.tokenLoginOnly', {
+      hasTokenLoginUrl: Boolean(tokenLoginUrl),
+      hasRestNonce: Boolean(restNonce),
+    });
+  } else if (!token) {
     deviceLog.error('wordpressAuth.loginWithPassword.invalidToken', {
       token: maskTokenForLogging(json.token ?? null),
     });
@@ -1287,31 +1453,43 @@ export const loginWithPassword = async ({
       ? json.refresh_token.trim()
       : undefined;
 
-  const profile = await fetchUserProfile(token);
+  const loginUser = parseLoginUserPayload(json.user ?? null);
+  const profile = token ? await fetchUserProfile(token) : null;
 
   const fallbackEmail =
+    loginUser?.email ??
     (typeof json.user_email === 'string' && json.user_email.trim().length > 0
       ? json.user_email.trim()
-      : null) ?? email;
+      : null) ??
+    email;
 
   const fallbackName =
+    loginUser?.name ??
     (typeof json.user_display_name === 'string' &&
       json.user_display_name.trim().length > 0
       ? json.user_display_name.trim()
       : typeof json.user_nicename === 'string' &&
         json.user_nicename.trim().length > 0
       ? json.user_nicename.trim()
-      : null) ?? fallbackEmail;
+      : null) ??
+    fallbackEmail;
+
+  const defaultWooCredentials = createWooCommerceCredentialBundle(
+    WORDPRESS_CONFIG.woocommerce.consumerKey,
+    WORDPRESS_CONFIG.woocommerce.consumerSecret,
+  );
 
   const user: AuthUser | null = profile
     ? {
         ...profile,
         woocommerceCredentials:
-          profile.woocommerceCredentials ??
-          createWooCommerceCredentialBundle(
-            WORDPRESS_CONFIG.woocommerce.consumerKey,
-            WORDPRESS_CONFIG.woocommerce.consumerSecret,
-          ),
+          profile.woocommerceCredentials ?? defaultWooCredentials,
+      }
+    : loginUser
+    ? {
+        ...loginUser,
+        woocommerceCredentials:
+          loginUser.woocommerceCredentials ?? defaultWooCredentials,
       }
     : {
         id: -1,
@@ -1320,18 +1498,15 @@ export const loginWithPassword = async ({
         firstName: null,
         lastName: null,
         membership: null,
-        woocommerceCredentials: createWooCommerceCredentialBundle(
-          WORDPRESS_CONFIG.woocommerce.consumerKey,
-          WORDPRESS_CONFIG.woocommerce.consumerSecret,
-        ),
+        woocommerceCredentials: defaultWooCredentials,
       };
 
   const session: PersistedSession = {
     token,
     refreshToken,
     user,
-    tokenLoginUrl: undefined,
-    restNonce: undefined,
+    tokenLoginUrl,
+    restNonce,
     locked: false,
   };
 
@@ -1342,6 +1517,8 @@ export const loginWithPassword = async ({
     hasRefreshToken: Boolean(refreshToken),
     hasUser: Boolean(user),
     wooCredentials: Boolean(user?.woocommerceCredentials ?? null),
+    hasTokenLoginUrl: Boolean(tokenLoginUrl),
+    hasRestNonce: Boolean(restNonce),
   });
 
   await storeSession(session);

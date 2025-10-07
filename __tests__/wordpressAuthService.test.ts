@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import EncryptedStorage from 'react-native-encrypted-storage';
 
 import { AUTH_STORAGE_KEYS, WORDPRESS_CONFIG } from '../src/config/authConfig';
 import {
@@ -56,6 +57,9 @@ describe('wordpressAuthService', () => {
     __unsafeResetBearerTokenCacheForTests();
     __unsafeResetWordPressCookieCacheForTests();
     __unsafeResetWooCommerceAuthHeaderCacheForTests();
+    if (typeof EncryptedStorage.clear === 'function') {
+      await EncryptedStorage.clear();
+    }
   });
 
   it('retries WordPress requests using rest_route when the JWT token route is missing', async () => {
@@ -107,11 +111,8 @@ describe('wordpressAuthService', () => {
       expect.arrayContaining([
         [
           AUTH_STORAGE_KEYS.userProfile,
-          JSON.stringify(
-            expect.objectContaining({
-              email: 'member@example.com',
-              name: 'Member Example',
-            }),
+          expect.stringMatching(
+            /^(?=.*member@example\.com)(?=.*Member Example).*/,
           ),
         ],
       ]),
@@ -181,6 +182,94 @@ describe('wordpressAuthService', () => {
         Authorization:
           'Bearer ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
       }),
+    );
+  });
+
+  it('extracts API tokens from token login URLs and persists token login metadata', async () => {
+    const apiToken = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl';
+    const tokenLoginUrl =
+      'https://example.com/wp-login.php?action=gn_token_login&token=' +
+      encodeURIComponent(apiToken) +
+      '&redirect_to=https%3A%2F%2Fexample.com%2Fapp';
+
+    const loginResponseBody = {
+      token: tokenLoginUrl,
+      token_login_url: tokenLoginUrl,
+      rest_nonce: 'rest-nonce-value',
+      user: {
+        id: 55,
+        email: 'member@example.com',
+        display: 'Member Example',
+        first_name: 'Member',
+        last_name: 'Example',
+      },
+    };
+
+    const profileResponseBody = {
+      id: 55,
+      email: 'member@example.com',
+      name: 'Member Example',
+      avatar_urls: {},
+    };
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody))
+      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+      mode: 'token',
+      remember: true,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${WORDPRESS_CONFIG.baseUrl}/wp-json/jwt-auth/v1/token`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'member@example.com',
+          password: 'passw0rd',
+          mode: 'token',
+          remember: true,
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${apiToken}`,
+        }),
+      }),
+    );
+
+    expect(EncryptedStorage.setItem).toHaveBeenCalledWith(
+      AUTH_STORAGE_KEYS.token,
+      apiToken,
+    );
+
+    expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        [AUTH_STORAGE_KEYS.tokenLoginUrl, tokenLoginUrl],
+        [AUTH_STORAGE_KEYS.wpRestNonce, 'rest-nonce-value'],
+        [
+          AUTH_STORAGE_KEYS.userProfile,
+          expect.stringContaining('Member Example'),
+        ],
+      ]),
+    );
+
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      AUTH_STORAGE_KEYS.passwordAuthenticated,
+      'true',
     );
   });
 
