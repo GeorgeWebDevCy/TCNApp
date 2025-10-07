@@ -1675,6 +1675,196 @@ export const uploadProfileAvatar = async (
   }
 };
 
+export const deleteProfileAvatar = async (): Promise<AuthUser> => {
+  let endpoint = resolveAvatarEndpoint();
+  let session = await restoreSession();
+  const restNonce = session?.restNonce?.trim();
+
+  let tokenSource: 'session' | 'secure' | 'async' | null = null;
+  let token = normalizeApiToken(session?.token);
+  if (token) {
+    tokenSource = 'session';
+  }
+
+  if (!token) {
+    try {
+      const secure = await getSecureValue(AUTH_STORAGE_KEYS.token);
+      token = normalizeApiToken(secure ?? undefined);
+      if (token) {
+        tokenSource = 'secure';
+      }
+    } catch {}
+  }
+
+  if (!token) {
+    try {
+      const plain = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.token);
+      token = normalizeApiToken(plain ?? undefined);
+      if (token) {
+        tokenSource = 'async';
+      }
+    } catch {}
+  }
+
+  if (token && (!session || !session.token)) {
+    try {
+      const patched: PersistedSession = {
+        token,
+        refreshToken: session?.refreshToken,
+        tokenLoginUrl: undefined,
+        restNonce: session?.restNonce ?? undefined,
+        user: session?.user ?? null,
+        locked: Boolean(session?.locked) && !!session?.locked,
+      };
+      await storeSession(patched);
+      session = patched;
+    } catch {}
+  }
+
+  const baseInit: RequestInit = {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
+      ...(token
+        ? {
+            Authorization: `Bearer ${token}`,
+            'X-Authorization': `Bearer ${token}`,
+          }
+        : {}),
+    },
+  };
+
+  const preparedInit = await buildWordPressRequestInit(baseInit);
+
+  deviceLog.info('wordpressAuth.deleteProfileAvatar.start', {
+    session: describeSessionForLogging(session),
+    hasTokenHeader: Boolean(token),
+    tokenSource,
+    maskedToken: maskTokenForLogging(token),
+    endpoint: describeUrlForLogging(endpoint),
+  });
+
+  let response = await fetchWithRouteFallback(endpoint, preparedInit);
+
+  deviceLog.debug('wordpressAuth.deleteProfileAvatar.response', {
+    status: response.status,
+    ok: response.ok,
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    deviceLog.info('wordpressAuth.deleteProfileAvatar.unauthorized', {
+      status: response.status,
+    });
+
+    const refreshed = await refreshJwtTokenIfPossible(token ?? session?.token);
+    if (refreshed) {
+      token = refreshed;
+      try {
+        const patched: PersistedSession = {
+          token: refreshed,
+          refreshToken: session?.refreshToken,
+          tokenLoginUrl: undefined,
+          restNonce: session?.restNonce ?? undefined,
+          user: session?.user ?? null,
+          locked: Boolean(session?.locked) && !!session?.locked,
+        };
+        await storeSession(patched);
+        session = patched;
+      } catch {}
+
+      const retryInit: RequestInit = {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
+          Authorization: `Bearer ${refreshed}`,
+          'X-Authorization': `Bearer ${refreshed}`,
+        },
+      };
+      const preparedRetry = await buildWordPressRequestInit(retryInit);
+      deviceLog.info('wordpressAuth.deleteProfileAvatar.retry.start', {
+        endpoint: describeUrlForLogging(endpoint),
+        hasRestNonce: Boolean(restNonce),
+      });
+      response = await fetchWithRouteFallback(endpoint, preparedRetry);
+      deviceLog.debug('wordpressAuth.deleteProfileAvatar.retry.response', {
+        status: response.status,
+        ok: response.ok,
+      });
+    } else {
+      deviceLog.warn('wordpressAuth.deleteProfileAvatar.refreshToken.unavailable');
+    }
+  }
+
+  if (!response.ok) {
+    let errorBody = '';
+    try {
+      errorBody = await response.text();
+    } catch {}
+    deviceLog.error('wordpressAuth.deleteProfileAvatar.failed', {
+      status: response.status,
+      errorBody,
+    });
+    throw new Error(
+      `Avatar removal failed (${response.status}). ${
+        errorBody || 'Enable the WordPress avatar endpoint.'
+      }`,
+    );
+  }
+
+  let user: AuthUser | null = null;
+  if (response.status !== 204) {
+    try {
+      const json = (await response.json()) as Record<string, unknown>;
+      const userPayload =
+        (json.user as Record<string, unknown> | undefined) ?? json;
+      user = parseProfileUserPayload(userPayload);
+    } catch (error) {
+      deviceLog.debug('wordpressAuth.deleteProfileAvatar.parseFallback', {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (!user) {
+    user = await refreshPersistedUserProfile(token ?? session?.token ?? null);
+  }
+
+  if (!user && session?.user) {
+    user = { ...session.user, avatarUrl: undefined };
+  }
+
+  if (!user) {
+    throw new Error(
+      'Unable to remove profile photo. Please ensure the WordPress avatar endpoint is available.',
+    );
+  }
+
+  if (session) {
+    const nextSession: PersistedSession = {
+      token: token ?? session.token,
+      refreshToken: session.refreshToken,
+      tokenLoginUrl: undefined,
+      restNonce: session.restNonce ?? undefined,
+      user,
+      locked: Boolean(session.locked) && !!session.locked,
+    };
+    await storeSession(nextSession);
+  } else {
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(user),
+    );
+  }
+
+  deviceLog.success('wordpressAuth.deleteProfileAvatar.success', {
+    userId: user.id,
+  });
+
+  return user;
+};
+
 export const ensureValidSession =
   async (): Promise<PersistedSession | null> => {
     const session = await restoreSession();

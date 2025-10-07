@@ -210,12 +210,22 @@ export const translations: Record<Language, TranslationDictionary> = {
         subtitle:
           'This photo appears on your membership card and welcome screen.',
         changeButton: 'Change photo',
+        removeButton: 'Remove photo',
+        removeConfirmTitle: 'Remove profile photo',
+        removeConfirmMessage:
+          'Are you sure you want to remove your current profile photo?',
+        removeConfirmCancel: 'Cancel',
+        removeConfirmAction: 'Remove',
         successTitle: 'Profile photo updated',
         successMessage:
           'Your new photo may take a moment to appear across the app.',
         errorTitle: 'Unable to update photo',
         errorMessage:
           'Please try again or ensure the WordPress avatar endpoint is configured.',
+        removeSuccessTitle: 'Profile photo removed',
+        removeSuccessMessage: 'Your initials will be shown until you add a photo.',
+        removeErrorMessage:
+          'Please try again or ensure the WordPress avatar endpoint supports removal.',
         errors: {
           invalidSelection: 'Select a valid image to continue.',
         },
@@ -507,11 +517,20 @@ export const translations: Record<Language, TranslationDictionary> = {
       avatar: {
         subtitle: 'รูปภาพนี้จะแสดงบนบัตรสมาชิกและหน้าจอต้อนรับของคุณ.',
         changeButton: 'เปลี่ยนรูปภาพ',
+        removeButton: 'ลบรูปภาพ',
+        removeConfirmTitle: 'ลบรูปโปรไฟล์',
+        removeConfirmMessage: 'คุณแน่ใจหรือไม่ว่าต้องการลบรูปโปรไฟล์ปัจจุบัน?',
+        removeConfirmCancel: 'ยกเลิก',
+        removeConfirmAction: 'ลบ',
         successTitle: 'อัปเดตรูปโปรไฟล์แล้ว',
         successMessage: 'รูปใหม่ของคุณอาจใช้เวลาสักครู่จึงจะแสดงทั่วทั้งแอป.',
         errorTitle: 'ไม่สามารถอัปเดตรูปภาพได้',
         errorMessage:
           'โปรดลองอีกครั้งหรือตรวจสอบว่ามีการตั้งค่าเอ็นด์พอยต์สำหรับอัปโหลดรูปภาพแล้ว.',
+        removeSuccessTitle: 'ลบรูปโปรไฟล์แล้ว',
+        removeSuccessMessage: 'ระบบจะแสดงตัวอักษรย่อของคุณจนกว่าจะอัปโหลดรูปใหม่.',
+        removeErrorMessage:
+          'โปรดลองอีกครั้งหรือตรวจสอบว่าเอ็นด์พอยต์รองรับการลบรูปภาพ.',
         errors: {
           invalidSelection: 'โปรดเลือกรูปภาพที่ถูกต้องเพื่อดำเนินการต่อ.',
         },

@@ -13,6 +13,7 @@ import {
   loginWithPassword,
   registerAccount,
   updatePassword,
+  deleteProfileAvatar,
 } from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -140,6 +141,43 @@ describe('wordpressAuthService', () => {
     );
   });
 
+  it('persists the avatar URL returned by the WordPress profile endpoint', async () => {
+    const loginResponseBody = {
+      token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
+      user_email: 'member@example.com',
+      user_display_name: 'Member Example',
+    };
+
+    const profileResponseBody = {
+      id: 42,
+      email: 'member@example.com',
+      name: 'Member Example',
+      avatar_urls: {
+        '96': 'https://example.com/uploads/avatar-96x96.jpg',
+      },
+    };
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody))
+      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
+
+    expect(session.user?.avatarUrl).toContain('avatar-96x96.jpg');
+
+    const storedProfile = await AsyncStorage.getItem(
+      AUTH_STORAGE_KEYS.userProfile,
+    );
+    expect(storedProfile).not.toBeNull();
+    expect(JSON.parse(storedProfile as string)).toEqual(session.user);
+  });
+
   it('applies the API token authorization header to subsequent requests after login', async () => {
     const fetchMock = jest
       .fn()
@@ -183,6 +221,76 @@ describe('wordpressAuthService', () => {
           'Bearer ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
       }),
     );
+  });
+
+  it('removes the avatar and refreshes the cached profile when deletion succeeds', async () => {
+    const loginFetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
+          user_email: 'member@example.com',
+          user_display_name: 'Member Example',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+          avatar_urls: {
+            '96': 'https://example.com/uploads/custom-avatar.jpg',
+          },
+        }),
+      );
+
+    global.fetch = loginFetch as unknown as typeof fetch;
+    await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
+
+    const deleteFetch = jest
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse(204, null))
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+          avatar_urls: {
+            '96': 'https://example.com/uploads/default-avatar.jpg',
+          },
+        }),
+      );
+
+    global.fetch = deleteFetch as unknown as typeof fetch;
+
+    const updatedUser = await deleteProfileAvatar();
+
+    expect(deleteFetch).toHaveBeenNthCalledWith(
+      1,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profileAvatar}`,
+      expect.objectContaining({
+        method: 'DELETE',
+      }),
+    );
+
+    expect(deleteFetch).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+      }),
+    );
+
+    expect(updatedUser.avatarUrl).toContain('default-avatar.jpg');
+
+    const storedProfile = await AsyncStorage.getItem(
+      AUTH_STORAGE_KEYS.userProfile,
+    );
+    expect(storedProfile).not.toBeNull();
+    expect(JSON.parse(storedProfile as string)).toEqual(updatedUser);
   });
 
   it('extracts API tokens from token login URLs and persists token login metadata', async () => {
