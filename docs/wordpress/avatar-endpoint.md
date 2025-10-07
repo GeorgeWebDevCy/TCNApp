@@ -35,3 +35,5 @@ With this endpoint in place the mobile app will automatically update WordPress w
 
 - Fetch the bearer token from the `POST /wp-json/gn/v1/login` response when establishing a session without cookies, store it client-side, and attach it to avatar uploads while it remains valid (tokens expire after roughly 15 minutes, so refresh it as needed).
 - Construct the React Native `fetch`/`axios` request with an `Authorization` header of exactly `Bearer ${token}` to satisfy the plugin's `TokenAuthenticator` regex.
+- Hydrate the profile card from the `avatar_urls` field returned by `/wp-json/gn/v1/me`. When the API omits this map the client falls back to showing the member's initials.
+- Implement a companion `DELETE /wp-json/gn/v1/profile/avatar` handler that clears the stored avatar metadata and returns the refreshed profile payload so the app can revert to WordPress' default avatar when members remove their photo.
