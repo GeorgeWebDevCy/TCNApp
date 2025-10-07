@@ -432,8 +432,6 @@ describe('wordpressAuthService', () => {
       newPassword: 'NewPass456!',
       tokenLoginUrl: null,
       restNonce: null,
-      userId: 7,
-      identifier: 'member@example.com',
     });
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -444,12 +442,6 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      `${WORDPRESS_CONFIG.baseUrl}/wp-json/gn/v1/sql/change-password`,
-      expect.objectContaining({ method: 'POST' }),
-    );
-
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
       `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
       expect.objectContaining({ method: 'GET' }),
     );

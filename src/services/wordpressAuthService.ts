@@ -1561,8 +1561,8 @@ export const updatePassword = async ({
   confirmPassword: _confirmPassword,
   tokenLoginUrl,
   restNonce,
-  userId,
-  identifier,
+  userId: _userId,
+  identifier: _identifier,
 }: {
   token?: string | null;
   currentPassword: string;
@@ -1575,13 +1575,6 @@ export const updatePassword = async ({
 }): Promise<void> => {
   const trimmedCurrent = currentPassword.trim();
   const trimmedNew = newPassword.trim();
-  const resolvedUserId =
-    typeof userId === 'number' && Number.isFinite(userId) ? userId : null;
-  const normalizedIdentifier =
-    typeof identifier === 'string' && identifier.trim().length > 0
-      ? identifier.trim()
-      : undefined;
-
   if (!trimmedCurrent || !trimmedNew) {
     throw new Error('Unable to change password.');
   }
@@ -1625,81 +1618,12 @@ export const updatePassword = async ({
     }
   };
 
-  const performSqlPasswordUpdate = async () => {
-    if (!resolvedUserId) {
-      throw new Error('Unable to change password.');
-    }
-
-    const sqlEndpoint = WORDPRESS_CONFIG.endpoints.changePasswordSql;
-    if (!sqlEndpoint) {
-      throw new Error('Unable to change password.');
-    }
-
-    const payload: Record<string, unknown> = {
-      user_id: resolvedUserId,
-      current_password: trimmedCurrent,
-      password: trimmedNew,
-    };
-
-    if (normalizedIdentifier) {
-      payload.identifier = normalizedIdentifier;
-    }
-
-    const response = await fetchWithRouteFallback(sqlEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(restNonce
-          ? {
-              'X-WP-Nonce': restNonce,
-            }
-          : {}),
-        ...(token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {}),
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await parseJsonResponse<Record<string, unknown>>(response);
-    const successFlag = extractSuccessFlag(json);
-
-    if (!response.ok || successFlag === false) {
-      const message = await extractMessageFromResponse(
-        response,
-        'Unable to change password.',
-      );
-      throw new Error(message);
-    }
-  };
-
-  let restError: Error | null = null;
-
   try {
     await performRestPasswordUpdate();
   } catch (error) {
-    restError =
-      error instanceof Error ? error : new Error('Unable to change password.');
-  }
-
-  if (restError) {
-    if (!resolvedUserId || !WORDPRESS_CONFIG.endpoints.changePasswordSql) {
-      throw restError;
-    }
-
-    try {
-      await performSqlPasswordUpdate();
-      await refreshPersistedUserProfile(token);
-      return;
-    } catch (sqlError) {
-      if (sqlError instanceof Error) {
-        throw sqlError;
-      }
-      throw restError;
-    }
+    throw error instanceof Error
+      ? error
+      : new Error('Unable to change password.');
   }
 
   await refreshPersistedUserProfile(token);
