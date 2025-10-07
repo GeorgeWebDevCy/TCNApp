@@ -733,11 +733,55 @@ const parseLoginUserPayload = (
       source.woocommerce_credentials ?? source.woocommerceCredentials,
     ) ?? null;
 
-  const avatarSource =
+  const pickAvatarFromAvatarUrls = (value: unknown): string | null => {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+    const map = value as Record<string, unknown>;
+    const preference = [
+      'full',
+      '512',
+      '384',
+      '320',
+      '300',
+      '256',
+      '192',
+      '128',
+      '100',
+      '96',
+      '64',
+      '48',
+      '32',
+      '24',
+      // Some servers accidentally reindex numeric keys; check generic indexes too
+      '0', '1', '2', '3', '4', '5', '6', '7'
+    ];
+    for (const key of preference) {
+      const url = getString(map[key]);
+      if (url) return url;
+    }
+    // Fallback: first string value we can find
+    for (const v of Object.values(map)) {
+      const url = getString(v);
+      if (url) return url;
+    }
+    return null;
+  };
+
+  let avatarSource =
     getString(source.avatar) ??
     getString(source.avatar_url) ??
     getString(source.avatarUrl) ??
-    undefined;
+    null;
+
+  if (!avatarSource) {
+    const fromMap =
+      pickAvatarFromAvatarUrls(
+        (source as Record<string, unknown>).avatar_urls ??
+          (source as Record<string, unknown>).avatarUrls,
+      ) ?? null;
+    avatarSource = fromMap;
+  }
 
   return {
     id: Number.isFinite(parsedId) ? parsedId : -1,
@@ -956,6 +1000,13 @@ const storeSession = async ({
   const normalizedToken = normalizeApiToken(token);
 
   await setSecureValue(AUTH_STORAGE_KEYS.token, normalizedToken);
+  // Also persist a non-secure fallback copy so requests that cannot read
+  // encrypted storage (or after process restarts) can still attach auth.
+  if (normalizedToken) {
+    entries.push([AUTH_STORAGE_KEYS.token, normalizedToken]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.token);
+  }
 
   if (refreshToken && refreshToken.trim().length > 0) {
     await setSecureValue(AUTH_STORAGE_KEYS.refreshToken, refreshToken);
@@ -1050,7 +1101,7 @@ export const restoreSession = async (
   options: RestoreSessionOptions = {},
 ): Promise<PersistedSession | null> => {
   const { silent = false } = options;
-  const [rawToken, rawRefreshToken, storedTuples] = await Promise.all([
+  const [rawToken, rawRefreshToken, storedTuples, plainToken] = await Promise.all([
     getSecureValue(AUTH_STORAGE_KEYS.token),
     getSecureValue(AUTH_STORAGE_KEYS.refreshToken),
     AsyncStorage.multiGet([
@@ -1059,6 +1110,8 @@ export const restoreSession = async (
       AUTH_STORAGE_KEYS.tokenLoginUrl,
       AUTH_STORAGE_KEYS.wpRestNonce,
     ]),
+    // Plain-text fallback copy persisted alongside encrypted storage
+    AsyncStorage.getItem(AUTH_STORAGE_KEYS.token),
   ]);
 
   const storedValues = Object.fromEntries(storedTuples);
@@ -1071,7 +1124,8 @@ export const restoreSession = async (
     await AsyncStorage.removeItem(AUTH_STORAGE_KEYS.tokenLoginUrl);
   }
 
-  const token = normalizeApiToken(rawToken ?? undefined);
+  // Prefer secure storage; fall back to plain AsyncStorage copy if needed
+  const token = normalizeApiToken((rawToken ?? plainToken) ?? undefined);
   if (rawToken && !token) {
     if (!silent) {
       deviceLog.debug('wordpressAuth.restoreSession.ignoredToken', {
@@ -1166,12 +1220,19 @@ type UploadProfileAvatarOptions = {
 };
 
 const resolveAvatarEndpoint = (): string => {
-  const endpoint = WORDPRESS_CONFIG.endpoints.profileAvatar;
+  let endpoint = WORDPRESS_CONFIG.endpoints.profileAvatar;
   if (!endpoint || typeof endpoint !== 'string') {
     throw new Error(
       'Profile avatar endpoint is not configured. Please expose a WordPress REST endpoint that accepts avatar uploads.',
     );
   }
+
+  const trimmed = endpoint.trim();
+  // Guard against misconfiguration where endpoint ends up as '/' or very short
+  if (trimmed === '/' || trimmed.length < 10) {
+    endpoint = '/wp-json/gn/v1/profile/avatar';
+  }
+
   return endpoint;
 };
 
@@ -1206,31 +1267,71 @@ export const uploadProfileAvatar = async (
   options: UploadProfileAvatarOptions,
 ): Promise<AuthUser> => {
   const formData = buildAvatarFormData(options);
-  const endpoint = resolveAvatarEndpoint();
+  let endpoint = resolveAvatarEndpoint();
+  if (endpoint === '/' || endpoint.trim().length < 10) {
+    endpoint = '/wp-json/gn/v1/profile/avatar';
+  }
   const session = await restoreSession();
-  const token = normalizeApiToken(session?.token);
   const restNonce = session?.restNonce?.trim();
 
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
+  // Build request init via WordPress helper so Authorization is ensured
+  // Try to resolve a bearer token eagerly
+  let token = normalizeApiToken(session?.token);
+  if (!token) {
+    try {
+      const secure = await getSecureValue(AUTH_STORAGE_KEYS.token);
+      token = normalizeApiToken(secure ?? undefined);
+    } catch {}
+  }
+  if (!token) {
+    try {
+      const plain = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.token);
+      token = normalizeApiToken(plain ?? undefined);
+    } catch {}
   }
 
+  const baseInit: RequestInit = {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(token ? { 'X-Authorization': `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  };
+
+  const preparedInit = await buildWordPressRequestInit(baseInit);
+
+  const hasAuthHeader = (() => {
+    const h = preparedInit.headers as HeadersInit | undefined;
+    if (!h) return false;
+    if (typeof Headers !== 'undefined' && h instanceof Headers) {
+      return Boolean(h.get('authorization'));
+    }
+    if (Array.isArray(h)) {
+      return h.some(([k]) => String(k).toLowerCase() === 'authorization');
+    }
+    const rec = h as Record<string, string>;
+    return Object.keys(rec).some(k => k.toLowerCase() === 'authorization');
+  })();
+
   try {
+    // For diagnostics, compute the primary URL the request builder will use
+    let primaryUrlForLog: string | null = null;
+    try {
+      primaryUrlForLog = appendWooCommerceCredentialsIfNeeded(
+        buildUrl(endpoint),
+        endpoint,
+      );
+    } catch {}
+
     deviceLog.info('wordpressAuth.uploadProfileAvatar.start', {
       session: describeSessionForLogging(session),
-      hasTokenHeader: Boolean(headers.Authorization),
-      endpoint: describeUrlForLogging(endpoint),
+      hasTokenHeader: hasAuthHeader,
+      endpoint: describeUrlForLogging(primaryUrlForLog ?? endpoint),
     });
-    const response = await fetchWithRouteFallback(endpoint, {
-      method: 'POST',
-      headers,
-      body: formData,
-    });
+    const response = await fetchWithRouteFallback(endpoint, preparedInit);
 
     deviceLog.debug('wordpressAuth.uploadProfileAvatar.response', {
       status: response.status,
@@ -1474,10 +1575,20 @@ export const loginWithPassword = async ({
     throw new Error(message);
   }
 
-  const token = normalizeApiToken(rawTokenValue ?? undefined);
+  // Prefer the explicit api_token as the bearer token.
+  // Only treat the legacy `token` field as a possible URL handoff.
+  let token: string | undefined;
   let tokenLoginUrl = rawTokenLoginUrl ?? undefined;
-  if (!token && rawTokenValue && isLikelyUrl(rawTokenValue)) {
-    tokenLoginUrl = tokenLoginUrl ?? rawTokenValue;
+
+  if (rawApiTokenValue) {
+    token = rawApiTokenValue; // opaque API token (not a URL/JWT is fine)
+  } else if (rawTokenFieldValue) {
+    const normalized = normalizeApiToken(rawTokenFieldValue);
+    if (normalized) {
+      token = normalized;
+    } else if (isLikelyUrl(rawTokenFieldValue)) {
+      tokenLoginUrl = tokenLoginUrl ?? rawTokenFieldValue;
+    }
   }
   const restNonce =
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
