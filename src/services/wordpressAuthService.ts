@@ -1354,6 +1354,10 @@ export const ensureValidSession =
 
 interface JwtTokenResponse {
   token?: string;
+  api_token?: string;
+  apiToken?: string;
+  login_token?: string;
+  loginToken?: string;
   refresh_token?: string;
   user_email?: string;
   user_nicename?: string;
@@ -1424,7 +1428,16 @@ export const loginWithPassword = async ({
     throw new Error('Unable to log in with WordPress credentials.');
   }
 
-  const rawTokenValue = getString(json.token);
+  const rawApiTokenValue =
+    getString(json.api_token) ?? getString((json as any).apiToken);
+  const rawTokenFieldValue = getString(json.token);
+  const rawTokenValue = rawApiTokenValue ?? rawTokenFieldValue;
+  const rawTokenType =
+    rawTokenFieldValue != null
+      ? typeof json.token
+      : rawApiTokenValue != null
+      ? typeof json.api_token
+      : 'undefined';
   const hasResponseToken = Boolean(rawTokenValue);
   const rawTokenLoginUrl =
     getString(json.token_login_url) ?? getString(json.tokenLoginUrl);
@@ -1461,9 +1474,10 @@ export const loginWithPassword = async ({
   } else if (!token) {
     deviceLog.error('wordpressAuth.loginWithPassword.invalidToken', {
       token: maskTokenForLogging(rawTokenValue ?? null),
-      rawTokenType: typeof json.token,
+      rawTokenType,
       rawTokenLength: rawTokenValue ? rawTokenValue.length : null,
       rawTokenIsUrl: rawTokenValue ? isLikelyUrl(rawTokenValue) : null,
+      hasApiTokenField: Boolean(rawApiTokenValue),
       hasTokenLoginUrl: Boolean(tokenLoginUrl),
       responseStatus: response.status,
     });
