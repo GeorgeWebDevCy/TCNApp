@@ -5,7 +5,12 @@ import {
 } from './wordpressCookieService';
 import { restoreSession } from './wordpressAuthService';
 
-export type ActivityMonitorLogLevel = 'debug' | 'info' | 'warn' | 'error' | 'success';
+export type ActivityMonitorLogLevel =
+  | 'debug'
+  | 'info'
+  | 'warn'
+  | 'error'
+  | 'success';
 
 export interface ActivityMonitorLogEntry {
   level: ActivityMonitorLogLevel;
@@ -27,20 +32,17 @@ interface PendingLogPayload {
 const queue: ActivityMonitorLogEntry[] = [];
 let isProcessing = false;
 
-const resolveUsername = async (
-  override?: string | null,
-): Promise<string> => {
+const resolveUsername = async (override?: string | null): Promise<string> => {
   const fallback = ACTIVITY_MONITOR_CONFIG.sentinelUsername;
 
-  const trimmedOverride =
-    typeof override === 'string' ? override.trim() : '';
+  const trimmedOverride = typeof override === 'string' ? override.trim() : '';
 
   if (trimmedOverride.length > 0) {
     return trimmedOverride;
   }
 
   try {
-    const session = await restoreSession();
+    const session = await restoreSession({ silent: true });
     const sessionUser = session?.user;
 
     if (!sessionUser) {
@@ -83,7 +85,10 @@ const buildPayload = async (
   return payload;
 };
 
-const sanitizeParams = (params: unknown[], seen = new WeakSet<object>()): unknown[] => {
+const sanitizeParams = (
+  params: unknown[],
+  seen = new WeakSet<object>(),
+): unknown[] => {
   return params.map(param => sanitizeValue(param, seen));
 };
 
@@ -92,7 +97,11 @@ const sanitizeValue = (value: unknown, seen: WeakSet<object>): unknown => {
     return null;
   }
 
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  ) {
     return value;
   }
 
@@ -115,7 +124,9 @@ const sanitizeValue = (value: unknown, seen: WeakSet<object>): unknown => {
 
     seen.add(value as object);
     const entries: Record<string, unknown> = {};
-    for (const [key, entryValue] of Object.entries(value as Record<string, unknown>)) {
+    for (const [key, entryValue] of Object.entries(
+      value as Record<string, unknown>,
+    )) {
       entries[key] = sanitizeValue(entryValue, seen);
     }
     seen.delete(value as object);
@@ -167,7 +178,10 @@ const processQueue = async (): Promise<void> => {
 };
 
 const safeConsumeResponse = async (response: unknown): Promise<void> => {
-  if (!response || typeof (response as { json?: unknown }).json !== 'function') {
+  if (
+    !response ||
+    typeof (response as { json?: unknown }).json !== 'function'
+  ) {
     return;
   }
 

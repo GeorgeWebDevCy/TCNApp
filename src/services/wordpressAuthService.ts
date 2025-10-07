@@ -49,7 +49,12 @@ const maskTokenForLogging = (token?: string | null): string | null => {
 
 const describeUrlForLogging = (
   value?: string | null,
-): { host?: string; pathname?: string; hasQuery?: boolean; length?: number } | null => {
+): {
+  host?: string;
+  pathname?: string;
+  hasQuery?: boolean;
+  length?: number;
+} | null => {
   if (!value) {
     return null;
   }
@@ -117,9 +122,7 @@ const extractTokenFromUrl = (value: string): string | undefined => {
   return undefined;
 };
 
-const normalizeApiToken = (
-  value?: string | null,
-): string | undefined => {
+const normalizeApiToken = (value?: string | null): string | undefined => {
   if (!value || typeof value !== 'string') {
     return undefined;
   }
@@ -142,17 +145,15 @@ const normalizeApiToken = (
 
 const describeSessionForLogging = (
   session?: PersistedSession | null,
-):
-  | {
-      hasToken: boolean;
-      maskedToken: string | null;
-      hasRefreshToken: boolean;
-      maskedRefreshToken: string | null;
-      tokenLoginUrl: ReturnType<typeof describeUrlForLogging>;
-      locked: boolean;
-      hasUser: boolean;
-    }
-  | null => {
+): {
+  hasToken: boolean;
+  maskedToken: string | null;
+  hasRefreshToken: boolean;
+  maskedRefreshToken: string | null;
+  tokenLoginUrl: ReturnType<typeof describeUrlForLogging>;
+  locked: boolean;
+  hasUser: boolean;
+} | null => {
   if (!session) {
     return null;
   }
@@ -169,6 +170,10 @@ const describeSessionForLogging = (
 };
 
 let lastRestoreSessionLogSummary: string | null = null;
+
+interface RestoreSessionOptions {
+  silent?: boolean;
+}
 
 const normalizeBaseUrl = (baseUrl: string): string =>
   baseUrl.replace(/\/+$/, '');
@@ -491,7 +496,10 @@ const encodeBase64 = (value: string): string | null => {
       const scope = globalThis as {
         btoa?: (input: string) => string;
         Buffer?: {
-          from: (input: string, encoding?: string) => {
+          from: (
+            input: string,
+            encoding?: string,
+          ) => {
             toString: (encoding: string) => string;
           };
         };
@@ -614,18 +622,20 @@ const parseProfileUserPayload = (
 
   const emailSource = payload.email ?? payload.user_email ?? '';
   const resolvedEmail =
-    typeof emailSource === 'string'
-      ? emailSource
-      : String(emailSource ?? '');
+    typeof emailSource === 'string' ? emailSource : String(emailSource ?? '');
 
   const nameSource =
-    payload.name ?? payload.user_display_name ?? payload.username ?? resolvedEmail;
+    payload.name ??
+    payload.user_display_name ??
+    payload.username ??
+    resolvedEmail;
   const resolvedName =
     typeof nameSource === 'string' && nameSource.trim().length > 0
       ? nameSource
       : resolvedEmail;
 
-  const meta = (payload.meta as Record<string, unknown> | undefined) ?? undefined;
+  const meta =
+    (payload.meta as Record<string, unknown> | undefined) ?? undefined;
   const firstNameSource =
     payload.first_name ??
     payload.firstName ??
@@ -641,9 +651,7 @@ const parseProfileUserPayload = (
     payload.meta_last_name ??
     undefined;
 
-  const avatarUrls = payload.avatar_urls as
-    | Record<string, string>
-    | undefined;
+  const avatarUrls = payload.avatar_urls as Record<string, string> | undefined;
 
   return {
     id: Number.isFinite(parsedId) ? parsedId : -1,
@@ -708,15 +716,9 @@ const parseLoginUserPayload = (
       : resolvedEmail;
 
   const firstNameSource =
-    source.first_name ??
-    source.firstName ??
-    source.user_first_name ??
-    null;
+    source.first_name ?? source.firstName ?? source.user_first_name ?? null;
   const lastNameSource =
-    source.last_name ??
-    source.lastName ??
-    source.user_last_name ??
-    null;
+    source.last_name ?? source.lastName ?? source.user_last_name ?? null;
 
   const membership = parseMembershipInfo(
     (source.membership as Record<string, unknown> | undefined) ??
@@ -990,15 +992,13 @@ const storeSession = async ({
   }
 
   const wooAuthHeader = user?.woocommerceCredentials
-    ? (
-        user.woocommerceCredentials.basicAuthorizationHeader ??
-        createWooCommerceCredentialBundle(
-          user.woocommerceCredentials.consumerKey,
-          user.woocommerceCredentials.consumerSecret,
-          user.woocommerceCredentials.basicAuthorizationHeader ?? null,
-        )?.basicAuthorizationHeader ??
-        null
-      )
+    ? user.woocommerceCredentials.basicAuthorizationHeader ??
+      createWooCommerceCredentialBundle(
+        user.woocommerceCredentials.consumerKey,
+        user.woocommerceCredentials.consumerSecret,
+        user.woocommerceCredentials.basicAuthorizationHeader ?? null,
+      )?.basicAuthorizationHeader ??
+      null
     : null;
 
   await persistWooCommerceAuthHeader(wooAuthHeader);
@@ -1046,7 +1046,10 @@ export const clearSession = async () => {
   lastRestoreSessionLogSummary = null;
 };
 
-export const restoreSession = async (): Promise<PersistedSession | null> => {
+export const restoreSession = async (
+  options: RestoreSessionOptions = {},
+): Promise<PersistedSession | null> => {
+  const { silent = false } = options;
   const [rawToken, rawRefreshToken, storedTuples] = await Promise.all([
     getSecureValue(AUTH_STORAGE_KEYS.token),
     getSecureValue(AUTH_STORAGE_KEYS.refreshToken),
@@ -1070,14 +1073,18 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
 
   const token = normalizeApiToken(rawToken ?? undefined);
   if (rawToken && !token) {
-    deviceLog.debug('wordpressAuth.restoreSession.ignoredToken', {
-      length: rawToken.length,
-    });
+    if (!silent) {
+      deviceLog.debug('wordpressAuth.restoreSession.ignoredToken', {
+        length: rawToken.length,
+      });
+    }
   }
   const refreshToken = rawRefreshToken ?? undefined;
 
   if (!token && !userJson) {
-    deviceLog.debug('wordpressAuth.restoreSession.empty');
+    if (!silent) {
+      deviceLog.debug('wordpressAuth.restoreSession.empty');
+    }
     lastRestoreSessionLogSummary = null;
     return null;
   }
@@ -1088,9 +1095,11 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
     try {
       user = JSON.parse(userJson) as AuthUser;
     } catch (error) {
-      deviceLog.warn('wordpressAuth.restoreSession.userParseError', {
-        message: error instanceof Error ? error.message : String(error),
-      });
+      if (!silent) {
+        deviceLog.warn('wordpressAuth.restoreSession.userParseError', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
       user = null;
     }
   }
@@ -1110,9 +1119,11 @@ export const restoreSession = async (): Promise<PersistedSession | null> => {
   const serializedSessionSummary = JSON.stringify(sessionSummary);
   if (serializedSessionSummary !== lastRestoreSessionLogSummary) {
     lastRestoreSessionLogSummary = serializedSessionSummary;
-    deviceLog.debug('wordpressAuth.restoreSession.success', {
-      session: sessionSummary,
-    });
+    if (!silent) {
+      deviceLog.debug('wordpressAuth.restoreSession.success', {
+        session: sessionSummary,
+      });
+    }
   }
   return session;
 };
@@ -1298,7 +1309,10 @@ export const ensureValidSession =
     }
 
     const tokenResult = await fetchSessionUser(normalizedToken);
-    deviceLog.debug('wordpressAuth.ensureValidSession.tokenResult', tokenResult);
+    deviceLog.debug(
+      'wordpressAuth.ensureValidSession.tokenResult',
+      tokenResult,
+    );
 
     if (tokenResult.user) {
       await AsyncStorage.setItem(
@@ -1449,7 +1463,8 @@ export const loginWithPassword = async ({
   }
 
   const refreshToken =
-    typeof json.refresh_token === 'string' && json.refresh_token.trim().length > 0
+    typeof json.refresh_token === 'string' &&
+    json.refresh_token.trim().length > 0
       ? json.refresh_token.trim()
       : undefined;
 
@@ -1466,7 +1481,7 @@ export const loginWithPassword = async ({
   const fallbackName =
     loginUser?.name ??
     (typeof json.user_display_name === 'string' &&
-      json.user_display_name.trim().length > 0
+    json.user_display_name.trim().length > 0
       ? json.user_display_name.trim()
       : typeof json.user_nicename === 'string' &&
         json.user_nicename.trim().length > 0
@@ -1659,9 +1674,7 @@ export const updatePassword = async ({
     await performRestPasswordUpdate();
   } catch (error) {
     restError =
-      error instanceof Error
-        ? error
-        : new Error('Unable to change password.');
+      error instanceof Error ? error : new Error('Unable to change password.');
   }
 
   if (restError) {
