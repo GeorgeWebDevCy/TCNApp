@@ -25,7 +25,8 @@ const WOOCOMMERCE_CONSUMER_SECRET_VALUE = sanitizeEnvValue(
 export const WORDPRESS_CONFIG = {
   baseUrl: BASE_URL,
   endpoints: {
-    passwordLogin: '/wp-json/jwt-auth/v1/token',
+    // Use GN/TCN connector login endpoint which returns api_token and token_login_url
+    passwordLogin: '/wp-json/gn/v1/login',
     refreshToken: '/wp-json/jwt-auth/v1/token/refresh',
     validateToken: '/wp-json/jwt-auth/v1/token/validate',
     profile: '/wp-json/gn/v1/me',

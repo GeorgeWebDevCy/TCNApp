@@ -1440,7 +1440,23 @@ export const loginWithPassword = async ({
       : 'undefined';
   const hasResponseToken = Boolean(rawTokenValue);
   const rawTokenLoginUrl =
-    getString(json.token_login_url) ?? getString(json.tokenLoginUrl);
+    getString(json.token_login_url) ??
+    getString(json.tokenLoginUrl) ??
+    getString((json as any).redirect);
+
+  // Debug which keys the server actually returned (no secrets exposed)
+  try {
+    deviceLog.debug('wordpressAuth.loginWithPassword.payloadKeys', {
+      hasApiToken: Boolean(rawApiTokenValue),
+      hasTokenField: Boolean(rawTokenFieldValue),
+      hasTokenLoginUrl: Boolean(rawTokenLoginUrl),
+      hasUser: Boolean(json.user),
+      tokenPreview:
+        rawTokenValue && rawTokenValue.length >= 8
+          ? `***${rawTokenValue.slice(-4)}(len=${rawTokenValue.length})`
+          : null,
+    });
+  } catch {}
 
   if (!response.ok || (!hasResponseToken && !rawTokenLoginUrl)) {
     const message =
