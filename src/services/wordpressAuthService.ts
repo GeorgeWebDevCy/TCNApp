@@ -408,6 +408,42 @@ const extractSuccessFlag = (
   return undefined;
 };
 
+// Attempt to refresh a JWT-style token using the compatible JWT endpoint.
+const refreshJwtTokenIfPossible = async (
+  token?: string | null,
+): Promise<string | null> => {
+  const normalized = normalizeApiToken(token ?? undefined);
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const response = await fetchWithRouteFallback(
+      WORDPRESS_CONFIG.endpoints.refreshToken,
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `Bearer ${normalized}`,
+        },
+      },
+    );
+
+    const json = (await parseJsonResponse<JwtTokenResponse>(
+      response,
+    )) as JwtTokenResponse | null;
+
+    if (!response.ok || !json || typeof json !== 'object') {
+      return null;
+    }
+
+    const newToken = getString(json.token);
+    return newToken ?? null;
+  } catch (error) {
+    return null;
+  }
+};
+
 const fetchWithRouteFallback = async (
   path: string,
   init?: RequestInit,
@@ -607,6 +643,43 @@ const parseWooCommerceCredentialBundle = (
   );
 };
 
+// Helper to select an avatar URL from a WordPress avatar_urls map.
+// Handles numeric keys reindexed by array_merge as well as known sizes and 'full'.
+const pickAvatarUrlFromMap = (value: unknown): string | null => {
+  if (!value || typeof value !== 'object') {
+    return null;
+  }
+  const map = value as Record<string, unknown>;
+  const preference = [
+    'full',
+    '512',
+    '384',
+    '320',
+    '300',
+    '256',
+    '192',
+    '128',
+    '100',
+    '96',
+    '64',
+    '48',
+    '32',
+    '24',
+    // Some servers accidentally reindex numeric keys; check generic indexes too
+    '0', '1', '2', '3', '4', '5', '6', '7'
+  ];
+  for (const key of preference) {
+    const url = getString(map[key]);
+    if (url) return url;
+  }
+  // Fallback: first string value we can find
+  for (const v of Object.values(map)) {
+    const url = getString(v);
+    if (url) return url;
+  }
+  return null;
+};
+
 const parseProfileUserPayload = (
   payload: Record<string, unknown>,
 ): AuthUser => {
@@ -651,7 +724,8 @@ const parseProfileUserPayload = (
     payload.meta_last_name ??
     undefined;
 
-  const avatarUrls = payload.avatar_urls as Record<string, string> | undefined;
+  const avatarUrls = payload.avatar_urls as Record<string, unknown> | undefined;
+  const resolvedAvatarUrl = avatarUrls ? pickAvatarUrlFromMap(avatarUrls) : null;
 
   return {
     id: Number.isFinite(parsedId) ? parsedId : -1,
@@ -659,7 +733,7 @@ const parseProfileUserPayload = (
     name: resolvedName,
     firstName: getString(firstNameSource),
     lastName: getString(lastNameSource),
-    avatarUrl: avatarUrls?.['96'] ?? avatarUrls?.['48'],
+    avatarUrl: resolvedAvatarUrl ?? undefined,
     membership,
   };
 };
@@ -1081,6 +1155,8 @@ export const clearSession = async () => {
   await Promise.all([
     removeSecureValue(AUTH_STORAGE_KEYS.token),
     removeSecureValue(AUTH_STORAGE_KEYS.refreshToken),
+    removeSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
+    removeSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
   ]);
   await AsyncStorage.multiRemove([
     AUTH_STORAGE_KEYS.token,
@@ -1271,23 +1347,83 @@ export const uploadProfileAvatar = async (
   if (endpoint === '/' || endpoint.trim().length < 10) {
     endpoint = '/wp-json/gn/v1/profile/avatar';
   }
-  const session = await restoreSession();
+  let session = await restoreSession();
   const restNonce = session?.restNonce?.trim();
 
   // Build request init via WordPress helper so Authorization is ensured
   // Try to resolve a bearer token eagerly
+  let tokenSource: 'session' | 'secure' | 'async' | null = null;
   let token = normalizeApiToken(session?.token);
+  if (token) {
+    tokenSource = 'session';
+  }
   if (!token) {
     try {
       const secure = await getSecureValue(AUTH_STORAGE_KEYS.token);
       token = normalizeApiToken(secure ?? undefined);
+      if (token) tokenSource = 'secure';
     } catch {}
   }
   if (!token) {
     try {
       const plain = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.token);
       token = normalizeApiToken(plain ?? undefined);
+      if (token) tokenSource = 'async';
     } catch {}
+  }
+
+  // If we resolved a token outside of the restored session, update the session
+  // so downstream logs and helpers see hasToken = true.
+  try {
+    if (token && (!session || !session.token)) {
+      const patched: PersistedSession = {
+        token,
+        refreshToken: session?.refreshToken,
+        tokenLoginUrl: undefined,
+        restNonce: session?.restNonce ?? undefined,
+        user: session?.user ?? null,
+        locked: Boolean(session?.locked) && !!session?.locked,
+      };
+      await storeSession(patched);
+      session = patched;
+    }
+  } catch (e) {
+    // non-fatal; continue with local token
+  }
+
+  // Preemptive re-auth: if no token is available, attempt a background re-login
+  // using securely stored credentials (mirrors the smoke script's login-first flow).
+  if (!token) {
+    try {
+      const savedEmail = await getSecureValue(AUTH_STORAGE_KEYS.credentialEmail);
+      const savedPassword = await getSecureValue(
+        AUTH_STORAGE_KEYS.credentialPassword,
+      );
+      if (savedEmail && savedPassword) {
+        deviceLog.info('wordpressAuth.uploadProfileAvatar.preauth.attempt');
+        const reauthSession = await loginWithPassword({
+          email: savedEmail,
+          password: savedPassword,
+          remember: true,
+        });
+        const t = normalizeApiToken(reauthSession.token);
+        if (t) {
+          token = t;
+          tokenSource = 'session';
+          session = reauthSession;
+          deviceLog.success('wordpressAuth.uploadProfileAvatar.preauth.succeeded', {
+            maskedToken: maskTokenForLogging(token),
+          });
+        }
+      }
+    } catch (preauthError) {
+      deviceLog.warn('wordpressAuth.uploadProfileAvatar.preauth.failed', {
+        message:
+          preauthError instanceof Error
+            ? preauthError.message
+            : String(preauthError),
+      });
+    }
   }
 
   const baseInit: RequestInit = {
@@ -1307,6 +1443,16 @@ export const uploadProfileAvatar = async (
   try {
     if (token && preparedInit && preparedInit.body && typeof (preparedInit.body as any).append === 'function') {
       (preparedInit.body as any).append('token', token);
+    }
+  } catch {}
+
+  // Final fallback: also include the token in the query string. Some hosts
+  // strip Authorization headers on multipart/form-data requests and may not
+  // pass custom headers through. The server accepts a `token` parameter.
+  try {
+    if (token && !/([?&])token=/.test(endpoint)) {
+      const join = endpoint.includes('?') ? '&' : '?';
+      endpoint = `${endpoint}${join}token=${encodeURIComponent(token)}`;
     }
   } catch {}
 
@@ -1336,14 +1482,137 @@ export const uploadProfileAvatar = async (
     deviceLog.info('wordpressAuth.uploadProfileAvatar.start', {
       session: describeSessionForLogging(session),
       hasTokenHeader: hasAuthHeader,
+      hasResolvedToken: Boolean(token),
+      tokenSource,
+      maskedResolvedToken: maskTokenForLogging(token),
       endpoint: describeUrlForLogging(primaryUrlForLog ?? endpoint),
     });
-    const response = await fetchWithRouteFallback(endpoint, preparedInit);
+    let response = await fetchWithRouteFallback(endpoint, preparedInit);
 
     deviceLog.debug('wordpressAuth.uploadProfileAvatar.response', {
       status: response.status,
       ok: response.ok,
     });
+
+    // If unauthorized, try to refresh JWT token once and retry
+    if (response.status === 401 || response.status === 403) {
+      deviceLog.info('wordpressAuth.uploadProfileAvatar.unauthorized', {
+        status: response.status,
+      });
+      deviceLog.info('wordpressAuth.uploadProfileAvatar.refreshToken.attempt', {
+        hadToken: Boolean(token),
+        maskedToken: maskTokenForLogging(token),
+      });
+      const refreshed = await refreshJwtTokenIfPossible(token ?? undefined);
+      if (refreshed) {
+        deviceLog.success('wordpressAuth.uploadProfileAvatar.refreshToken.succeeded', {
+          maskedToken: maskTokenForLogging(refreshed),
+        });
+        await storeSession({
+          token: refreshed,
+          refreshToken: session?.refreshToken,
+          tokenLoginUrl: undefined,
+          restNonce: session?.restNonce ?? undefined,
+          user: session?.user ?? null,
+        });
+        token = refreshed;
+        // Rebuild headers/body/query with new token
+        const retryInit: RequestInit = {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
+            Authorization: `Bearer ${token}`,
+            'X-Authorization': `Bearer ${token}`,
+          },
+          body: formData,
+        };
+        const preparedRetry = await buildWordPressRequestInit(retryInit);
+        try {
+          if (preparedRetry && preparedRetry.body && typeof (preparedRetry.body as any).append === 'function') {
+            (preparedRetry.body as any).append('token', token);
+          }
+        } catch {}
+        try {
+          if (token && !/([?&])token=/.test(endpoint)) {
+            const join2 = endpoint.includes('?') ? '&' : '?';
+            endpoint = `${endpoint}${join2}token=${encodeURIComponent(token)}`;
+          }
+        } catch {}
+        deviceLog.info('wordpressAuth.uploadProfileAvatar.retry.start', {
+          endpoint: describeUrlForLogging(endpoint),
+          hasRestNonce: Boolean(restNonce),
+        });
+        response = await fetchWithRouteFallback(endpoint, preparedRetry);
+        deviceLog.debug('wordpressAuth.uploadProfileAvatar.retry.response', {
+          status: response.status,
+          ok: response.ok,
+        });
+      } else {
+        deviceLog.warn('wordpressAuth.uploadProfileAvatar.refreshToken.unavailable');
+        // Last-chance fallback: if stored credentials exist, perform a quick re-login
+        try {
+          const savedEmail = await getSecureValue(
+            AUTH_STORAGE_KEYS.credentialEmail,
+          );
+          const savedPassword = await getSecureValue(
+            AUTH_STORAGE_KEYS.credentialPassword,
+          );
+          if (savedEmail && savedPassword) {
+            deviceLog.info('wordpressAuth.uploadProfileAvatar.reauth.attempt', {
+              hasSavedCredentials: true,
+            });
+            const reauthSession = await loginWithPassword({
+              email: savedEmail,
+              password: savedPassword,
+              remember: true,
+            });
+            token = normalizeApiToken(reauthSession.token);
+            if (token) {
+              const retryInit2: RequestInit = {
+                method: 'POST',
+                headers: {
+                  Accept: 'application/json',
+                  ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
+                  Authorization: `Bearer ${token}`,
+                  'X-Authorization': `Bearer ${token}`,
+                },
+                body: formData,
+              };
+              const preparedRetry2 = await buildWordPressRequestInit(retryInit2);
+              try {
+                if (
+                  preparedRetry2 &&
+                  preparedRetry2.body &&
+                  typeof (preparedRetry2.body as any).append === 'function'
+                ) {
+                  (preparedRetry2.body as any).append('token', token);
+                }
+              } catch {}
+              try {
+                if (token && !/([?&])token=/.test(endpoint)) {
+                  const join3 = endpoint.includes('?') ? '&' : '?';
+                  endpoint = `${endpoint}${join3}token=${encodeURIComponent(token)}`;
+                }
+              } catch {}
+              deviceLog.info('wordpressAuth.uploadProfileAvatar.reauth.retry.start');
+              response = await fetchWithRouteFallback(endpoint, preparedRetry2);
+              deviceLog.debug(
+                'wordpressAuth.uploadProfileAvatar.reauth.retry.response',
+                {
+                  status: response.status,
+                  ok: response.ok,
+                },
+              );
+            }
+          }
+        } catch (e) {
+          deviceLog.warn('wordpressAuth.uploadProfileAvatar.reauth.failed', {
+            message: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+    }
 
     if (!response.ok) {
       const errorBody = await response.text();
@@ -1445,6 +1714,51 @@ export const ensureValidSession =
       deviceLog.warn('wordpressAuth.ensureValidSession.tokenRejected', {
         status: tokenResult.status,
       });
+      // Try to refresh JWT token and re-validate once
+      deviceLog.info('wordpressAuth.ensureValidSession.refreshToken.attempt', {
+        hadToken: Boolean(normalizedToken),
+        maskedToken: maskTokenForLogging(normalizedToken),
+      });
+      const refreshed = await refreshJwtTokenIfPossible(normalizedToken);
+      if (refreshed) {
+        deviceLog.success(
+          'wordpressAuth.ensureValidSession.refreshToken.succeeded',
+          {
+            maskedToken: maskTokenForLogging(refreshed),
+          },
+        );
+        await storeSession({
+          token: refreshed,
+          refreshToken: session.refreshToken,
+          tokenLoginUrl: undefined,
+          restNonce: session.restNonce ?? undefined,
+          user: session.user,
+        });
+        deviceLog.info('wordpressAuth.ensureValidSession.retry.start');
+        const retry = await fetchSessionUser(refreshed);
+        deviceLog.debug('wordpressAuth.ensureValidSession.retryTokenResult', retry);
+        if (retry.user) {
+          await AsyncStorage.setItem(
+            AUTH_STORAGE_KEYS.userProfile,
+            JSON.stringify(retry.user),
+          );
+          deviceLog.success('wordpressAuth.ensureValidSession.retry.success', {
+            userId: retry.user.id,
+          });
+          return {
+            ...session,
+            token: refreshed,
+            tokenLoginUrl: undefined,
+            user: retry.user,
+          };
+        } else {
+          deviceLog.warn('wordpressAuth.ensureValidSession.retry.failed', {
+            status: retry.status,
+          });
+        }
+      } else {
+        deviceLog.warn('wordpressAuth.ensureValidSession.refreshToken.unavailable');
+      }
       await clearSession();
       return null;
     }
@@ -1694,6 +2008,21 @@ export const loginWithPassword = async ({
 
   await storeSession(session);
   await markPasswordAuthenticated();
+  // Optionally persist credentials for re-auth fallback (only when remember is true)
+  try {
+    if (remember) {
+      await setSecureValue(AUTH_STORAGE_KEYS.credentialEmail, email);
+      await setSecureValue(AUTH_STORAGE_KEYS.credentialPassword, password);
+      deviceLog.debug('wordpressAuth.loginWithPassword.credentialsStored');
+    } else {
+      await removeSecureValue(AUTH_STORAGE_KEYS.credentialEmail);
+      await removeSecureValue(AUTH_STORAGE_KEYS.credentialPassword);
+    }
+  } catch (error) {
+    deviceLog.warn('wordpressAuth.loginWithPassword.storeCredentialsFailed', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   deviceLog.success('wordpressAuth.loginWithPassword.success', {
     email,

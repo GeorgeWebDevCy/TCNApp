@@ -82,7 +82,8 @@ export const LoginScreen: React.FC = () => {
     async ({ email, password }: { email: string; password: string }) => {
       setLastAttempt('password');
       resetError();
-      await loginWithPassword({ email, password });
+      // Persist credentials for secure re-auth fallback
+      await loginWithPassword({ email, password, remember: true });
     },
     [loginWithPassword, resetError],
   );
