@@ -1303,6 +1303,13 @@ export const uploadProfileAvatar = async (
 
   const preparedInit = await buildWordPressRequestInit(baseInit);
 
+  // As a final defense for hosts that strip headers on multipart, also include the token as a form field
+  try {
+    if (token && preparedInit && preparedInit.body && typeof (preparedInit.body as any).append === 'function') {
+      (preparedInit.body as any).append('token', token);
+    }
+  } catch {}
+
   const hasAuthHeader = (() => {
     const h = preparedInit.headers as HeadersInit | undefined;
     if (!h) return false;
