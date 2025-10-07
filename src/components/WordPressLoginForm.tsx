@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { COLORS } from '../config/theme';
+import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
 
 interface WordPressLoginFormProps {
   loading?: boolean;
@@ -29,6 +29,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const { t } = useLocalization();
 
   const handleSubmit = () => {
@@ -63,13 +64,26 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
       </View>
       <View style={styles.formGroup}>
         <Text style={styles.label}>{t('auth.forms.passwordLabel')}</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          style={styles.input}
-          placeholder={t('auth.forms.passwordPlaceholder')}
-        />
+        <View style={styles.passwordInputWrapper}>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={!passwordVisible}
+            style={styles.passwordInput}
+            placeholder={t('auth.forms.passwordPlaceholder')}
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="password"
+            autoComplete="password"
+          />
+          <PasswordVisibilityToggle
+            visible={passwordVisible}
+            onToggle={() => setPasswordVisible(visible => !visible)}
+            labelShow={t('auth.forms.showPassword')}
+            labelHide={t('auth.forms.hidePassword')}
+            style={styles.togglePasswordButton}
+          />
+        </View>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -125,6 +139,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.surface,
+  },
+  passwordInputWrapper: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  togglePasswordButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   error: {
     color: COLORS.error,

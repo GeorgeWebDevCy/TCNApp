@@ -20,6 +20,7 @@ import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { getUserDisplayName, getUserInitials } from '../utils/user';
+import { PasswordVisibilityToggle } from '../components/PasswordVisibilityToggle';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -48,6 +49,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSubmitting, setPasswordSubmitting] = useState(false);
 
@@ -381,43 +385,80 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             <Text style={styles.label}>
               {t('profile.password.currentLabel')}
             </Text>
-            <TextInput
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              placeholder={t('profile.password.currentPlaceholder')}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
+            <View style={styles.passwordInputWrapper}>
+              <TextInput
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                placeholder={t('profile.password.currentPlaceholder')}
+                secureTextEntry={!showCurrentPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.passwordInput}
+                textContentType="password"
+                autoComplete="password"
+              />
+              <PasswordVisibilityToggle
+                visible={showCurrentPassword}
+                onToggle={() =>
+                  setShowCurrentPassword(visible => !visible)
+                }
+                labelShow={t('auth.forms.showPassword')}
+                labelHide={t('auth.forms.hidePassword')}
+                style={styles.togglePasswordButton}
+              />
+            </View>
           </View>
 
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>{t('profile.password.newLabel')}</Text>
-            <TextInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              placeholder={t('profile.password.newPlaceholder')}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
+            <View style={styles.passwordInputWrapper}>
+              <TextInput
+                value={newPassword}
+                onChangeText={setNewPassword}
+                placeholder={t('profile.password.newPlaceholder')}
+                secureTextEntry={!showNewPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.passwordInput}
+                textContentType="newPassword"
+                autoComplete="password-new"
+              />
+              <PasswordVisibilityToggle
+                visible={showNewPassword}
+                onToggle={() => setShowNewPassword(visible => !visible)}
+                labelShow={t('auth.forms.showPassword')}
+                labelHide={t('auth.forms.hidePassword')}
+                style={styles.togglePasswordButton}
+              />
+            </View>
           </View>
 
           <View style={styles.fieldGroup}>
             <Text style={styles.label}>
               {t('profile.password.confirmLabel')}
             </Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              placeholder={t('profile.password.confirmPlaceholder')}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.input}
-            />
+            <View style={styles.passwordInputWrapper}>
+              <TextInput
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder={t('profile.password.confirmPlaceholder')}
+                secureTextEntry={!showConfirmPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                style={styles.passwordInput}
+                textContentType="newPassword"
+                autoComplete="password-new"
+              />
+              <PasswordVisibilityToggle
+                visible={showConfirmPassword}
+                onToggle={() =>
+                  setShowConfirmPassword(visible => !visible)
+                }
+                labelShow={t('auth.forms.showPassword')}
+                labelHide={t('auth.forms.hidePassword')}
+                style={styles.togglePasswordButton}
+              />
+            </View>
           </View>
 
           {passwordError ? (
@@ -816,6 +857,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: COLORS.background,
     color: COLORS.textPrimary,
+  },
+  passwordInputWrapper: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.textPrimary,
+  },
+  togglePasswordButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   errorText: {
     color: COLORS.error,

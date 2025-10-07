@@ -12,6 +12,7 @@ import {
 import { useLocalization } from '../contexts/LocalizationContext';
 import { RegisterOptions } from '../types/auth';
 import { COLORS } from '../config/theme';
+import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
 
 interface RegisterModalProps {
   visible: boolean;
@@ -29,6 +30,9 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [confirmPasswordVisible, setConfirmPasswordVisible] =
+    useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,8 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       setEmail('');
       setPassword('');
       setConfirmPassword('');
+      setPasswordVisible(false);
+      setConfirmPasswordVisible(false);
       setFirstName('');
       setLastName('');
       setLoading(false);
@@ -152,28 +158,58 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               <Text style={styles.label}>
                 {t('auth.registerModal.passwordLabel')}
               </Text>
-              <TextInput
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!loading && successMessage === null}
-                style={styles.input}
-                placeholder={t('auth.registerModal.passwordPlaceholder')}
-              />
+              <View style={styles.passwordInputWrapper}>
+                <TextInput
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!passwordVisible}
+                  editable={!loading && successMessage === null}
+                  style={styles.passwordInput}
+                  placeholder={t('auth.registerModal.passwordPlaceholder')}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="newPassword"
+                  autoComplete="password-new"
+                />
+                <PasswordVisibilityToggle
+                  visible={passwordVisible}
+                  onToggle={() => setPasswordVisible(visible => !visible)}
+                  labelShow={t('auth.forms.showPassword')}
+                  labelHide={t('auth.forms.hidePassword')}
+                  style={styles.togglePasswordButton}
+                />
+              </View>
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>
                 {t('auth.registerModal.confirmPasswordLabel')}
               </Text>
-              <TextInput
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                editable={!loading && successMessage === null}
-                style={styles.input}
-                placeholder={t('auth.registerModal.confirmPasswordPlaceholder')}
-              />
+              <View style={styles.passwordInputWrapper}>
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!confirmPasswordVisible}
+                  editable={!loading && successMessage === null}
+                  style={styles.passwordInput}
+                  placeholder={t(
+                    'auth.registerModal.confirmPasswordPlaceholder',
+                  )}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  textContentType="newPassword"
+                  autoComplete="password-new"
+                />
+                <PasswordVisibilityToggle
+                  visible={confirmPasswordVisible}
+                  onToggle={() =>
+                    setConfirmPasswordVisible(visible => !visible)
+                  }
+                  labelShow={t('auth.forms.showPassword')}
+                  labelHide={t('auth.forms.hidePassword')}
+                  style={styles.togglePasswordButton}
+                />
+              </View>
             </View>
 
             <View style={styles.row}>
@@ -301,6 +337,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.surface,
+  },
+  passwordInputWrapper: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  togglePasswordButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   primaryButton: {
     height: 48,
