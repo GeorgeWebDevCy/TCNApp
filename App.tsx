@@ -1,3 +1,8 @@
+// The root of the React Native application. Here we stitch together the global providers
+// and render the high-level screens. The goal of this file is to orchestrate application
+// state and supporting services (authentication, localization, payments, logging, etc.)
+// rather than hold any domain-specific logic. Because the composition of providers can
+// be non-trivial for new contributors, we comment each section in detail.
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,21 +26,32 @@ import { MembershipScreen } from './src/screens/MembershipScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
 import { COLORS } from './src/config/theme';
 
+// AppContent is intentionally separated from the surrounding provider tree so we can
+// consume the AuthContext without worrying about provider order in the JSX tree below.
+// This component makes all routing decisions based on authentication state and user
+// interactions, keeping the top-level App component focused on wiring.
 const AppContent: React.FC = () => {
   const {
     state: { isAuthenticated, isLoading },
   } = useAuthContext();
+  // Track which high-level screen the authenticated user is currently viewing.
+  // We model the navigation stack as a discriminated union to keep the state strict.
   const [activeScreen, setActiveScreen] = useState<
     'home' | 'profile' | 'membership'
   >('home');
 
   useEffect(() => {
+    // Whenever the user signs out we reset the active screen to "home". This prevents
+    // stale state from trying to render profile/membership views while the LoginScreen
+    // should be shown instead.
     if (!isAuthenticated) {
       setActiveScreen('home');
     }
   }, [isAuthenticated]);
 
   if (isLoading) {
+    // While authentication is bootstrapping (e.g., validating stored tokens) we display
+    // a centered loading indicator to block the UI until the result is known.
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={COLORS.primary} />
@@ -44,18 +60,27 @@ const AppContent: React.FC = () => {
   }
 
   if (!isAuthenticated) {
+    // No authenticated session found, so we show the login experience. The AuthProvider
+    // will update the context once the user signs in.
     return <LoginScreen />;
   }
 
   if (activeScreen === 'profile') {
+    // The profile screen exposes a callback to return to the home view. Rather than
+    // introducing a navigation library in this lightweight shell we manage the routing
+    // manually.
     return <UserProfileScreen onBack={() => setActiveScreen('home')} />;
   }
 
   if (activeScreen === 'membership') {
+    // Same pattern as the profile screen—show the membership upsell/management view
+    // and allow the component to return the user to the home view.
     return <MembershipScreen onBack={() => setActiveScreen('home')} />;
   }
 
   return (
+    // The home screen is the default route once authenticated. We pass callbacks that
+    // simply mutate the local activeScreen state, emulating a navigation push.
     <HomeScreen
       onManageProfile={() => setActiveScreen('profile')}
       onUpgradeMembership={() => setActiveScreen('membership')}
@@ -64,7 +89,12 @@ const AppContent: React.FC = () => {
 };
 
 function App(): JSX.Element {
+  // Control whether the device log overlay is visible. Developers can toggle this to
+  // inspect logs directly on-device without connecting to a remote debugger.
   const [areLogsVisible, setAreLogsVisible] = useState(false);
+  // Extract Stripe configuration values so we can memoize them and avoid re-creating
+  // the provider props on every render. Any change would cause the Stripe SDK to
+  // reinitialize, so we minimize churn here.
   const { publishableKey, merchantIdentifier, urlScheme } = STRIPE_CONFIG;
   const stripeProviderProps = useMemo(
     () => ({
@@ -76,6 +106,9 @@ function App(): JSX.Element {
   );
 
   useEffect(() => {
+    // Initialize the device logging utility once. We persist logs to AsyncStorage so
+    // they survive app restarts, which is invaluable when diagnosing issues reported
+    // by QA or end users. The logger also mirrors messages to the native console.
     deviceLog
       .init(AsyncStorage, {
         logToConsole: true,
@@ -84,14 +117,26 @@ function App(): JSX.Element {
         maxNumberToPersist: 1000,
       })
       .then(() => {
+        // We log a message once initialization completes so we can verify the logger
+        // is wired up correctly even if no other logs have been emitted yet.
         deviceLog.info('Device log initialized');
       })
       .catch(error => {
+        // Intentionally swallow initialization errors but surface them in the console.
+        // Failing to set up deviceLog should not prevent the rest of the application
+        // from working.
         console.warn('Failed to initialize device log', error);
       });
   }, []);
 
   return (
+    // Provider stack:
+    // 1. StripeProvider: Configures the Stripe SDK for payments.
+    // 2. LocalizationProvider: Supplies localized strings and locale helpers.
+    // 3. SafeAreaProvider: Ensures layouts respect device safe areas (notches, etc.).
+    // 4. TokenLoginProvider: Handles token-based authentication flows.
+    // 5. AuthProvider: Maintains authentication state exposed via useAuthContext.
+    // 6. OneSignalProvider: Sets up push notification support.
     <StripeProvider {...stripeProviderProps}>
       <LocalizationProvider>
         <SafeAreaProvider>
@@ -99,8 +144,11 @@ function App(): JSX.Element {
             <AuthProvider>
               <OneSignalProvider>
                 <View style={styles.appContainer}>
+                  {/* Render the conditional app content discussed above. */}
                   <AppContent />
                   {!areLogsVisible && (
+                    // When the log overlay is hidden we show a floating action button
+                    // styled as "Show Logs" to let developers bring it into view.
                     <TouchableOpacity
                       accessibilityRole="button"
                       accessibilityLabel="Show device logs"
@@ -134,6 +182,9 @@ function App(): JSX.Element {
                         </View>
                       </View>
                       <LogView
+                        // LogView is provided by the deviceLog utility and renders a
+                        // scrollable list of logs. We expand entries by default and
+                        // use a 24-hour timestamp for easier reading.
                         style={styles.logView}
                         multiExpanded
                         timeStampFormat="HH:mm:ss"
@@ -152,15 +203,19 @@ function App(): JSX.Element {
 
 const styles = StyleSheet.create({
   appContainer: {
+    // Ensure the root container fills the screen so nested components can rely on
+    // flex layout to position themselves.
     flex: 1,
   },
   loadingContainer: {
+    // Standard centered loading pattern while authentication is resolving.
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.surface,
   },
   logToggle: {
+    // Position the "Show Logs" button as a floating pill in the bottom-right corner.
     position: 'absolute',
     bottom: 24,
     right: 24,
@@ -175,55 +230,66 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   logToggleText: {
+    // Ensure the toggle text is legible against the primary background.
     color: COLORS.textOnPrimary,
     fontSize: 14,
     fontWeight: '600',
   },
   logOverlay: {
+    // Full-screen translucent overlay that hosts the log viewer when visible.
     ...StyleSheet.absoluteFillObject,
     backgroundColor: COLORS.overlay,
     padding: 16,
     paddingTop: 32,
   },
   logOverlayHeader: {
+    // Header row contains the title and action buttons (clear/close).
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
   logOverlayActions: {
+    // Layout the two action buttons horizontally with a small gap.
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   logOverlayTitle: {
+    // Title styling for the overlay header.
     color: COLORS.textOnPrimary,
     fontSize: 16,
     fontWeight: '700',
   },
   logOverlaySecondary: {
+    // Secondary button styling shared by "Clear" and "Close" controls.
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     backgroundColor: COLORS.overlayMuted,
   },
   logOverlaySecondaryText: {
+    // Provide sufficient contrast for the secondary button labels.
     color: COLORS.primaryLighter,
     fontSize: 14,
     fontWeight: '600',
   },
   logOverlayClose: {
+    // Styling mirrors logOverlaySecondary but kept separate in case we need to
+    // customize the close button independently in the future.
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     backgroundColor: COLORS.overlayMuted,
   },
   logOverlayCloseText: {
+    // Same rationale as logOverlaySecondaryText—explicit style prevents regressions.
     color: COLORS.primaryLighter,
     fontSize: 14,
     fontWeight: '600',
   },
   logView: {
+    // Allow the log list to expand and occupy the remaining overlay space.
     flex: 1,
   },
 });
