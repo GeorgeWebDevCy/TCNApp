@@ -21,6 +21,7 @@ import { BrandLogo } from '../components/BrandLogo';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { getUserDisplayName, getUserInitials } from '../utils/user';
 import { PasswordVisibilityToggle } from '../components/PasswordVisibilityToggle';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -46,6 +47,75 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     loading: availabilityLoading,
     refresh: refreshAuthAvailability,
   } = useAuthAvailability();
+  const layout = useResponsiveLayout();
+  const responsiveStyles = useMemo(() => {
+    const stackAvatar = layout.width < 640;
+    const stackPinStatus = layout.width < 520;
+    const avatarSize = layout.isTablet ? 96 : layout.isSmallPhone ? 64 : 80;
+    return {
+      container: {
+        paddingHorizontal: layout.contentPadding,
+        paddingVertical: layout.contentPadding,
+        width: '100%',
+        alignSelf: 'center' as const,
+        maxWidth: layout.maxContentWidth,
+      },
+      brandWrapper: layout.isTablet ? { alignItems: 'center' as const } : {},
+      header: layout.isTablet
+        ? { alignItems: 'center' as const, gap: 8 }
+        : {},
+      title: layout.isTablet ? { fontSize: 28, textAlign: 'center' as const } : {},
+      subtitle: layout.isTablet ? { textAlign: 'center' as const } : {},
+      avatarSection: stackAvatar
+        ? {
+            flexDirection: 'column' as const,
+            alignItems: 'flex-start' as const,
+            gap: 12,
+          }
+        : { alignItems: 'center' as const },
+      avatar: {
+        width: avatarSize,
+        height: avatarSize,
+        borderRadius: avatarSize / 2,
+      },
+      avatarActions: {
+        flexWrap: 'wrap' as const,
+        gap: 12,
+        width: stackAvatar ? '100%' : undefined,
+      },
+      section: {
+        padding: layout.isSmallPhone ? 16 : layout.isLargeTablet ? 24 : 20,
+      },
+      primaryButton:
+        layout.width < 520
+          ? { width: '100%' as const, alignSelf: 'stretch' as const }
+          : {},
+      outlineButton:
+        layout.width < 520
+          ? { width: '100%' as const, alignSelf: 'stretch' as const }
+          : {},
+      secondaryButton:
+        layout.width < 520
+          ? { width: '100%' as const, alignSelf: 'stretch' as const }
+          : {},
+      statusChipsRow: layout.width < 520 ? { flexDirection: 'column' as const } : {},
+      biometricButtonsRow:
+        layout.width < 520
+          ? { flexDirection: 'column' as const, alignItems: 'stretch' as const }
+          : {},
+      pinStatusRow: stackPinStatus
+        ? {
+            flexDirection: 'column' as const,
+            alignItems: 'stretch' as const,
+            gap: 8,
+          }
+        : {},
+      backButton:
+        layout.width < 520
+          ? { width: '100%' as const }
+          : { alignSelf: 'center' as const },
+    };
+  }, [layout]);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -370,21 +440,32 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, responsiveStyles.container]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.brandWrapper}>
-          <BrandLogo orientation="horizontal" />
+        <View style={[styles.brandWrapper, responsiveStyles.brandWrapper]}>
+          <BrandLogo
+            orientation={layout.isTablet ? 'horizontal' : 'vertical'}
+          />
         </View>
-        <View style={styles.header}>
-          <Text style={styles.title}>{t('profile.title')}</Text>
-          <Text style={styles.subtitle}>{t('profile.subtitle')}</Text>
+        <View style={[styles.header, responsiveStyles.header]}>
+          <Text style={[styles.title, responsiveStyles.title]}>
+            {t('profile.title')}
+          </Text>
+          <Text style={[styles.subtitle, responsiveStyles.subtitle]}>
+            {t('profile.subtitle')}
+          </Text>
         </View>
-        <View style={styles.avatarSection}>
+        <View
+          style={[styles.avatarSection, responsiveStyles.avatarSection]}
+        >
           {user?.avatarUrl ? (
-            <Image source={{ uri: user.avatarUrl }} style={styles.avatarImage} />
+            <Image
+              source={{ uri: user.avatarUrl }}
+              style={[styles.avatarImage, responsiveStyles.avatar]}
+            />
           ) : (
-            <View style={styles.avatarPlaceholder}>
+            <View style={[styles.avatarPlaceholder, responsiveStyles.avatar]}>
               <Text style={styles.avatarInitials}>{avatarInitials}</Text>
             </View>
           )}
@@ -396,7 +477,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
               <Text style={styles.avatarEmail}>{user.email}</Text>
             ) : null}
             <Text style={styles.avatarHint}>{t('profile.avatar.subtitle')}</Text>
-            <View style={styles.avatarActions}>
+            <View style={[styles.avatarActions, responsiveStyles.avatarActions]}>
               <Pressable
                 onPress={handleChangeAvatar}
                 style={styles.avatarButton}
@@ -436,7 +517,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, responsiveStyles.section]}>
           <Text style={styles.sectionTitle}>
             {t('profile.password.heading')}
           </Text>
@@ -531,6 +612,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           <Pressable
             style={[
               styles.primaryButton,
+              responsiveStyles.primaryButton,
               passwordSubmitting ? styles.buttonDisabled : null,
             ]}
             onPress={handlePasswordSubmit}
@@ -547,7 +629,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           </Pressable>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, responsiveStyles.section]}>
           <Text style={styles.sectionTitle}>{t('profile.pin.heading')}</Text>
           <Text style={styles.sectionDescription}>
             {t('profile.pin.description')}
@@ -582,6 +664,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           <Pressable
             style={[
               styles.primaryButton,
+              responsiveStyles.primaryButton,
               pinSubmitting ? styles.buttonDisabled : null,
             ]}
             onPress={handlePinSubmit}
@@ -597,7 +680,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             )}
           </Pressable>
 
-          <View style={styles.pinStatusRow}>
+          <View style={[styles.pinStatusRow, responsiveStyles.pinStatusRow]}>
             {availabilityLoading ? (
               <ActivityIndicator color={COLORS.primary} />
             ) : (
@@ -608,7 +691,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             {hasPin ? (
               <Pressable
                 onPress={confirmRemovePin}
-                style={styles.secondaryButton}
+                style={[styles.secondaryButton, responsiveStyles.secondaryButton]}
                 disabled={pinSubmitting}
                 accessibilityRole="button"
               >
@@ -620,7 +703,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, responsiveStyles.section]}>
           <Text style={styles.sectionTitle}>
             {t('profile.biometric.heading')}
           </Text>
@@ -632,7 +715,9 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             <ActivityIndicator color={COLORS.primary} />
           ) : (
             <>
-              <View style={styles.statusChipsRow}>
+              <View
+                style={[styles.statusChipsRow, responsiveStyles.statusChipsRow]}
+              >
                 <View
                   style={[
                     styles.statusChip,
@@ -705,11 +790,14 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                 <Text style={styles.errorText}>{biometricError}</Text>
               ) : null}
 
-              <View style={styles.biometricButtonsRow}>
+              <View
+                style={[styles.biometricButtonsRow, responsiveStyles.biometricButtonsRow]}
+              >
                 {biometricsSupported && !biometricsEnabled ? (
                   <Pressable
                     style={[
                       styles.primaryButton,
+                      responsiveStyles.primaryButton,
                       biometricSubmitting ? styles.buttonDisabled : null,
                     ]}
                     disabled={biometricSubmitting}
@@ -728,7 +816,11 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
 
                 {biometricsEnabled ? (
                   <Pressable
-                    style={[styles.outlineButton, biometricSubmitting ? styles.buttonDisabled : null]}
+                    style={[
+                      styles.outlineButton,
+                      responsiveStyles.outlineButton,
+                      biometricSubmitting ? styles.buttonDisabled : null,
+                    ]}
                     accessibilityRole="button"
                     disabled={biometricSubmitting}
                     onPress={handleDisableBiometrics}
@@ -750,7 +842,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         {onBack ? (
           <Pressable
             onPress={onBack}
-            style={styles.backButton}
+            style={[styles.backButton, responsiveStyles.backButton]}
             accessibilityRole="button"
           >
             <Text style={styles.backButtonText}>

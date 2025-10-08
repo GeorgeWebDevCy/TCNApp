@@ -22,6 +22,7 @@ import { useAuthAvailability } from '../hooks/useAuthAvailability';
 import { RegisterOptions } from '../types/auth';
 import { COLORS } from '../config/theme';
 import { getUserDisplayName } from '../utils/user';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 type AuthTabId = 'password' | 'pin';
 
@@ -184,24 +185,88 @@ export const LoginScreen: React.FC = () => {
   const passwordError =
     lastAttempt === 'password' ? translateError(state.error) : null;
 
+  const layout = useResponsiveLayout();
+  const responsiveStyles = useMemo(() => {
+    const effectiveMaxWidth = layout.maxContentWidth ?? 420;
+    const cardMaxWidth = layout.isLargeTablet
+      ? Math.min(effectiveMaxWidth, 560)
+      : layout.isTablet
+      ? Math.min(effectiveMaxWidth, 480)
+      : effectiveMaxWidth;
+    const stackTabs = layout.width < 420;
+    const stackSecondary = layout.width < 420;
+    const stackDivider = layout.width < 380;
+
+    return {
+      scrollContainer: {
+        paddingHorizontal: layout.contentPadding,
+        paddingVertical: layout.contentPadding,
+      },
+      switcherContainer: {
+        maxWidth: cardMaxWidth,
+        alignSelf: 'stretch' as const,
+        alignItems: layout.width < 520 ? ('flex-start' as const) : ('flex-end' as const),
+      },
+      card: {
+        maxWidth: cardMaxWidth,
+        padding: layout.isSmallPhone ? 20 : layout.isLargeTablet ? 28 : 24,
+        gap: layout.isSmallPhone ? 20 : 24,
+      },
+      tabRow: stackTabs
+        ? {
+            flexDirection: 'column' as const,
+            gap: 8,
+            padding: 6,
+          }
+        : {
+            paddingHorizontal: layout.width < 520 ? 6 : 4,
+          },
+      tabButton: stackTabs
+        ? { width: '100%' as const }
+        : { flex: 1 },
+      tabButtonText: stackTabs ? { paddingVertical: 8 } : {},
+      dividerSection: stackDivider
+        ? {
+            flexDirection: 'column' as const,
+            gap: 8,
+            alignItems: 'stretch' as const,
+          }
+        : {},
+      divider: stackDivider ? { width: '100%' as const } : {},
+      secondaryActions: stackSecondary
+        ? {
+            flexDirection: 'column' as const,
+            gap: 8,
+            alignItems: 'stretch' as const,
+          }
+        : {
+            gap: 8,
+          },
+      noticeText: stackSecondary ? { textAlign: 'center' as const } : {},
+      lockMessage: stackSecondary ? { textAlign: 'center' as const } : {},
+    };
+  }, [layout]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={[styles.scrollContainer, responsiveStyles.scrollContainer]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.switcherContainer}>
+        <View style={[styles.switcherContainer, responsiveStyles.switcherContainer]}>
           <LanguageSwitcher />
         </View>
-        <View style={styles.card}>
+        <View style={[styles.card, responsiveStyles.card]}>
           <LoginHeader subtitle={greeting ?? t('login.subtitle')} />
 
           {lockMessage ? (
-            <Text style={styles.lockMessage}>{lockMessage}</Text>
+            <Text style={[styles.lockMessage, responsiveStyles.lockMessage]}>
+              {lockMessage}
+            </Text>
           ) : null}
 
-          <View style={styles.tabRow}>
+          <View style={[styles.tabRow, responsiveStyles.tabRow]}>
             {authTabs.map(tab => {
               const isActive = tab.id === activeTab;
               return (
@@ -209,13 +274,17 @@ export const LoginScreen: React.FC = () => {
                   key={tab.id}
                   onPress={() => changeTab(tab.id)}
                   accessibilityRole="button"
-                  style={[styles.tabButton, isActive && styles.tabButtonActive]}
+                  style={[
+                    styles.tabButton,
+                    responsiveStyles.tabButton,
+                    isActive && styles.tabButtonActive,
+                  ]}
                 >
                   <Text
                     style={
                       isActive
-                        ? styles.tabButtonTextActive
-                        : styles.tabButtonText
+                        ? [styles.tabButtonTextActive, responsiveStyles.tabButtonText]
+                        : [styles.tabButtonText, responsiveStyles.tabButtonText]
                     }
                   >
                     {tab.label}
@@ -253,10 +322,10 @@ export const LoginScreen: React.FC = () => {
 
           {biometricsEnabled ? (
             <>
-              <View style={styles.dividerSection}>
-                <View style={styles.divider} />
+              <View style={[styles.dividerSection, responsiveStyles.dividerSection]}>
+                <View style={[styles.divider, responsiveStyles.divider]} />
                 <Text style={styles.dividerText}>{t('common.or')}</Text>
-                <View style={styles.divider} />
+                <View style={[styles.divider, responsiveStyles.divider]} />
               </View>
 
               <BiometricLoginButton
@@ -267,7 +336,7 @@ export const LoginScreen: React.FC = () => {
               />
             </>
           ) : biometricsSupported ? (
-            <Text style={styles.noticeText}>
+            <Text style={[styles.noticeText, responsiveStyles.noticeText]}>
               {t('login.prompts.biometricSetup')}
             </Text>
           ) : null}
