@@ -5,9 +5,12 @@ import {
   FlatList,
   Pressable,
   ScrollView,
+  StyleProp,
   StyleSheet,
   Text,
+  TextStyle,
   View,
+  ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
@@ -23,6 +26,7 @@ import {
 import { MembershipPlan } from '../types/auth';
 import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 type MembershipScreenProps = {
   onBack?: () => void;
@@ -52,6 +56,13 @@ const formatPlanPrice = (
   }
 };
 
+type PlanCardLayoutStyles = {
+  card?: StyleProp<ViewStyle>;
+  header?: StyleProp<ViewStyle>;
+  name?: StyleProp<TextStyle>;
+  price?: StyleProp<TextStyle>;
+};
+
 const PlanCard: React.FC<{
   plan: MembershipPlan;
   selected: boolean;
@@ -60,6 +71,7 @@ const PlanCard: React.FC<{
   descriptionLabel: string;
   featureLabel: string;
   intervalLabel?: string;
+  layoutStyles?: PlanCardLayoutStyles;
 }> = ({
   plan,
   selected,
@@ -68,17 +80,22 @@ const PlanCard: React.FC<{
   descriptionLabel,
   featureLabel,
   intervalLabel,
+  layoutStyles,
 }) => {
   return (
     <Pressable
       onPress={() => onSelect(plan.id)}
-      style={[styles.planCard, selected ? styles.planCardSelected : null]}
+      style={[
+        styles.planCard,
+        layoutStyles?.card,
+        selected ? styles.planCardSelected : null,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={`${plan.name} ${selected ? 'selected' : ''}`.trim()}
     >
-      <View style={styles.planCardHeader}>
-        <Text style={styles.planName}>{plan.name}</Text>
-        <Text style={styles.planPrice}>
+      <View style={[styles.planCardHeader, layoutStyles?.header]}>
+        <Text style={[styles.planName, layoutStyles?.name]}>{plan.name}</Text>
+        <Text style={[styles.planPrice, layoutStyles?.price]}>
           {formatPlanPrice(plan, locale, intervalLabel)}
         </Text>
       </View>
@@ -107,6 +124,56 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
   const { t, language } = useLocalization();
   const { getSessionToken, refreshSession } = useAuthContext();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const layout = useResponsiveLayout();
+  const numColumns = layout.isLargeTablet ? 3 : layout.isTablet ? 2 : 1;
+  const responsiveStyles = useMemo(() => ({
+    container: {
+      paddingHorizontal: layout.contentPadding,
+      paddingTop: layout.contentPadding,
+      paddingBottom: Math.max(layout.contentPadding, 40),
+      width: '100%',
+      alignSelf: 'center' as const,
+      maxWidth: layout.maxContentWidth,
+    },
+    brandWrapper: layout.isTablet ? { alignItems: 'center' as const } : {},
+    header: layout.isTablet
+      ? { alignItems: 'center' as const, gap: 12 }
+      : {},
+    title: layout.isTablet ? { fontSize: 28, textAlign: 'center' as const } : {},
+    subtitle: layout.isTablet
+      ? { textAlign: 'center' as const, fontSize: 16 }
+      : {},
+    backButton: layout.isTablet ? { alignSelf: 'center' as const } : {},
+    loadingState: layout.width < 520 ? { alignItems: 'center' as const } : {},
+    errorState: layout.width < 520 ? { alignItems: 'stretch' as const } : {},
+    primaryButton:
+      layout.width < 520
+        ? { width: '100%' as const, alignSelf: 'stretch' as const }
+        : layout.isTablet
+        ? { alignSelf: 'center' as const, minWidth: 320 }
+        : { alignSelf: 'stretch' as const },
+    secondaryButton: layout.width < 520 ? { width: '100%' as const } : {},
+  }), [layout]);
+  const planCardLayoutStyles = useMemo(
+    () => ({
+      card: numColumns > 1 ? { flex: 1, minWidth: 0 } : undefined,
+      header:
+        layout.width < 520
+          ? {
+              flexDirection: 'column' as const,
+              alignItems: 'flex-start' as const,
+              gap: 8,
+            }
+          : { alignItems: 'center' as const },
+      name: layout.width < 520 ? { fontSize: 16 } : {},
+      price: layout.width < 520 ? { fontSize: 18 } : {},
+    }),
+    [layout.width, numColumns],
+  );
+  const planColumnStyle = useMemo<StyleProp<ViewStyle>>(
+    () => (numColumns > 1 ? { gap: 16 } : undefined),
+    [numColumns],
+  );
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -155,9 +222,10 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
             ? intervalLabels[item.interval] ?? item.interval
             : undefined
         }
+        layoutStyles={planCardLayoutStyles}
       />
     ),
-    [intervalLabels, locale, selectedPlanId, t],
+    [intervalLabels, locale, planCardLayoutStyles, selectedPlanId, t],
   );
 
   const renderSeparator = useCallback(
@@ -263,27 +331,31 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, responsiveStyles.container]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.brandWrapper}>
+        <View style={[styles.brandWrapper, responsiveStyles.brandWrapper]}>
           <BrandLogo orientation="horizontal" />
         </View>
-        <View style={styles.header}>
+        <View style={[styles.header, responsiveStyles.header]}>
           <Pressable
             onPress={onBack}
             accessibilityRole="button"
             accessibilityLabel={headerActionLabel}
-            style={styles.backButton}
+            style={[styles.backButton, responsiveStyles.backButton]}
           >
             <Text style={styles.backButtonText}>{headerActionLabel}</Text>
           </Pressable>
-          <Text style={styles.title}>{t('membership.screen.title')}</Text>
-          <Text style={styles.subtitle}>{t('membership.screen.subtitle')}</Text>
+          <Text style={[styles.title, responsiveStyles.title]}>
+            {t('membership.screen.title')}
+          </Text>
+          <Text style={[styles.subtitle, responsiveStyles.subtitle]}>
+            {t('membership.screen.subtitle')}
+          </Text>
         </View>
 
         {loading ? (
-          <View style={styles.loadingState}>
+          <View style={[styles.loadingState, responsiveStyles.loadingState]}>
             <ActivityIndicator color={COLORS.primary} />
             <Text style={styles.loadingText}>
               {t('membership.screen.loading')}
@@ -292,10 +364,10 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         ) : null}
 
         {error ? (
-          <View style={styles.errorState}>
+          <View style={[styles.errorState, responsiveStyles.errorState]}>
             <Text style={styles.errorText}>{error}</Text>
             <Pressable
-              style={styles.secondaryButton}
+              style={[styles.secondaryButton, responsiveStyles.secondaryButton]}
               onPress={loadPlans}
               accessibilityRole="button"
             >
@@ -317,12 +389,15 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
             renderItem={renderPlan}
             ItemSeparatorComponent={renderSeparator}
             scrollEnabled={false}
+            numColumns={numColumns}
+            columnWrapperStyle={planColumnStyle}
           />
         ) : null}
 
         <Pressable
           style={[
             styles.primaryButton,
+            responsiveStyles.primaryButton,
             (!selectedPlan || processing) && styles.buttonDisabled,
           ]}
           disabled={!selectedPlan || processing}

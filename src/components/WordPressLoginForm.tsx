@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -12,6 +12,7 @@ import {
 import { useLocalization } from '../contexts/LocalizationContext';
 import { COLORS } from '../config/theme';
 import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface WordPressLoginFormProps {
   loading?: boolean;
@@ -32,6 +33,28 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { t } = useLocalization();
+  const layout = useResponsiveLayout();
+  const responsiveStyles = useMemo(() => {
+    const stackSecondary = layout.width < 420;
+    return {
+      container: {
+        gap: layout.isSmallPhone ? 14 : 16,
+      },
+      input: layout.isSmallPhone ? { paddingVertical: 10 } : {},
+      secondaryActions: stackSecondary
+        ? {
+            flexDirection: 'column' as const,
+            alignItems: 'stretch' as const,
+            gap: 8,
+            paddingHorizontal: 0,
+            justifyContent: 'flex-start' as const,
+          }
+        : {
+            gap: 12,
+          },
+      linkText: stackSecondary ? { textAlign: 'center' as const } : {},
+    };
+  }, [layout]);
 
   const handleSubmit = () => {
     if (loading) {
@@ -47,7 +70,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
     <KeyboardAvoidingView
       behavior={Platform.select({ ios: 'padding', android: undefined })}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
-      style={styles.container}
+      style={[styles.container, responsiveStyles.container]}
     >
       <View style={styles.formGroup}>
         <Text style={styles.label}>{t('auth.forms.emailLabel')}</Text>
@@ -59,7 +82,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
           textContentType="emailAddress"
           autoComplete="email"
           keyboardType="email-address"
-          style={styles.input}
+          style={[styles.input, responsiveStyles.input]}
           placeholder={t('auth.forms.emailPlaceholder')}
         />
       </View>
@@ -70,7 +93,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!passwordVisible}
-            style={styles.passwordInput}
+            style={[styles.passwordInput, responsiveStyles.input]}
             placeholder={t('auth.forms.passwordPlaceholder')}
             autoCapitalize="none"
             autoCorrect={false}
@@ -102,16 +125,20 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
         )}
       </Pressable>
 
-      <View style={styles.secondaryActions}>
+      <View style={[styles.secondaryActions, responsiveStyles.secondaryActions]}>
         <Pressable
           onPress={onForgotPassword}
           hitSlop={8}
           accessibilityRole="link"
         >
-          <Text style={styles.linkText}>{t('auth.forms.forgotPassword')}</Text>
+          <Text style={[styles.linkText, responsiveStyles.linkText]}>
+            {t('auth.forms.forgotPassword')}
+          </Text>
         </Pressable>
         <Pressable onPress={onRegister} hitSlop={8} accessibilityRole="link">
-          <Text style={styles.linkText}>{t('auth.forms.register')}</Text>
+          <Text style={[styles.linkText, responsiveStyles.linkText]}>
+            {t('auth.forms.register')}
+          </Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { COLORS } from '../config/theme';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface PinLoginFormProps {
   hasPin: boolean;
@@ -35,6 +36,26 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
     hasPin ? 'login' : 'create',
   );
   const { t } = useLocalization();
+  const layout = useResponsiveLayout();
+  const responsiveStyles = useMemo(() => {
+    const stackHeader = layout.width < 420;
+    return {
+      container: {
+        padding: layout.isSmallPhone ? 16 : layout.isLargeTablet ? 24 : 20,
+        gap: layout.isSmallPhone ? 14 : 16,
+      },
+      headerRow: stackHeader
+        ? {
+            flexDirection: 'column' as const,
+            alignItems: 'flex-start' as const,
+            gap: 8,
+          }
+        : {},
+      input: layout.isSmallPhone ? { paddingVertical: 10 } : {},
+      primaryButton: layout.width < 420 ? { width: '100%' as const } : {},
+      dangerButton: layout.width < 420 ? { alignSelf: 'stretch' as const } : {},
+    };
+  }, [layout]);
 
   useEffect(() => {
     setMode(hasPin ? 'login' : 'create');
@@ -81,8 +102,8 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
   };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.headerRow}>
+    <View style={[styles.container, responsiveStyles.container]}>
+      <View style={[styles.headerRow, responsiveStyles.headerRow]}>
         <Text style={styles.title}>
           {mode === 'login'
             ? t('auth.pinForm.titleLogin')
@@ -110,7 +131,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
           onChangeText={setPin}
           keyboardType="number-pad"
           secureTextEntry
-          style={styles.input}
+          style={[styles.input, responsiveStyles.input]}
           maxLength={8}
           placeholder="••••"
         />
@@ -124,7 +145,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
             onChangeText={setConfirmationPin}
             keyboardType="number-pad"
             secureTextEntry
-            style={styles.input}
+            style={[styles.input, responsiveStyles.input]}
             maxLength={8}
             placeholder="••••"
           />
@@ -143,6 +164,7 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
         onPress={handlePrimaryAction}
         style={[
           styles.primaryButton,
+          responsiveStyles.primaryButton,
           !canSubmit && styles.primaryButtonDisabled,
         ]}
         disabled={!canSubmit}
@@ -159,7 +181,11 @@ export const PinLoginForm: React.FC<PinLoginFormProps> = ({
       </Pressable>
 
       {mode === 'login' && hasPin && onResetPin && canManagePin ? (
-        <Pressable onPress={onResetPin} hitSlop={8} style={styles.dangerButton}>
+        <Pressable
+          onPress={onResetPin}
+          hitSlop={8}
+          style={[styles.dangerButton, responsiveStyles.dangerButton]}
+        >
           <Text style={styles.dangerButtonText}>
             {t('auth.pinForm.removePin')}
           </Text>

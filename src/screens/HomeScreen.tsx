@@ -24,6 +24,7 @@ import {
   getUserFullName,
   getUserInitials,
 } from '../utils/user';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 export const getMaxDiscount = (
   benefits: MembershipBenefit[],
@@ -141,6 +142,78 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     [t],
   );
 
+  const layout = useResponsiveLayout();
+  const responsiveStyles = useMemo(() => {
+    const stackProfile = layout.width < 640;
+    const stackNotificationActions = layout.width < 420;
+    const stackQuickActions = layout.width < 520;
+    const avatarSize = layout.isTablet ? 80 : layout.isSmallPhone ? 56 : 64;
+
+    return {
+      container: {
+        paddingHorizontal: layout.contentPadding,
+        paddingVertical: layout.contentPadding,
+        width: '100%',
+        alignSelf: 'center' as const,
+        maxWidth: layout.maxContentWidth,
+      },
+      switcherWrapper: stackProfile
+        ? { alignSelf: 'stretch', alignItems: 'flex-end' as const }
+        : {},
+      brandHeader: layout.isTablet ? { alignItems: 'center' as const } : {},
+      profileHeader: {
+        flexDirection: stackProfile ? ('column' as const) : ('row' as const),
+        alignItems: stackProfile ? ('flex-start' as const) : ('center' as const),
+        gap: stackProfile ? 12 : 16,
+      },
+      avatar: {
+        width: avatarSize,
+        height: avatarSize,
+        borderRadius: avatarSize / 2,
+      },
+      profileDetails: stackProfile ? { alignSelf: 'stretch' as const } : {},
+      title: {
+        fontSize: layout.isTablet ? 28 : layout.isSmallPhone ? 22 : 24,
+      },
+      subtitle: layout.isTablet ? { fontSize: 18 } : {},
+      notificationBanner: stackNotificationActions ? { gap: 16, padding: 20 } : {},
+      notificationBannerActions: stackNotificationActions
+        ? {
+            flexDirection: 'column' as const,
+            alignItems: 'stretch' as const,
+            gap: 8,
+          }
+        : {},
+      notificationAction: stackNotificationActions
+        ? { alignItems: 'center' as const }
+        : {},
+      notificationSettings: {
+        padding: layout.isSmallPhone ? 16 : layout.isLargeTablet ? 24 : 20,
+      },
+      manageProfileButton: stackProfile
+        ? { alignSelf: 'stretch' as const }
+        : {},
+      button:
+        layout.width < 520
+          ? { alignSelf: 'stretch' as const, width: '100%' as const }
+          : { alignSelf: 'center' as const },
+      sectionTitle: layout.isTablet ? { fontSize: 20 } : {},
+      quickActionsContainer: layout.isTablet ? { gap: 16 } : {},
+      quickActionsRow: stackQuickActions
+        ? { flexDirection: 'column' as const, gap: 12 }
+        : {},
+      quickActionButton: stackQuickActions
+        ? {
+            width: '100%' as const,
+            alignItems: 'center' as const,
+          }
+        : {
+            minWidth: 140,
+          },
+      quickActionLabel: stackQuickActions ? { textAlign: 'center' as const } : {},
+    };
+  }, [layout]);
+
   const handleQuickAction = useCallback(
     (action: QuickAction) => {
       if (action.key === 'upgrade') {
@@ -242,27 +315,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, responsiveStyles.container]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.switcherWrapper}>
+        <View style={[styles.switcherWrapper, responsiveStyles.switcherWrapper]}>
           <LanguageSwitcher />
         </View>
-        <View style={styles.brandHeader}>
-          <BrandLogo orientation="vertical" />
+        <View style={[styles.brandHeader, responsiveStyles.brandHeader]}>
+          <BrandLogo orientation={layout.isTablet ? 'horizontal' : 'vertical'} />
         </View>
-        <View style={styles.profileHeader}>
+        <View style={[styles.profileHeader, responsiveStyles.profileHeader]}>
           {user?.avatarUrl ? (
-            <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
+            <Image
+              source={{ uri: user.avatarUrl }}
+              style={[styles.avatar, responsiveStyles.avatar]}
+            />
           ) : displayName ? (
-            <View style={styles.avatarFallback}>
+            <View style={[styles.avatarFallback, responsiveStyles.avatar]}>
               <Text style={styles.avatarInitials}>{getUserInitials(user)}</Text>
             </View>
           ) : null}
-          <View style={styles.profileDetails}>
-            <Text style={styles.title}>{greeting}</Text>
+          <View style={[styles.profileDetails, responsiveStyles.profileDetails]}>
+            <Text style={[styles.title, responsiveStyles.title]}>{greeting}</Text>
             {user?.email ? (
-              <Text style={styles.subtitle}>{user.email}</Text>
+              <Text style={[styles.subtitle, responsiveStyles.subtitle]}>
+                {user.email}
+              </Text>
             ) : null}
             {membership ? (
               <View style={styles.planSummary}>
@@ -282,7 +360,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         {onManageProfile ? (
           <Pressable
             onPress={onManageProfile}
-            style={styles.manageProfileButton}
+            style={[styles.manageProfileButton, responsiveStyles.manageProfileButton]}
             accessibilityRole="button"
           >
             <Text style={styles.manageProfileButtonText}>
@@ -295,6 +373,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <View
             style={[
               styles.notificationBanner,
+              responsiveStyles.notificationBanner,
               activeNotification.category === 'promotion'
                 ? styles.notificationBannerPromotion
                 : styles.notificationBannerReminder,
@@ -315,13 +394,19 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 </Text>
               ) : null}
             </View>
-            <View style={styles.notificationBannerActions}>
+            <View
+              style={[
+                styles.notificationBannerActions,
+                responsiveStyles.notificationBannerActions,
+              ]}
+            >
               {activeNotification.target ? (
                 <Pressable
                   onPress={handleNotificationNavigate}
                   style={[
                     styles.notificationAction,
                     styles.notificationActionPrimary,
+                    responsiveStyles.notificationAction,
                   ]}
                   accessibilityRole="button"
                 >
@@ -335,6 +420,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 style={[
                   styles.notificationAction,
                   styles.notificationActionSecondary,
+                  responsiveStyles.notificationAction,
                 ]}
                 accessibilityRole="button"
               >
@@ -361,8 +447,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           benefits={membership?.benefits ?? []}
         />
 
-        <View style={styles.notificationSettings}>
-          <Text style={styles.sectionTitle}>
+        <View style={[styles.notificationSettings, responsiveStyles.notificationSettings]}>
+          <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
             {t('home.notifications.heading')}
           </Text>
           <View style={styles.preferenceRow}>
@@ -408,19 +494,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           ) : null}
         </View>
 
-        <View style={styles.quickActionsContainer}>
-          <Text style={styles.sectionTitle}>
+        <View
+          style={[styles.quickActionsContainer, responsiveStyles.quickActionsContainer]}
+        >
+          <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
             {t('home.quickActions.heading')}
           </Text>
-          <View style={styles.quickActionsRow}>
+          <View style={[styles.quickActionsRow, responsiveStyles.quickActionsRow]}>
             {quickActions.map(action => (
               <Pressable
                 key={action.key}
                 onPress={() => handleQuickAction(action)}
-                style={styles.quickActionButton}
+                style={[styles.quickActionButton, responsiveStyles.quickActionButton]}
                 accessibilityRole="button"
               >
-                <Text style={styles.quickActionLabel}>{action.label}</Text>
+                <Text style={[styles.quickActionLabel, responsiveStyles.quickActionLabel]}>
+                  {action.label}
+                </Text>
               </Pressable>
             ))}
           </View>
@@ -428,7 +518,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         <Pressable
           onPress={logout}
-          style={styles.button}
+          style={[styles.button, responsiveStyles.button]}
           accessibilityRole="button"
         >
           <Text style={styles.buttonText}>{t('home.logout')}</Text>
