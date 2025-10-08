@@ -32,8 +32,18 @@ const normalizeHeaders = (headers?: HeadersInit): HeaderRecord => {
   return { ...(headers as HeaderRecord) };
 };
 
-const hasAuthorizationHeader = (headers: HeaderRecord): boolean =>
-  Object.keys(headers).some(key => key.toLowerCase() === 'authorization');
+const hasHeader = (headers: HeaderRecord, name: string): boolean =>
+  Object.keys(headers).some(key => key.toLowerCase() === name.toLowerCase());
+
+const ensureHeader = (
+  headers: HeaderRecord,
+  name: string,
+  value: string,
+): void => {
+  if (!hasHeader(headers, name)) {
+    headers[name] = value;
+  }
+};
 
 const getStoredWooCommerceAuthHeader = async (): Promise<string | null> => {
   if (typeof cachedWooCommerceAuthHeader !== 'undefined') {
@@ -69,19 +79,18 @@ const getStoredBearerToken = async (): Promise<string | null> => {
 const ensureAuthorizationHeader = async (
   headers: HeaderRecord,
 ): Promise<void> => {
-  if (hasAuthorizationHeader(headers)) {
-    return;
-  }
-
   const bearerToken = await getStoredBearerToken();
   if (bearerToken) {
-    headers.Authorization = `Bearer ${bearerToken}`;
+    const bearerHeader = `Bearer ${bearerToken}`;
+    ensureHeader(headers, 'Authorization', bearerHeader);
+    ensureHeader(headers, 'X-Authorization', bearerHeader);
     return;
   }
 
   const wooAuthHeader = await getStoredWooCommerceAuthHeader();
   if (wooAuthHeader) {
-    headers.Authorization = wooAuthHeader;
+    ensureHeader(headers, 'Authorization', wooAuthHeader);
+    ensureHeader(headers, 'X-Authorization', wooAuthHeader);
   }
 };
 

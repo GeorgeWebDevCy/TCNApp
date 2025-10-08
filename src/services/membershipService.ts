@@ -87,7 +87,9 @@ const buildHeaders = (token?: string): Record<string, string> => {
   };
 
   if (token) {
-    headers.Authorization = `Bearer ${token}`;
+    const bearer = `Bearer ${token}`;
+    headers.Authorization = bearer;
+    headers['X-Authorization'] = bearer;
   }
 
   return headers;
