@@ -67,6 +67,21 @@ These settings persist in the `gn_login_api_settings` option. A compatibility sh
 - Adds **MLM Dashboard** and **MLM Genealogy** entries to WooCommerce My Account navigation (`/my-account/tcn-member-dashboard/`, `/my-account/tcn-genealogy/`).
 - REST endpoints under `tcn-mlm/v1/*` expose member profiles, genealogy trees, and commission summaries (`/member`, `/genealogy`, `/commissions`) that power the TCNApp dashboards.
 
+## 🏪 Vendor tiers & onboarding
+
+- Activation seeds two default vendor tiers—**Sapphire** and **Diamond**—into the `tcn_vendor_tiers` option so the mobile client and admin screens can surface consistent messaging.
+- Each tier definition tracks the headline benefits used by the marketing site and mobile registration form:
+
+  | Vendor Tier | Discounts (Gold / Platinum / Black) | Free Promotion Allowance | Fees |
+  | ----------- | ----------------------------------- | ------------------------ | ---- |
+  | Sapphire    | 2.5% / 5% / 10%                     | 1 per quarter            | ฿0   |
+  | Diamond     | 5% / 10% / 20%                      | 1 per month              | ฿0   |
+
+- The plugin exposes a read-only endpoint (`GET /wp-json/gn/v1/vendors/tiers`) that returns the tier catalogue with marketing copy so registration flows can render the benefits selector without hard-coding strings.
+- `POST /wp-json/gn/v1/register` now accepts an optional `vendor_tier` field whenever `account_type` is `vendor`. Unknown tiers trigger `400 gn_invalid_vendor_tier` and fall back to the default (`sapphire`) when omitted.
+- Vendor tier assignments persist to user meta and surface alongside `account_type` inside `/wp-json/gn/v1/me`, `/wp-json/gn/v1/login`, and the admin moderation endpoints so the app can tailor dashboards immediately after approval.
+- Administrators can update a vendor’s tier from the **TCN Platform → Vendors** list or via the REST endpoint `POST /wp-json/tcn/v1/admin/vendors/{id}/tier` (documented in the reference). Changes are logged to the activity log for auditability.
+
 ## 📱 TCNApp Mobile Alignment
 
 TCN Platform keeps the WooCommerce catalogue aligned with the membership products consumed by the TCNApp mobile client. Default pricing now mirrors the THB membership matrix so the web checkout and in-app upsells stay consistent:
