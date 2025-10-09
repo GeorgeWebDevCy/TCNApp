@@ -49,7 +49,7 @@ export const getMaxDiscount = (
 };
 
 type QuickAction = {
-  key: 'vendors' | 'upgrade';
+  key: 'vendors' | 'upgrade' | 'analytics';
   label: string;
   message: string;
 };
@@ -57,11 +57,13 @@ type QuickAction = {
 type HomeScreenProps = {
   onManageProfile?: () => void;
   onUpgradeMembership?: () => void;
+  onViewAnalytics?: () => void;
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onManageProfile,
   onUpgradeMembership,
+  onViewAnalytics,
 }) => {
   const { state, logout } = useAuthContext();
   const user = state.user;
@@ -153,6 +155,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         message: t('home.quickActions.viewVendorsMessage'),
       },
       {
+        key: 'analytics',
+        label: t('home.quickActions.viewAnalytics'),
+        message: t('home.quickActions.viewAnalyticsMessage'),
+      },
+      {
         key: 'upgrade',
         label: t('home.quickActions.upgradeOptions'),
         message: t('home.quickActions.upgradeOptionsMessage'),
@@ -237,15 +244,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleQuickAction = useCallback(
     (action: QuickAction) => {
       if (action.key === 'upgrade') {
-        if (onUpgradeMembership) {
-          onUpgradeMembership();
-          return;
-        }
+      if (onUpgradeMembership) {
+        onUpgradeMembership();
+        return;
       }
+    } else if (action.key === 'analytics') {
+      if (onViewAnalytics) {
+        onViewAnalytics();
+        return;
+      }
+    }
 
-      Alert.alert(t('home.quickActions.comingSoonTitle'), action.message);
-    },
-    [onUpgradeMembership, t],
+    Alert.alert(t('home.quickActions.comingSoonTitle'), action.message);
+  },
+  [onUpgradeMembership, onViewAnalytics, t],
   );
 
   const recentTransactions = useMemo(

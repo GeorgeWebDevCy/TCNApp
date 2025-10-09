@@ -18,6 +18,8 @@ const TRANSACTION_ENDPOINTS = {
   lookupMember: '/wp-json/gn/v1/transactions/lookup-member',
   calculateDiscount: '/wp-json/gn/v1/transactions/calculate-discount',
   recordTransaction: '/wp-json/gn/v1/transactions',
+  memberTransactions: '/wp-json/gn/v1/transactions/member',
+  vendorTransactions: '/wp-json/gn/v1/transactions/vendor',
 };
 
 const buildHeaders = (token?: string | null): Record<string, string> => {
@@ -214,6 +216,52 @@ const parseTransactionRecord = (
   };
 };
 
+const parseTransactionList = (
+  payload: unknown,
+  fallbackStatus: TransactionRecord['status'] = 'completed',
+): TransactionRecord[] => {
+  if (!Array.isArray(payload)) {
+    return [];
+  }
+
+  return payload
+    .map((item, index) => {
+      if (!item || typeof item !== 'object') {
+        return null;
+      }
+
+      const base: TransactionRecord = {
+        id: `remote-${index}`,
+        memberToken: '',
+        status: fallbackStatus,
+        createdAt: new Date(0).toISOString(),
+        discountPercentage: 0,
+        discountAmount: 0,
+        netAmount: 0,
+        grossAmount: 0,
+        currency: null,
+        membershipTier: null,
+        vendorTier: null,
+        message: null,
+        vendorName: null,
+        memberName: null,
+        membership: null,
+        errorMessage: null,
+      };
+
+      try {
+        return parseTransactionRecord(item as Record<string, unknown>, base);
+      } catch (error) {
+        deviceLog.warn('transaction.parseTransactionList.error', {
+          message:
+            error instanceof Error ? error.message : 'Unable to parse record',
+        });
+        return null;
+      }
+    })
+    .filter((record): record is TransactionRecord => Boolean(record));
+};
+
 const performRequest = async <T>(
   endpoint: string,
   init: RequestInit,
@@ -374,5 +422,55 @@ export const recordTransaction = async (
       status: 'failed',
       errorMessage: message,
     };
+  }
+};
+
+export const fetchMemberTransactions = async (
+  authToken?: string | null,
+): Promise<TransactionRecord[]> => {
+  try {
+    const payload = await performRequest<unknown>(
+      TRANSACTION_ENDPOINTS.memberTransactions,
+      {
+        method: 'GET',
+        headers: buildHeaders(authToken ?? undefined),
+      },
+    );
+
+    const records = parseTransactionList(payload);
+    deviceLog.debug('transaction.fetchMemberTransactions.success', {
+      count: records.length,
+    });
+    return records;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to fetch member transactions.';
+    deviceLog.warn('transaction.fetchMemberTransactions.error', { message });
+    return [];
+  }
+};
+
+export const fetchVendorTransactions = async (
+  authToken?: string | null,
+): Promise<TransactionRecord[]> => {
+  try {
+    const payload = await performRequest<unknown>(
+      TRANSACTION_ENDPOINTS.vendorTransactions,
+      {
+        method: 'GET',
+        headers: buildHeaders(authToken ?? undefined),
+      },
+    );
+
+    const records = parseTransactionList(payload);
+    deviceLog.debug('transaction.fetchVendorTransactions.success', {
+      count: records.length,
+    });
+    return records;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to fetch vendor transactions.';
+    deviceLog.warn('transaction.fetchVendorTransactions.error', { message });
+    return [];
   }
 };

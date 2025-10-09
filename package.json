@@ -27,7 +27,9 @@
     "react-native-onesignal": "^5.2.13",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-qrcode-svg": "^6.2.0",
-    "react-native-webview": "^13.8.4"
+    "react-native-svg": "^15.11.0",
+    "react-native-webview": "^13.8.4",
+    "victory-native": "^36.9.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
