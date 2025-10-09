@@ -16,6 +16,7 @@ import { MembershipCard } from '../components/MembershipCard';
 import { BrandLogo } from '../components/BrandLogo';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { useTransactionContext } from '../contexts/TransactionContext';
 import { useOneSignalNotifications } from '../notifications/OneSignalProvider';
 import { MembershipBenefit } from '../types/auth';
 import { COLORS } from '../config/theme';
@@ -66,6 +67,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const user = state.user;
   const membership = state.membership ?? state.user?.membership ?? null;
   const { t, language } = useLocalization();
+  const { transactions } = useTransactionContext();
   const {
     preferences,
     updatePreference,
@@ -228,6 +230,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             minWidth: 140,
           },
       quickActionLabel: stackQuickActions ? { textAlign: 'center' as const } : {},
+      transactionsCard: layout.isTablet ? { gap: 16 } : {},
     };
   }, [layout]);
 
@@ -244,6 +247,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     },
     [onUpgradeMembership, t],
   );
+
+  const recentTransactions = useMemo(
+    () => transactions.slice(0, 3),
+    [transactions],
+  );
+
+  const formatTransactionAmount = useCallback((value?: number | null) => {
+    if (!Number.isFinite(value ?? Number.NaN)) {
+      return '0.00';
+    }
+    return Number(value ?? 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }, []);
 
   const notificationTitle = useMemo(() => {
     if (!activeNotification) {
@@ -536,6 +554,69 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           </View>
         </View>
 
+        <View
+          style={[styles.transactionsCard, responsiveStyles.transactionsCard]}
+        >
+          <Text style={[styles.sectionTitle, responsiveStyles.sectionTitle]}>
+            {t('home.transactions.title')}
+          </Text>
+          {recentTransactions.length === 0 ? (
+            <Text style={styles.transactionsEmpty}>
+              {t('home.transactions.empty')}
+            </Text>
+          ) : (
+            recentTransactions.map(transaction => {
+              const statusKey = `home.transactions.status.${transaction.status}`;
+              const statusLabel = t(statusKey);
+              const statusStyle =
+                transaction.status === 'failed'
+                  ? styles.transactionStatusFailed
+                  : transaction.status === 'completed'
+                    ? styles.transactionStatusCompleted
+                    : styles.transactionStatusPending;
+              const vendorLabel = transaction.vendorName
+                ? transaction.vendorName
+                : t('home.transactions.defaultVendor');
+
+              return (
+                <View style={styles.transactionRow} key={transaction.id}>
+                  <View style={styles.transactionRowHeader}>
+                    <View>
+                      <Text style={styles.transactionRowTitle}>{vendorLabel}</Text>
+                      <Text style={styles.transactionRowMeta}>
+                        {t('home.transactions.savings', {
+                          replace: {
+                            discount: formatTransactionAmount(
+                              transaction.discountAmount ?? 0,
+                            ),
+                          },
+                        })}
+                      </Text>
+                    </View>
+                    <Text style={[styles.transactionStatus, statusStyle]}>
+                      {statusLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.transactionRowSummary}>
+                    {t('home.transactions.summary', {
+                      replace: {
+                        total: formatTransactionAmount(transaction.netAmount ?? 0),
+                        original: formatTransactionAmount(
+                          transaction.grossAmount ??
+                            Number(
+                              ((transaction.netAmount ?? 0) +
+                                (transaction.discountAmount ?? 0)).toFixed(2),
+                            ),
+                        ),
+                      },
+                    })}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         <Pressable
           onPress={logout}
           style={[styles.button, responsiveStyles.button]}
@@ -771,5 +852,63 @@ const styles = StyleSheet.create({
   quickActionLabel: {
     color: COLORS.infoText,
     fontWeight: '600',
+  },
+  transactionsCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    gap: 12,
+  },
+  transactionsEmpty: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  transactionRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.mutedBorder,
+    padding: 12,
+    gap: 8,
+  },
+  transactionRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  transactionRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  transactionRowMeta: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  transactionRowSummary: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  transactionStatus: {
+    fontSize: 12,
+    fontWeight: '600',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  transactionStatusPending: {
+    backgroundColor: COLORS.warningBackground,
+    color: COLORS.warningText,
+  },
+  transactionStatusCompleted: {
+    backgroundColor: COLORS.successBackground,
+    color: COLORS.successText,
+  },
+  transactionStatusFailed: {
+    backgroundColor: COLORS.errorBackground,
+    color: COLORS.errorText,
   },
 });
