@@ -1,5 +1,6 @@
 import { MEMBERSHIP_CONFIG } from '../config/membershipConfig';
-import { StripePaymentSession } from '../config/stripeConfig';
+// Note: We initialise Stripe PaymentSheet with a PaymentIntent client secret.
+// Customer and ephemeral key are optional when not using a saved-payment flow.
 import { MembershipPlan } from '../types/auth';
 import deviceLog from '../utils/deviceLog';
 import {
@@ -71,21 +72,22 @@ type MembershipPlansResponse = {
   plans?: WordPressMembershipPlan[];
 } & Record<string, unknown>;
 
-type BasePaymentSession = {
-  paymentIntentId?: string | null;
-  publishableKey?: string | null;
-};
-
-type PaidPaymentSession = BasePaymentSession &
-  StripePaymentSession & {
-    requiresPayment: true;
-  };
-
-type FreePaymentSession = BasePaymentSession & {
-  requiresPayment: false;
-};
-
-type PaymentSessionResponse = PaidPaymentSession | FreePaymentSession;
+type PaymentSessionResponse =
+  | {
+      requiresPayment: true;
+      paymentIntentClientSecret: string;
+      // Optional extras when using a Customer session
+      customerId?: string | null;
+      customerEphemeralKeySecret?: string | null;
+      // Helpful metadata
+      paymentIntentId?: string | null;
+      publishableKey?: string | null;
+    }
+  | {
+      requiresPayment: false;
+      paymentIntentId?: string | null;
+      publishableKey?: string | null;
+    };
 
 type ConfirmUpgradeResponse = {
   success: boolean;
@@ -289,8 +291,10 @@ type PaymentSessionApiResponse = {
   requires_payment?: boolean;
   paymentIntentId?: string | null;
   payment_intent?: string | null;
+  id?: string | null; // Stripe PI id when returning raw PaymentIntent
   paymentIntentClientSecret?: string | null;
   payment_intent_client_secret?: string | null;
+  client_secret?: string | null; // Stripe PI client secret when returning raw PaymentIntent
   customerId?: string | null;
   customer?: string | null;
   customerEphemeralKeySecret?: string | null;
@@ -343,16 +347,19 @@ export const createMembershipPaymentSession = async (
           ? payload.requires_payment
           : true;
 
-    const paymentIntentId =
-      payload.paymentIntentId ??
-      (typeof payload.payment_intent === 'string'
-        ? payload.payment_intent
-        : null);
-    const paymentIntentClientSecret =
-      payload.paymentIntentClientSecret ??
-      (typeof payload.payment_intent_client_secret === 'string'
-        ? payload.payment_intent_client_secret
-        : null);
+    const paymentIntentId = (() => {
+      if (typeof payload.paymentIntentId === 'string') return payload.paymentIntentId;
+      if (typeof payload.payment_intent === 'string') return payload.payment_intent;
+      if (typeof payload.id === 'string' && payload.id.startsWith('pi_')) return payload.id;
+      return null;
+    })();
+
+    const paymentIntentClientSecret = (() => {
+      if (typeof payload.paymentIntentClientSecret === 'string') return payload.paymentIntentClientSecret;
+      if (typeof payload.payment_intent_client_secret === 'string') return payload.payment_intent_client_secret;
+      if (typeof payload.client_secret === 'string') return payload.client_secret;
+      return null;
+    })();
     const customerId =
       payload.customerId ??
       (typeof payload.customer === 'string' ? payload.customer : null);
@@ -369,14 +376,12 @@ export const createMembershipPaymentSession = async (
 
     const normalizedPayload: PaymentSessionResponse = requiresPayment
       ? (() => {
-          if (
-            !paymentIntentClientSecret ||
-            !customerEphemeralKeySecret ||
-            !customerId
-          ) {
-            throw new Error('Incomplete payment session details received.');
+          if (!paymentIntentClientSecret) {
+            throw new Error('Missing payment intent client secret.');
           }
 
+          // For basic card collection we can initialise PaymentSheet with only the
+          // PaymentIntent client secret. Customer+ephemeral key are optional.
           return {
             requiresPayment: true,
             paymentIntentClientSecret,
