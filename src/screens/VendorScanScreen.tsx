@@ -24,7 +24,7 @@ import {
   TransactionRecord,
 } from '../types/transactions';
 import { COLORS } from '../config/theme';
-import { QrWebScanner } from '../components/QrWebScanner';
+import QrScanner from '../components/QrScanner';
 
 type VendorScanScreenProps = {
   onShowAnalytics?: () => void;
@@ -354,7 +354,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         ) : null}
 
         <View style={styles.cameraContainer}>
-          <QrWebScanner
+          <QrScanner
             style={{ flex: 1 }}
             onScan={(text: string) => {
               setManualToken(text);
