@@ -112,6 +112,19 @@ export const translations: Record<Language, TranslationDictionary> = {
         vendorOption: 'Vendor',
         vendorDescription:
           'Vendors require admin approval before they can access the app.',
+        vendorTierLabel: 'Select your vendor tier',
+        vendorTierLoading: 'Loading vendor tiers…',
+        vendorTierError:
+          'Unable to load the latest vendor tiers. Default options are shown below.',
+        vendorTierRequired: 'Please select a vendor tier.',
+        vendorTierDiscounts: 'Discounts: {{summary}}',
+        vendorTierPromotions: 'Promotions: {{summary}}',
+        vendorTierSapphireDescription:
+          'Base tier with quarterly promotional features and core discounts.',
+        vendorTierDiamondDescription:
+          'Premium visibility with monthly promotions and the highest savings.',
+        vendorTierSapphirePromotions: '1 free promotion per quarter',
+        vendorTierDiamondPromotions: '1 free promotion per month',
         submit: 'Create account',
         cancel: 'Cancel',
         closeAfterSuccess: 'Close',
@@ -521,6 +534,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       resetPassword: 'Unable to reset password.',
       registerAccount: 'Unable to register a new account.',
       passwordMismatch: 'Passwords do not match.',
+      vendorTierRequired: 'Please select a vendor tier.',
       changePassword: 'Unable to change password.',
       pinMismatch: 'PIN entries do not match.',
       vendorPending: 'Your vendor account is pending approval.',
@@ -632,6 +646,19 @@ export const translations: Record<Language, TranslationDictionary> = {
         vendorOption: 'ร้านค้า',
         vendorDescription:
           'ร้านค้าต้องได้รับการอนุมัติโดยผู้ดูแลระบบก่อนจึงจะเข้าใช้งานได้.',
+        vendorTierLabel: 'เลือกระดับร้านค้า',
+        vendorTierLoading: 'กำลังโหลดระดับร้านค้า…',
+        vendorTierError:
+          'ไม่สามารถโหลดข้อมูลล่าสุดได้ จะแสดงตัวเลือกเริ่มต้นแทน',
+        vendorTierRequired: 'โปรดเลือกระดับร้านค้า',
+        vendorTierDiscounts: 'ส่วนลด: {{summary}}',
+        vendorTierPromotions: 'โปรโมชัน: {{summary}}',
+        vendorTierSapphireDescription:
+          'ระดับพื้นฐานพร้อมโปรโมชันรายไตรมาสและส่วนลดมาตรฐาน',
+        vendorTierDiamondDescription:
+          'ความโดดเด่นระดับพรีเมียม โปรโมชันรายเดือน และส่วนลดสูงสุด',
+        vendorTierSapphirePromotions: 'โปรโมชันฟรี 1 ครั้งต่อไตรมาส',
+        vendorTierDiamondPromotions: 'โปรโมชันฟรี 1 ครั้งต่อเดือน',
         submit: 'สร้างบัญชี',
         cancel: 'ยกเลิก',
         closeAfterSuccess: 'ปิด',
@@ -1033,6 +1060,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       resetPassword: 'ไม่สามารถรีเซ็ตรหัสผ่านได้',
       registerAccount: 'ไม่สามารถสร้างบัญชีใหม่ได้',
       passwordMismatch: 'รหัสผ่านไม่ตรงกัน',
+      vendorTierRequired: 'โปรดเลือกระดับร้านค้า',
       changePassword: 'ไม่สามารถเปลี่ยนรหัสผ่านได้',
       pinMismatch: 'พินไม่ตรงกัน',
       vendorPending: 'บัญชีร้านค้าของคุณกำลังรอการอนุมัติ.',

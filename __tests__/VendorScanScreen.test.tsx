@@ -27,6 +27,7 @@ jest.mock('../src/services/transactionService', () => ({
     netAmount: 950,
     grossAmount: 1000,
     currency: 'THB',
+    discountDescriptor: { type: 'percentage', value: 5 },
   }),
   recordTransaction: jest.fn().mockResolvedValue({
     id: 'remote-1',
@@ -38,6 +39,7 @@ jest.mock('../src/services/transactionService', () => ({
     netAmount: 950,
     grossAmount: 1000,
     createdAt: new Date().toISOString(),
+    discountDescriptor: { type: 'percentage', value: 5 },
   }),
 }));
 
@@ -64,7 +66,7 @@ jest.mock('../src/contexts/LocalizationContext', () => ({
 describe('VendorScanScreen', () => {
   beforeEach(() => {
     (useAuthContext as jest.Mock).mockReturnValue({
-      state: { user: { name: 'Vendor Tester' } },
+      state: { user: { name: 'Vendor Tester', id: 42 } },
       logout: jest.fn(),
       getSessionToken: jest.fn().mockResolvedValue('session-token'),
     });
@@ -73,6 +75,8 @@ describe('VendorScanScreen', () => {
       valid: true,
       membershipTier: 'Gold',
       allowedDiscount: 15,
+      memberId: 99,
+      discountDescriptor: { type: 'percentage', value: 15 },
     });
   });
 
@@ -92,6 +96,6 @@ describe('VendorScanScreen', () => {
       button.props.onPress();
     });
 
-    expect(lookupMember).toHaveBeenCalledWith('abc', 'session-token');
+    expect(lookupMember).toHaveBeenCalledWith('abc', 'session-token', 42);
   });
 });

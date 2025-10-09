@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -13,6 +13,9 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { RegisterAccountType, RegisterOptions } from '../types/auth';
 import { COLORS } from '../config/theme';
 import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
+import { fetchVendorTiers } from '../services/vendorService';
+import { VendorTierDefinition } from '../types/vendor';
+import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 
 interface RegisterModalProps {
   visible: boolean;
@@ -36,9 +39,16 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [accountType, setAccountType] = useState<RegisterAccountType>('member');
+  const [vendorTiers, setVendorTiers] = useState<VendorTierDefinition[]>([]);
+  const [selectedVendorTier, setSelectedVendorTier] = useState<string | null>(
+    null,
+  );
+  const [isLoadingVendorTiers, setIsLoadingVendorTiers] = useState(false);
+  const [vendorTierError, setVendorTierError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const layout = useResponsiveLayout();
 
   useEffect(() => {
     if (!visible) {
@@ -51,11 +61,107 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       setFirstName('');
       setLastName('');
       setAccountType('member');
+      setVendorTiers([]);
+      setSelectedVendorTier(null);
+      setIsLoadingVendorTiers(false);
+      setVendorTierError(null);
       setLoading(false);
       setError(null);
       setSuccessMessage(null);
     }
   }, [visible]);
+
+  const fallbackVendorTiers = useMemo<VendorTierDefinition[]>(
+    () => [
+      {
+        id: 'sapphire',
+        slug: 'sapphire',
+        name: 'Sapphire',
+        description: t('auth.registerModal.vendorTierSapphireDescription'),
+        discountRates: {
+          gold: 2.5,
+          platinum: 5,
+          black: 10,
+        },
+        promotionSummary: t(
+          'auth.registerModal.vendorTierSapphirePromotions',
+        ),
+        benefits: null,
+        metadata: null,
+      },
+      {
+        id: 'diamond',
+        slug: 'diamond',
+        name: 'Diamond',
+        description: t('auth.registerModal.vendorTierDiamondDescription'),
+        discountRates: {
+          gold: 5,
+          platinum: 10,
+          black: 20,
+        },
+        promotionSummary: t(
+          'auth.registerModal.vendorTierDiamondPromotions',
+        ),
+        benefits: null,
+        metadata: null,
+      },
+    ],
+    [t],
+  );
+
+  useEffect(() => {
+    if (!visible || accountType !== 'vendor' || successMessage !== null) {
+      return;
+    }
+
+    let isMounted = true;
+    setIsLoadingVendorTiers(true);
+    setVendorTierError(null);
+
+    fetchVendorTiers()
+      .then(tiers => {
+        if (!isMounted) {
+          return;
+        }
+        const list = tiers.length ? tiers : fallbackVendorTiers;
+        setVendorTiers(list);
+        if (list.length === 1) {
+          setSelectedVendorTier(list[0].slug);
+        } else if (
+          selectedVendorTier &&
+          !list.some(tier => tier.slug === selectedVendorTier)
+        ) {
+          setSelectedVendorTier(null);
+        }
+      })
+      .catch(fetchError => {
+        if (!isMounted) {
+          return;
+        }
+        setVendorTierError(
+          fetchError instanceof Error
+            ? fetchError.message
+            : t('auth.registerModal.vendorTierError'),
+        );
+        setVendorTiers(fallbackVendorTiers);
+      })
+      .finally(() => {
+        if (isMounted) {
+          setIsLoadingVendorTiers(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    accountType,
+    fallbackVendorTiers,
+    selectedVendorTier,
+    successMessage,
+    t,
+    visible,
+  ]);
 
   const handleSubmit = async () => {
     if (loading) {
@@ -77,6 +183,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       return;
     }
 
+    if (accountType === 'vendor' && !selectedVendorTier) {
+      setError('Please select a vendor tier.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -88,6 +199,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         firstName: trimmedFirstName || undefined,
         lastName: trimmedLastName || undefined,
         accountType,
+        vendorTier: selectedVendorTier ?? undefined,
       });
       if (accountType === 'vendor') {
         setSuccessMessage(
@@ -109,13 +221,64 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     () => (error ? translateError(error) ?? error : null),
     [error, translateError],
   );
+  const vendorTierNotice = useMemo(() => {
+    if (isLoadingVendorTiers) {
+      return t('auth.registerModal.vendorTierLoading');
+    }
+    if (vendorTierError) {
+      return (
+        translateError(vendorTierError) ??
+        vendorTierError ??
+        t('auth.registerModal.vendorTierError')
+      );
+    }
+    return null;
+  }, [
+    isLoadingVendorTiers,
+    t,
+    translateError,
+    vendorTierError,
+  ]);
   const isSubmitDisabled =
     loading ||
     !username.trim() ||
     !email.trim() ||
     !password ||
     !confirmPassword ||
-    successMessage !== null;
+    successMessage !== null ||
+    (accountType === 'vendor' && !selectedVendorTier);
+
+  const containerStyles = useMemo(() => {
+    const maxWidth = layout.isTablet ? 520 : 420;
+    return {
+      overlay: {
+        padding: layout.isSmallPhone ? 16 : 24,
+      },
+      card: {
+        maxWidth,
+      },
+      scrollContent: {
+        padding: layout.isSmallPhone ? 20 : 24,
+      },
+    };
+  }, [layout]);
+
+  const formatDiscountSummary = useCallback((discounts?: {
+    [tier: string]: number;
+  } | null) => {
+    if (!discounts) {
+      return null;
+    }
+
+    const entries = Object.entries(discounts)
+      .map(([tier, value]) => {
+        const normalizedTier = tier.charAt(0).toUpperCase() + tier.slice(1);
+        return `${normalizedTier} ${Number(value).toFixed(1)}%`;
+      })
+      .join(' · ');
+
+    return entries.length ? entries : null;
+  }, []);
 
   return (
     <Modal
@@ -124,9 +287,11 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <ScrollView contentContainerStyle={styles.scrollContent}>
+      <View style={[styles.overlay, containerStyles.overlay]}>
+        <View style={[styles.card, containerStyles.card]}>
+          <ScrollView
+            contentContainerStyle={[styles.scrollContent, containerStyles.scrollContent]}
+          >
             <Text style={styles.title}>{t('auth.registerModal.title')}</Text>
             <Text style={styles.description}>
               {t('auth.registerModal.description')}
@@ -299,6 +464,67 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               ) : null}
             </View>
 
+            {accountType === 'vendor' ? (
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>
+                  {t('auth.registerModal.vendorTierLabel')}
+                </Text>
+                {vendorTierNotice ? (
+                  <Text style={styles.notice}>{vendorTierNotice}</Text>
+                ) : null}
+                <View style={styles.vendorTierList}>
+                  {vendorTiers.map(tier => {
+                    const isActive = selectedVendorTier === tier.slug;
+                    const discountSummary = formatDiscountSummary(
+                      tier.discountRates ?? null,
+                    );
+                    return (
+                      <Pressable
+                        key={tier.slug}
+                        style={[
+                          styles.vendorTierOption,
+                          isActive && styles.vendorTierOptionActive,
+                          successMessage !== null &&
+                            styles.accountTypeOptionDisabled,
+                        ]}
+                        accessibilityRole="button"
+                        disabled={loading || successMessage !== null}
+                        onPress={() => setSelectedVendorTier(tier.slug)}
+                      >
+                        <Text
+                          style={[
+                            styles.vendorTierName,
+                            isActive && styles.vendorTierNameActive,
+                          ]}
+                        >
+                          {tier.name}
+                        </Text>
+                        {tier.description ? (
+                          <Text style={styles.vendorTierDescription}>
+                            {tier.description}
+                          </Text>
+                        ) : null}
+                        {discountSummary ? (
+                          <Text style={styles.vendorTierMeta}>
+                            {t('auth.registerModal.vendorTierDiscounts', {
+                              replace: { summary: discountSummary },
+                            })}
+                          </Text>
+                        ) : null}
+                        {tier.promotionSummary ? (
+                          <Text style={styles.vendorTierMeta}>
+                            {t('auth.registerModal.vendorTierPromotions', {
+                              replace: { summary: tier.promotionSummary },
+                            })}
+                          </Text>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
             {translatedError ? (
               <Text style={styles.error}>{translatedError}</Text>
             ) : null}
@@ -402,6 +628,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: COLORS.textSecondary,
   },
+  notice: {
+    fontSize: 13,
+    color: COLORS.textOnMuted,
+  },
   accountTypeRow: {
     flexDirection: 'row',
     gap: 12,
@@ -430,6 +660,37 @@ const styles = StyleSheet.create({
   },
   accountTypeLabelActive: {
     color: COLORS.primary,
+  },
+  vendorTierList: {
+    gap: 12,
+  },
+  vendorTierOption: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: COLORS.surface,
+    gap: 6,
+  },
+  vendorTierOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryMuted,
+  },
+  vendorTierName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  vendorTierNameActive: {
+    color: COLORS.primary,
+  },
+  vendorTierDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  vendorTierMeta: {
+    fontSize: 13,
+    color: COLORS.textOnMuted,
   },
   passwordInputWrapper: {
     borderWidth: 1,

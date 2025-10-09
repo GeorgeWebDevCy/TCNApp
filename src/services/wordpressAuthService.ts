@@ -2877,6 +2877,10 @@ export const registerAccount = async (
   const normalizedAccountType =
     requestedAccountType === 'vendor' ? 'vendor' : 'member';
   const isVendor = normalizedAccountType === 'vendor';
+  const selectedVendorTier =
+    typeof options.vendorTier === 'string' && options.vendorTier.trim().length > 0
+      ? options.vendorTier.trim()
+      : undefined;
 
   const payload: Record<string, unknown> = {
     username,
@@ -2905,6 +2909,7 @@ export const registerAccount = async (
       account_type: 'vendor',
       account_status: 'pending',
       vendor_status: 'pending',
+      vendor_tier: selectedVendorTier ?? undefined,
     };
 
     payload.role = 'vendor';
@@ -2913,6 +2918,9 @@ export const registerAccount = async (
     payload.status = 'pending';
     payload.account_status = 'pending';
     payload.vendor_status = 'pending';
+    if (selectedVendorTier) {
+      payload.vendor_tier = selectedVendorTier;
+    }
     payload.meta = vendorMeta;
     payload.woocommerce_customer = {
       role: 'vendor',
@@ -2925,8 +2933,14 @@ export const registerAccount = async (
       meta_data: [
         { key: 'account_status', value: 'pending' },
         { key: 'vendor_status', value: 'pending' },
+        selectedVendorTier
+          ? { key: 'vendor_tier', value: selectedVendorTier }
+          : null,
       ],
     };
+    payload.woocommerce_customer.meta_data = payload.woocommerce_customer.meta_data
+      .filter(Boolean)
+      .map(entry => entry as { key: string; value: string });
   } else {
     payload.role = 'customer';
     payload.membership_tier = 'blue';

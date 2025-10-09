@@ -82,6 +82,7 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Unable to reset password.': 'errors.resetPassword',
   'Unable to register a new account.': 'errors.registerAccount',
   'Passwords do not match.': 'errors.passwordMismatch',
+  'Please select a vendor tier.': 'errors.vendorTierRequired',
   'Unable to change password.': 'errors.changePassword',
   'PIN entries do not match.': 'errors.pinMismatch',
   'Your vendor account is pending approval.': 'errors.vendorPending',

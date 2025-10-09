@@ -1,0 +1,183 @@
+import deviceLog from '../utils/deviceLog';
+import { WORDPRESS_CONFIG } from '../config/authConfig';
+import {
+  buildWordPressRequestInit,
+  syncWordPressCookiesFromResponse,
+} from './wordpressCookieService';
+import { VendorTierDefinition, VendorTierDiscounts } from '../types/vendor';
+
+const VENDOR_ENDPOINTS = {
+  tiers: '/wp-json/gn/v1/vendors/tiers',
+};
+
+const getString = (value: unknown): string | null => {
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value.trim();
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return null;
+};
+
+const getNumber = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const parseDiscounts = (input: unknown): VendorTierDiscounts | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const discounts: VendorTierDiscounts = {};
+  for (const [key, value] of Object.entries(input)) {
+    const normalizedKey = key.trim().toLowerCase();
+    const parsedValue = getNumber(value);
+    if (!normalizedKey || parsedValue == null) {
+      continue;
+    }
+    const percent =
+      parsedValue > 1 || parsedValue < 0
+        ? Number(parsedValue.toFixed(2))
+        : Number((parsedValue * 100).toFixed(2));
+    discounts[normalizedKey] = percent;
+  }
+
+  return Object.keys(discounts).length ? discounts : null;
+};
+
+const parseStringArray = (input: unknown): string[] | null => {
+  if (!Array.isArray(input)) {
+    return null;
+  }
+
+  const values = input
+    .map(item => getString(item))
+    .filter((value): value is string => Boolean(value));
+
+  return values.length ? values : null;
+};
+
+const parseTier = (input: unknown): VendorTierDefinition | null => {
+  if (!input || typeof input !== 'object') {
+    return null;
+  }
+
+  const payload = input as Record<string, unknown>;
+  const id =
+    getString(payload.slug) ??
+    getString(payload.id) ??
+    getString(payload.key) ??
+    null;
+  const name = getString(payload.name) ?? getString(payload.label) ?? id;
+
+  if (!id || !name) {
+    return null;
+  }
+
+  const discountRates =
+    parseDiscounts(payload.discountRates) ??
+    parseDiscounts(payload.discounts) ??
+    parseDiscounts(payload.discount_matrix);
+
+  const promotionSummary =
+    getString(payload.promotionSummary) ??
+    getString(payload.promotion_frequency) ??
+    getString(payload.promotion) ??
+    null;
+
+  const benefits =
+    parseStringArray(payload.benefits) ??
+    parseStringArray(payload.highlight_benefits) ??
+    null;
+
+  const description =
+    getString(payload.description) ??
+    getString(payload.summary) ??
+    null;
+
+  return {
+    id,
+    slug: id,
+    name,
+    description,
+    discountRates,
+    promotionSummary,
+    benefits,
+    metadata: (payload.metadata as Record<string, unknown>) ?? null,
+  };
+};
+
+export const fetchVendorTiers = async (
+  authToken?: string | null,
+): Promise<VendorTierDefinition[]> => {
+  try {
+    const init = await buildWordPressRequestInit({
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization:
+          authToken && authToken.trim().length > 0
+            ? authToken.startsWith('Bearer ')
+              ? authToken
+              : `Bearer ${authToken.trim()}`
+            : undefined,
+      },
+    });
+
+    const response = await fetch(
+      `${WORDPRESS_CONFIG.baseUrl}${VENDOR_ENDPOINTS.tiers}`,
+      init,
+    );
+    await syncWordPressCookiesFromResponse(response);
+
+    const contentType = response.headers.get('content-type');
+    const isJson = contentType?.includes('application/json');
+    const json = isJson ? await response.json() : await response.text();
+
+    if (!response.ok) {
+      const message =
+        typeof json === 'string'
+          ? json
+          : getString((json as Record<string, unknown>)?.message) ??
+            'Unable to load vendor tiers.';
+      throw new Error(message);
+    }
+
+    const root = json as Record<string, unknown>;
+    const tiersSource = Array.isArray(root?.tiers)
+      ? (root.tiers as unknown[])
+      : Array.isArray(root?.data)
+      ? (root.data as unknown[])
+      : Array.isArray(root?.items)
+      ? (root.items as unknown[])
+      : Array.isArray(root)
+      ? (root as unknown[])
+      : [];
+
+    const tiers = tiersSource
+      .map(parseTier)
+      .filter((tier): tier is VendorTierDefinition => Boolean(tier));
+
+    deviceLog.debug('vendorService.fetchVendorTiers.success', {
+      count: tiers.length,
+    });
+    return tiers;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Unable to load vendor tiers.';
+    deviceLog.warn('vendorService.fetchVendorTiers.error', { message });
+    throw error instanceof Error ? error : new Error(message);
+  }
+};
