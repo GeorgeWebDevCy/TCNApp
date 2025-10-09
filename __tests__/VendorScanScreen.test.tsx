@@ -10,13 +10,42 @@ jest.mock('../src/contexts/AuthContext', () => ({
   useAuthContext: jest.fn(),
 }));
 
-jest.mock('../src/services/wordpressAuthService');
+jest.mock('../src/contexts/TransactionContext', () => ({
+  useTransactionContext: () => ({
+    transactions: [],
+    addTransaction: jest.fn(),
+    replaceTransaction: jest.fn(),
+    patchTransaction: jest.fn(),
+  }),
+}));
+
+jest.mock('../src/services/transactionService', () => ({
+  lookupMember: jest.fn(),
+  calculateDiscount: jest.fn().mockResolvedValue({
+    discountPercentage: 5,
+    discountAmount: 50,
+    netAmount: 950,
+    grossAmount: 1000,
+    currency: 'THB',
+  }),
+  recordTransaction: jest.fn().mockResolvedValue({
+    id: 'remote-1',
+    memberToken: 'abc',
+    memberName: 'Member Test',
+    status: 'completed',
+    discountPercentage: 5,
+    discountAmount: 50,
+    netAmount: 950,
+    grossAmount: 1000,
+    createdAt: new Date().toISOString(),
+  }),
+}));
 
 import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { VendorScanScreen } from '../src/screens/VendorScanScreen';
 import { useAuthContext } from '../src/contexts/AuthContext';
-import { validateMemberQrCode } from '../src/services/wordpressAuthService';
+import { lookupMember } from '../src/services/transactionService';
 
 jest.mock('../src/contexts/LocalizationContext', () => ({
   useLocalization: () => ({
@@ -39,7 +68,7 @@ describe('VendorScanScreen', () => {
       logout: jest.fn(),
       getSessionToken: jest.fn().mockResolvedValue('session-token'),
     });
-    (validateMemberQrCode as jest.Mock).mockResolvedValue({
+    (lookupMember as jest.Mock).mockResolvedValue({
       token: 'abc',
       valid: true,
       membershipTier: 'Gold',
@@ -63,7 +92,6 @@ describe('VendorScanScreen', () => {
       button.props.onPress();
     });
 
-    expect(validateMemberQrCode).toHaveBeenCalledWith('abc', 'session-token');
+    expect(lookupMember).toHaveBeenCalledWith('abc', 'session-token');
   });
 });
-

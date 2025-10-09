@@ -12,8 +12,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { RNCamera } from 'react-native-camera';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { validateMemberQrCode } from '../services/wordpressAuthService';
-import { MemberValidationResult } from '../types/auth';
+import { useTransactionContext } from '../contexts/TransactionContext';
+import {
+  calculateDiscount,
+  lookupMember,
+  recordTransaction,
+} from '../services/transactionService';
+import { calculateDiscountForAmount } from '../utils/discount';
+import { MemberLookupResult, TransactionRecord } from '../types/transactions';
 import { COLORS } from '../config/theme';
 
 export const VendorScanScreen: React.FC = () => {
@@ -22,13 +28,18 @@ export const VendorScanScreen: React.FC = () => {
     logout,
     getSessionToken,
   } = useAuthContext();
+  const { transactions, addTransaction, replaceTransaction, patchTransaction } =
+    useTransactionContext();
   const { t } = useLocalization();
   const [manualToken, setManualToken] = useState('');
   const [isValidating, setIsValidating] = useState(false);
-  const [result, setResult] = useState<MemberValidationResult | null>(null);
+  const [result, setResult] = useState<MemberLookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [lastScannedToken, setLastScannedToken] = useState<string | null>(null);
+  const [grossAmount, setGrossAmount] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleValidation = useCallback(
     async (token: string) => {
@@ -43,13 +54,14 @@ export const VendorScanScreen: React.FC = () => {
 
       try {
         const sessionToken = await getSessionToken();
-        const validation = await validateMemberQrCode(trimmed, sessionToken);
+        const validation = await lookupMember(trimmed, sessionToken);
         setResult(validation);
         setLastScannedToken(trimmed);
         if (!validation.valid) {
           setError(
             validation.message ?? t('vendor.screen.status.invalidMessage'),
           );
+          setSubmissionError(validation.message ?? null);
         }
       } catch (validationError) {
         const message =
@@ -57,8 +69,11 @@ export const VendorScanScreen: React.FC = () => {
             ? validationError.message
             : t('vendor.screen.errors.generic');
         setError(message);
+        setSubmissionError(message);
+        setResult(null);
       } finally {
         setIsValidating(false);
+        setGrossAmount('');
       }
     },
     [getSessionToken, t],
@@ -96,6 +111,166 @@ export const VendorScanScreen: React.FC = () => {
     const formatted = Math.round(result.allowedDiscount * 100) / 100;
     return `${formatted}%`;
   }, [result?.allowedDiscount]);
+
+  const vendorTier = user?.vendorTier ?? null;
+  const membershipTier = useMemo(() => {
+    if (!result) {
+      return null;
+    }
+    return result.membershipTier ?? result.membership?.tier ?? null;
+  }, [result]);
+
+  const grossAmountValue = useMemo(() => {
+    const sanitized = grossAmount.replace(/[^0-9.]/g, '');
+    const normalized = Number.parseFloat(sanitized);
+    return Number.isFinite(normalized) && normalized > 0 ? normalized : 0;
+  }, [grossAmount]);
+
+  const localCalculation = useMemo(() => {
+    return calculateDiscountForAmount(
+      grossAmountValue,
+      membershipTier,
+      vendorTier,
+    );
+  }, [grossAmountValue, membershipTier, vendorTier]);
+
+  const recentTransactions = useMemo(
+    () => transactions.slice(0, 5),
+    [transactions],
+  );
+
+  const formatCurrency = useCallback(
+    (value: number) =>
+      Number.isFinite(value)
+        ? value.toLocaleString(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
+        : '0.00',
+    [],
+  );
+
+  const handleTransactionSubmit = useCallback(async () => {
+    if (!result?.valid) {
+      setSubmissionError(t('vendor.screen.transaction.errors.noMember'));
+      return;
+    }
+
+    const parsedAmount = grossAmountValue;
+
+    if (!parsedAmount || parsedAmount <= 0) {
+      setSubmissionError(t('vendor.screen.transaction.errors.invalidAmount'));
+      return;
+    }
+
+    const optimisticCalculation = calculateDiscountForAmount(
+      parsedAmount,
+      membershipTier,
+      vendorTier,
+    );
+
+    const optimisticTransaction: TransactionRecord = {
+      id: `local-${Date.now()}`,
+      memberToken: result.token,
+      memberName: result.memberName ?? null,
+      membership: result.membership ?? null,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      discountPercentage: optimisticCalculation.discountPercentage,
+      discountAmount: optimisticCalculation.discountAmount,
+      netAmount: optimisticCalculation.netAmount,
+      currency: 'THB',
+      membershipTier: membershipTier ?? null,
+      vendorTier: vendorTier ?? null,
+      message: null,
+      vendorName: user?.name ?? null,
+      errorMessage: null,
+    };
+
+    addTransaction(optimisticTransaction);
+    setIsSubmitting(true);
+    setSubmissionError(null);
+
+    try {
+      const sessionToken = await getSessionToken();
+      const remoteCalculation = await calculateDiscount(
+        {
+          grossAmount: parsedAmount,
+          membershipTier: membershipTier ?? undefined,
+          vendorTier: vendorTier ?? undefined,
+          currency: 'THB',
+        },
+        sessionToken,
+      );
+
+      setResult(previous =>
+        previous
+          ? {
+              ...previous,
+              allowedDiscount: remoteCalculation.discountPercentage,
+            }
+          : previous,
+      );
+
+      const recorded = await recordTransaction(
+        {
+          memberToken: result.token,
+          memberName: result.memberName ?? null,
+          membership: result.membership ?? null,
+          membershipTier: membershipTier ?? undefined,
+          vendorTier: vendorTier ?? undefined,
+          grossAmount: parsedAmount,
+          currency: remoteCalculation.currency ?? 'THB',
+          discountPercentage: remoteCalculation.discountPercentage,
+          discountAmount: remoteCalculation.discountAmount,
+          netAmount: remoteCalculation.netAmount,
+        },
+        sessionToken,
+      );
+
+      const finalRecord: TransactionRecord = {
+        ...optimisticTransaction,
+        ...remoteCalculation,
+        ...recorded,
+        id: recorded.id ?? optimisticTransaction.id,
+        status: recorded.status ?? 'completed',
+      };
+
+      replaceTransaction(optimisticTransaction.id, finalRecord);
+
+      if (finalRecord.status === 'failed') {
+        const message =
+          finalRecord.errorMessage ??
+          t('vendor.screen.transaction.errors.submit');
+        setSubmissionError(message);
+      } else {
+        setGrossAmount('');
+      }
+    } catch (submissionError) {
+      const message =
+        submissionError instanceof Error
+          ? submissionError.message
+          : t('vendor.screen.transaction.errors.submit');
+      patchTransaction(optimisticTransaction.id, {
+        status: 'failed',
+        errorMessage: message,
+      });
+      setSubmissionError(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    addTransaction,
+    getSessionToken,
+    grossAmountValue,
+    membershipTier,
+    patchTransaction,
+    replaceTransaction,
+    result,
+    t,
+    user?.name,
+    vendorTier,
+  ]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -194,6 +369,126 @@ export const VendorScanScreen: React.FC = () => {
           </View>
         ) : null}
 
+        {result?.valid ? (
+          <View style={styles.transactionCard} testID="vendor-transaction-card">
+            <Text style={styles.sectionTitle}>
+              {t('vendor.screen.transaction.title')}
+            </Text>
+            <Text style={styles.transactionHint}>
+              {t('vendor.screen.transaction.hint')}
+            </Text>
+            <Text style={styles.inputLabel}>
+              {t('vendor.screen.transaction.amountLabel')}
+            </Text>
+            <TextInput
+              value={grossAmount}
+              onChangeText={setGrossAmount}
+              placeholder={t('vendor.screen.transaction.amountPlaceholder')}
+              style={styles.input}
+              keyboardType="decimal-pad"
+              inputMode="decimal"
+              testID="vendor-transaction-amount"
+            />
+            {grossAmountValue > 0 ? (
+              <View style={styles.transactionSummary}>
+                <Text style={styles.transactionSummaryText}>
+                  {t('vendor.screen.transaction.estimatedDiscount', {
+                    replace: {
+                      amount: formatCurrency(localCalculation.discountAmount),
+                      percent: localCalculation.discountPercentage.toFixed(2),
+                    },
+                  })}
+                </Text>
+                <Text style={styles.transactionSummaryText}>
+                  {t('vendor.screen.transaction.estimatedNet', {
+                    replace: {
+                      total: formatCurrency(localCalculation.netAmount),
+                    },
+                  })}
+                </Text>
+              </View>
+            ) : null}
+            {submissionError ? (
+              <Text style={styles.errorText} testID="vendor-transaction-error">
+                {submissionError}
+              </Text>
+            ) : null}
+            <Pressable
+              style={[
+                styles.primaryButton,
+                (isSubmitting || isValidating) && styles.buttonDisabled,
+              ]}
+              onPress={() => void handleTransactionSubmit()}
+              accessibilityRole="button"
+              disabled={isSubmitting || isValidating}
+              testID="vendor-transaction-submit"
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color={COLORS.textOnPrimary} />
+              ) : (
+                <Text style={styles.primaryButtonText}>
+                  {t('vendor.screen.transaction.submit')}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
+
+        <View style={styles.recentCard}>
+          <Text style={styles.sectionTitle}>
+            {t('vendor.screen.recent.title')}
+          </Text>
+          {recentTransactions.length === 0 ? (
+            <Text style={styles.resultMessage}>
+              {t('vendor.screen.recent.empty')}
+            </Text>
+          ) : (
+            recentTransactions.map(transaction => {
+              const statusStyle =
+                transaction.status === 'failed'
+                  ? styles.statusFailed
+                  : transaction.status === 'completed'
+                    ? styles.statusCompleted
+                    : styles.statusPending;
+              const statusLabel = t(
+                `vendor.screen.recent.status.${transaction.status}`,
+              );
+              const memberLabel =
+                transaction.memberName && transaction.memberName.length > 0
+                  ? transaction.memberName
+                  : transaction.memberToken;
+              const gross =
+                transaction.grossAmount ??
+                Number(
+                  ((transaction.netAmount ?? 0) +
+                    (transaction.discountAmount ?? 0)).toFixed(2),
+                );
+
+              return (
+                <View style={styles.recentRow} key={transaction.id}>
+                  <View style={styles.recentRowHeader}>
+                    <Text style={styles.recentRowName}>{memberLabel}</Text>
+                    <Text style={[styles.statusBadge, statusStyle]}>
+                      {statusLabel}
+                    </Text>
+                  </View>
+                  <Text style={styles.recentRowMeta}>
+                    {t('vendor.screen.recent.summary', {
+                      replace: {
+                        gross: formatCurrency(gross ?? 0),
+                        discount: formatCurrency(
+                          transaction.discountAmount ?? 0,
+                        ),
+                        net: formatCurrency(transaction.netAmount ?? 0),
+                      },
+                    })}
+                  </Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
         <Pressable
           style={styles.outlineButton}
           accessibilityRole="button"
@@ -255,10 +550,27 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  transactionCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    gap: 12,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.textPrimary,
+  },
+  transactionHint: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: COLORS.textSecondary,
   },
   input: {
     borderRadius: 12,
@@ -283,6 +595,16 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  transactionSummary: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  transactionSummaryText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
   },
   errorText: {
     color: COLORS.error,
@@ -320,6 +642,56 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontWeight: '600',
     fontSize: 15,
+  },
+  recentCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    gap: 12,
+  },
+  recentRow: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.mutedBorder,
+    padding: 12,
+    gap: 6,
+  },
+  recentRowHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  recentRowName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  recentRowMeta: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    fontSize: 12,
+    fontWeight: '600',
+    overflow: 'hidden',
+  },
+  statusPending: {
+    backgroundColor: COLORS.warningBackground,
+    color: COLORS.warningText,
+  },
+  statusCompleted: {
+    backgroundColor: COLORS.successBackground,
+    color: COLORS.successText,
+  },
+  statusFailed: {
+    backgroundColor: COLORS.errorBackground,
+    color: COLORS.errorText,
   },
   footerNote: {
     fontSize: 13,

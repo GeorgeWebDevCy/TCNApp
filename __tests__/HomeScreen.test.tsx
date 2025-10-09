@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
+import { Text } from 'react-native';
 import { HomeScreen, getMaxDiscount } from '../src/screens/HomeScreen';
 import { MembershipInfo } from '../src/types/auth';
 
@@ -42,6 +43,28 @@ jest.mock('../src/contexts/AuthContext', () => ({
       hasPasswordAuthenticated: true,
     },
     logout: jest.fn(),
+  }),
+}));
+
+jest.mock('../src/contexts/TransactionContext', () => ({
+  useTransactionContext: () => ({
+    transactions: [
+      {
+        id: 'tx-1',
+        memberToken: 'member-token',
+        memberName: 'Jane Doe',
+        vendorName: 'Vendor Plaza',
+        status: 'completed',
+        discountPercentage: 10,
+        discountAmount: 120,
+        netAmount: 1080,
+        grossAmount: 1200,
+        createdAt: '2024-01-01T00:00:00.000Z',
+      },
+    ],
+    addTransaction: jest.fn(),
+    replaceTransaction: jest.fn(),
+    patchTransaction: jest.fn(),
   }),
 }));
 
@@ -114,7 +137,14 @@ describe('HomeScreen', () => {
       );
     });
 
-    expect(renderer?.toJSON()).toMatchSnapshot();
+    const textNodes = renderer
+      ?.root.findAllByType(Text)
+      .map(node => node.props.children)
+      .flat();
+
+    expect(textNodes).toContain('Welcome, Jane Doe!');
+    expect(textNodes).toContain('Recent savings');
+    expect(textNodes).toContain('Vendor Plaza');
   });
 });
 

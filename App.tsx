@@ -16,6 +16,7 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import deviceLog, { LogView } from './src/utils/deviceLog';
 import { AuthProvider, useAuthContext } from './src/contexts/AuthContext';
+import { TransactionProvider } from './src/contexts/TransactionContext';
 import { TokenLoginProvider } from './src/providers/TokenLoginProvider';
 import { LocalizationProvider } from './src/contexts/LocalizationContext';
 import { OneSignalProvider } from './src/notifications/OneSignalProvider';
@@ -147,7 +148,8 @@ function App(): JSX.Element {
         <SafeAreaProvider>
           <TokenLoginProvider>
             <AuthProvider>
-              <OneSignalProvider>
+              <TransactionProvider>
+                <OneSignalProvider>
                 <View style={styles.appContainer}>
                   {/* Render the conditional app content discussed above. */}
                   <AppContent />
@@ -197,7 +199,8 @@ function App(): JSX.Element {
                     </View>
                   )}
                 </View>
-              </OneSignalProvider>
+                </OneSignalProvider>
+              </TransactionProvider>
             </AuthProvider>
           </TokenLoginProvider>
         </SafeAreaProvider>

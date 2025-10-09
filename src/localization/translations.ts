@@ -162,6 +162,18 @@ export const translations: Record<Language, TranslationDictionary> = {
           'Securely upgrade your membership without leaving the app.',
         comingSoonTitle: 'Coming soon',
       },
+      transactions: {
+        title: 'Recent savings',
+        empty: 'No transactions recorded yet.',
+        defaultVendor: 'Network partner',
+        savings: 'You saved {{discount}} THB',
+        summary: 'Paid {{total}} THB (was {{original}} THB)',
+        status: {
+          pending: 'Pending',
+          completed: 'Completed',
+          failed: 'Failed',
+        },
+      },
       notifications: {
         heading: 'Notifications',
         promotionTitle: 'New offer available',
@@ -238,6 +250,33 @@ export const translations: Record<Language, TranslationDictionary> = {
           memberName: 'Member: {{name}}',
           membershipTier: 'Tier: {{tier}}',
           discount: 'Allowed discount: {{discount}}',
+        },
+        transaction: {
+          title: 'Confirm transaction',
+          hint: 'Enter the gross amount before discount to create a record.',
+          amountLabel: 'Gross amount (THB)',
+          amountPlaceholder: 'Enter gross amount',
+          estimatedDiscount:
+            'Estimated discount: {{amount}} THB ({{percent}}%)',
+          estimatedNet:
+            'Estimated total after discount: {{total}} THB',
+          submit: 'Record transaction',
+          errors: {
+            invalidAmount: 'Enter a valid gross amount before submitting.',
+            submit: 'Unable to record the transaction. Please try again.',
+            noMember: 'Validate a member before recording a transaction.',
+          },
+        },
+        recent: {
+          title: 'Recent transactions',
+          empty: 'No recent transactions yet.',
+          summary:
+            'Paid {{net}} THB · Original {{gross}} THB · Saved {{discount}} THB',
+          status: {
+            pending: 'Pending',
+            completed: 'Completed',
+            failed: 'Failed',
+          },
         },
         logout: 'Sign out',
         operator: 'Signed in as {{name}}',
@@ -528,6 +567,18 @@ export const translations: Record<Language, TranslationDictionary> = {
         upgradeOptionsMessage: 'อัปเกรดสถานะสมาชิกของคุณได้ทันทีภายในแอป.',
         comingSoonTitle: 'เร็ว ๆ นี้',
       },
+      transactions: {
+        title: 'บันทึกล่าสุด',
+        empty: 'ยังไม่มีการบันทึกรายการ.',
+        defaultVendor: 'ร้านค้าพันธมิตร',
+        savings: 'คุณประหยัดได้ {{discount}} บาท',
+        summary: 'ชำระ {{total}} บาท (จาก {{original}} บาท)',
+        status: {
+          pending: 'รอดำเนินการ',
+          completed: 'เสร็จสมบูรณ์',
+          failed: 'ไม่สำเร็จ',
+        },
+      },
       notifications: {
         heading: 'การแจ้งเตือน',
         promotionTitle: 'มีข้อเสนอใหม่',
@@ -602,6 +653,33 @@ export const translations: Record<Language, TranslationDictionary> = {
           memberName: 'สมาชิก: {{name}}',
           membershipTier: 'ระดับ: {{tier}}',
           discount: 'ส่วนลดที่อนุญาต: {{discount}}',
+        },
+        transaction: {
+          title: 'ยืนยันรายการ',
+          hint: 'กรอกยอดก่อนหักส่วนลดเพื่อบันทึกรายการนี้.',
+          amountLabel: 'ยอดก่อนส่วนลด (บาท)',
+          amountPlaceholder: 'กรอกยอดก่อนส่วนลด',
+          estimatedDiscount:
+            'ส่วนลดโดยประมาณ: {{amount}} บาท ({{percent}}%)',
+          estimatedNet:
+            'ยอดหลังหักส่วนลดโดยประมาณ: {{total}} บาท',
+          submit: 'บันทึกรายการ',
+          errors: {
+            invalidAmount: 'กรุณากรอกยอดก่อนส่วนลดที่ถูกต้อง.',
+            submit: 'ไม่สามารถบันทึกรายการได้ โปรดลองอีกครั้ง.',
+            noMember: 'กรุณายืนยันสมาชิกก่อนบันทึกรายการ.',
+          },
+        },
+        recent: {
+          title: 'รายการล่าสุด',
+          empty: 'ยังไม่มีรายการล่าสุด.',
+          summary:
+            'ยอดสุทธิ {{net}} บาท · ยอดเต็ม {{gross}} บาท · ประหยัด {{discount}} บาท',
+          status: {
+            pending: 'รอดำเนินการ',
+            completed: 'เสร็จสมบูรณ์',
+            failed: 'ไม่สำเร็จ',
+          },
         },
         logout: 'ออกจากระบบ',
         operator: 'เข้าสู่ระบบในชื่อ {{name}}',
