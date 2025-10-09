@@ -258,6 +258,14 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         });
 
         if (qrCode) {
+          deviceLog.debug('auth.memberQr.fetchSuccess', {
+            userId: user.id,
+            hasPayload: Boolean(qrCode.payload ?? user.qrPayload ?? null),
+            tokenSuffix:
+              qrCode.token && qrCode.token.length > 4
+                ? qrCode.token.slice(-4)
+                : qrCode.token,
+          });
           const updatedUser: AuthUser = {
             ...user,
             qrToken: qrCode.token,

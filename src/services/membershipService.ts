@@ -177,6 +177,25 @@ const sanitizeHeadersForLog = (headers?: HeadersInit): Record<string, string> =>
   );
 };
 
+const summarizeSecretForLog = (
+  label: string,
+  value: string | null | undefined,
+): Record<string, unknown> => {
+  if (typeof value === 'string' && value.length > 0) {
+    return {
+      [`${label}Present`]: true,
+      [`${label}Length`]: value.length,
+      [`${label}Suffix`]: value.length > 6 ? value.slice(-6) : value,
+    };
+  }
+
+  return {
+    [`${label}Present`]: false,
+    [`${label}Length`]: null,
+    [`${label}Suffix`]: null,
+  };
+};
+
 const buildErrorLogPayload = (
   error: unknown,
   context: Record<string, unknown> = {},
@@ -242,6 +261,11 @@ export const fetchMembershipPlans = async (
       highlightedPlan: plans.find(plan => plan.highlight)?.id ?? null,
     });
 
+    deviceLog.debug('membership.plans.fetch.details', {
+      planIds: plans.map(plan => plan.id),
+      currencies: Array.from(new Set(plans.map(plan => plan.currency))),
+    });
+
     return plans;
   } catch (error) {
     deviceLog.error('membership.plans.fetch.error', buildErrorLogPayload(error));
@@ -298,6 +322,27 @@ export const createMembershipPaymentSession = async (
       hasPublishableKey: Boolean(payload.publishableKey),
       hasPaymentIntentSecret: Boolean(payload.paymentIntentClientSecret),
       hasCustomerKey: Boolean(payload.customerEphemeralKeySecret),
+    });
+
+    deviceLog.debug('membership.paymentSession.create.details', {
+      plan,
+      customerIdSuffix:
+        payload.customerId && payload.customerId.length > 6
+          ? payload.customerId.slice(-6)
+          : payload.customerId ?? null,
+      paymentIntentIdSuffix:
+        payload.paymentIntentId && payload.paymentIntentId.length > 6
+          ? payload.paymentIntentId.slice(-6)
+          : payload.paymentIntentId ?? null,
+      ...summarizeSecretForLog(
+        'paymentIntentSecret',
+        payload.paymentIntentClientSecret,
+      ),
+      ...summarizeSecretForLog(
+        'customerEphemeralKeySecret',
+        payload.customerEphemeralKeySecret,
+      ),
+      ...summarizeSecretForLog('publishableKey', payload.publishableKey ?? null),
     });
 
     return payload;
@@ -363,6 +408,12 @@ export const confirmMembershipUpgrade = async (
       plan,
       acknowledged: payload.success,
       hasMessage: Boolean(payload.message),
+    });
+
+    deviceLog.debug('membership.upgrade.confirm.details', {
+      plan,
+      acknowledged: payload.success,
+      message: payload.message ?? null,
     });
 
     return payload;

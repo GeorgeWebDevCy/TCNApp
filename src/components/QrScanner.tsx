@@ -9,6 +9,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import QrWebScanner from './QrWebScanner';
+import deviceLog from '../utils/deviceLog';
 
 type QrScannerProps = {
   onScan: (text: string) => void;
@@ -29,6 +30,10 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
     BarcodeScanner?: React.ComponentType<any>;
     CameraScanner?: React.ComponentType<any>;
   }>(null);
+  const loggedWebFallbackRef = useRef(false);
+  const blockedPermissionLoggedRef = useRef<'granted' | 'denied' | 'unknown' | null>(
+    null,
+  );
 
   useEffect(() => {
     // Dynamically require to avoid hard dependency at build time.
@@ -37,11 +42,20 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
       const mod = require('react-native-scanner');
       if (mod && typeof mod === 'object') {
         setNativeModule(mod);
+        deviceLog.debug('qrScanner.nativeModule.detected', {
+          exports: Object.keys(mod).slice(0, 5),
+        });
       } else {
         setNativeModule(null);
+        deviceLog.info('qrScanner.nativeModule.unavailable', {
+          reason: 'invalid_module',
+        });
       }
-    } catch {
+    } catch (error) {
       setNativeModule(null);
+      deviceLog.warn('qrScanner.nativeModule.error', {
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }, []);
 
@@ -50,10 +64,16 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
       if (Platform.OS !== 'android') {
         return;
       }
+      deviceLog.debug('qrScanner.permission.request.start', {
+        platform: Platform.OS,
+      });
       try {
         const has = await PermissionsAndroid.check(ANDROID_CAMERA_PERMISSION);
         if (has) {
           setPermission('granted');
+          deviceLog.debug('qrScanner.permission.request.cached', {
+            result: 'granted',
+          });
           return;
         }
         const res = await PermissionsAndroid.request(ANDROID_CAMERA_PERMISSION, {
@@ -63,12 +83,25 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
           buttonNegative: 'Deny',
         });
         setPermission(res === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : 'denied');
-      } catch {
+        deviceLog.debug('qrScanner.permission.request.complete', {
+          result: res,
+        });
+      } catch (error) {
         setPermission('denied');
+        deviceLog.warn('qrScanner.permission.request.error', {
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
     };
     void request();
   }, []);
+
+  useEffect(() => {
+    deviceLog.debug('qrScanner.permission.state', {
+      platform: Platform.OS,
+      state: permission,
+    });
+  }, [permission]);
 
   const handleNativeScan = useCallback(
     (event: unknown) => {
@@ -93,6 +126,10 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
 
       const text = tryExtract(event);
       if (text) {
+        deviceLog.debug('qrScanner.native.scan', {
+          length: text.length,
+          suffix: text.length > 4 ? text.slice(-4) : text,
+        });
         onScan(text);
       }
     },
@@ -112,6 +149,13 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
   }, [nativeModule]);
 
   if (Platform.OS === 'android' && permission !== 'granted') {
+    if (blockedPermissionLoggedRef.current !== permission) {
+      deviceLog.info('qrScanner.permission.blocked', {
+        platform: Platform.OS,
+        state: permission,
+      });
+      blockedPermissionLoggedRef.current = permission;
+    }
     return (
       <View style={[styles.container, style]}>
         <View style={styles.permissionBanner}>
@@ -140,6 +184,12 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
   }
 
   // Fallback to WebView-based scanner if the native module is not installed.
+  if (!loggedWebFallbackRef.current) {
+    deviceLog.info('qrScanner.webScanner.fallback', {
+      hasNativeModule: Boolean(nativeModule),
+    });
+    loggedWebFallbackRef.current = true;
+  }
   return (
     <View style={[styles.container, style]}>
       <QrWebScanner onScan={onScan} style={StyleSheet.absoluteFill} />

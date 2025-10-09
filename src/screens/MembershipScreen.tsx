@@ -303,12 +303,54 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
     try {
       setProcessing(true);
       logEvent('checkout.start', { planId: selectedPlan.id });
+      deviceLog.debug('membership.checkout.start', {
+        planId: selectedPlan.id,
+        price: selectedPlan.price,
+        currency: selectedPlan.currency,
+      });
       const token = await getSessionToken();
+      deviceLog.debug('membership.checkout.sessionToken', {
+        planId: selectedPlan.id,
+        hasToken: Boolean(token),
+      });
       const paymentSession = await createMembershipPaymentSession(
         selectedPlan.id,
         token ?? undefined,
       );
 
+      const summarizeSecret = (value?: string | null) => ({
+        present: Boolean(value),
+        length: typeof value === 'string' ? value.length : null,
+        suffix:
+          typeof value === 'string' && value.length > 6
+            ? value.slice(-6)
+            : typeof value === 'string'
+              ? value
+              : null,
+      });
+
+      deviceLog.debug('membership.checkout.paymentSession.received', {
+        planId: selectedPlan.id,
+        customerIdSuffix:
+          paymentSession.customerId && paymentSession.customerId.length > 6
+            ? paymentSession.customerId.slice(-6)
+            : paymentSession.customerId ?? null,
+        paymentIntentIdSuffix:
+          paymentSession.paymentIntentId &&
+          paymentSession.paymentIntentId.length > 6
+            ? paymentSession.paymentIntentId.slice(-6)
+            : paymentSession.paymentIntentId ?? null,
+        paymentIntentSecret: summarizeSecret(
+          paymentSession.paymentIntentClientSecret,
+        ),
+        customerKey: summarizeSecret(
+          paymentSession.customerEphemeralKeySecret,
+        ),
+      });
+
+      deviceLog.debug('membership.checkout.paymentSheet.init.start', {
+        planId: selectedPlan.id,
+      });
       const initResult = await initPaymentSheet({
         paymentIntentClientSecret: paymentSession.paymentIntentClientSecret,
         customerEphemeralKeySecret: paymentSession.customerEphemeralKeySecret,
@@ -317,23 +359,47 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         allowsDelayedPaymentMethods: false,
       });
 
+      deviceLog.debug('membership.checkout.paymentSheet.init.complete', {
+        planId: selectedPlan.id,
+        success: !initResult.error,
+        errorMessage: initResult.error?.message ?? null,
+      });
+
       if (initResult.error) {
         throw new Error(initResult.error.message);
       }
 
+      deviceLog.debug('membership.checkout.paymentSheet.present.start', {
+        planId: selectedPlan.id,
+      });
       const presentResult = await presentPaymentSheet();
+      deviceLog.debug('membership.checkout.paymentSheet.present.complete', {
+        planId: selectedPlan.id,
+        success: !presentResult.error,
+        errorMessage: presentResult.error?.message ?? null,
+      });
       if (presentResult.error) {
         throw new Error(presentResult.error.message);
       }
 
       try {
+        deviceLog.debug('membership.checkout.confirmUpgrade.start', {
+          planId: selectedPlan.id,
+          hasPaymentIntentId: Boolean(paymentSession.paymentIntentId),
+        });
         await confirmMembershipUpgrade(
           selectedPlan.id,
           token ?? undefined,
           paymentSession.paymentIntentId ?? null,
         );
       } catch (confirmError) {
-        console.warn('Membership confirmation failed', confirmError);
+        deviceLog.warn('membership.checkout.confirmUpgrade.error', {
+          planId: selectedPlan.id,
+          message:
+            confirmError instanceof Error
+              ? confirmError.message
+              : String(confirmError),
+        });
         logEvent('checkout.confirmationError', {
           message:
             confirmError instanceof Error
@@ -343,6 +409,9 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       }
 
       await refreshSession();
+      deviceLog.debug('membership.checkout.sessionRefreshed', {
+        planId: selectedPlan.id,
+      });
       logEvent('checkout.success', { planId: selectedPlan.id });
       Alert.alert(
         t('membership.screen.successTitle'),
@@ -360,9 +429,16 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           ? checkoutError.message
           : t('membership.screen.checkoutError');
       Alert.alert(t('membership.screen.checkoutErrorTitle'), message);
+      deviceLog.error('membership.checkout.error', {
+        planId: selectedPlan?.id ?? null,
+        message,
+      });
       logEvent('checkout.error', { message });
     } finally {
       setProcessing(false);
+      deviceLog.debug('membership.checkout.complete', {
+        planId: selectedPlan?.id ?? null,
+      });
     }
   }, [
     getSessionToken,
