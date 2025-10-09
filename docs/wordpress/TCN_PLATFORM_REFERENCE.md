@@ -34,6 +34,9 @@ The password login service powers the mobile authentication flow, rate-limits br
 | `/change-password` | POST | Bearer token or logged-in cookie | Validate the current password and set a new one. Refreshes the auth cookie. |
 | `/me` | GET | Bearer token issued by `/login` | Resolve the user linked to a bearer token without requiring cookies. |
 | `/log` | POST | Public | Proxy arbitrary client logs into the plugin’s activity log. |
+| `/discounts/lookup` | POST | Bearer token with `tcn_discount_redemptions` capability | Validate a QR token and return the member + discount context required to complete a redemption. |
+| `/discounts/transactions` | POST | Bearer token with `tcn_discount_redemptions` capability | Persist a redeemed discount transaction and snapshot the plan tier + monetary breakdown. |
+| `/discounts/history` | GET | Bearer token (member sees personal history, vendor sees outlet history) | Paginate prior redemptions and return aggregated totals for dashboards. |
 
 #### Shared request & response behaviour
 
@@ -106,6 +109,117 @@ The password login service powers the mobile authentication flow, rate-limits br
   * `log_source` *(string, optional, default `mobile-app`)*.
   * `log_params` *(array, optional)* – Additional context stored with the log entry.
 * **Success response:** `{ ok: true }` after calling `Support\Logger::log()`.
+
+#### `POST /wp-json/gn/v1/discounts/lookup`
+
+* **Purpose:** Validate a scanned discount QR token before the transaction finalises at the point of sale.
+* **Authentication:** `Authorization: Bearer {api_token}` belonging to a vendor account with the `tcn_discount_redemptions` capability. Token issuance follows the standard `/gn/v1/login` flow.
+* **Request body:**
+  * `qr_token` *(string, required)* – Raw token encoded in the QR code.
+  * `vendor_id` *(int, required)* – WordPress user ID of the vendor/outlet performing the lookup. The service cross-checks that the bearer token belongs to the same vendor or an elevated operator.
+* **Success response:**
+  ```json
+  {
+    "success": true,
+    "member": {
+      "id": 123,
+      "display_name": "Ada Example",
+      "plan_tier": "gold"
+    },
+    "discount": {
+      "token": "...",
+      "label": "10% Café Beverage",
+      "type": "percentage",
+      "value": 0.1,
+      "max_uses": 1,
+      "expires_at": "2024-08-31T23:59:59+00:00"
+    },
+    "eligible": true,
+    "usage": {
+      "uses_today": 0,
+      "uses_total": 0
+    }
+  }
+  ```
+* **Failure cases:**
+  * Invalid/expired QR token → `400 gn_invalid_discount_token`.
+  * Vendor mismatch or capability missing → `403 gn_rest_forbidden`.
+  * Daily/total limits reached → `409 gn_discount_limit_reached` with contextual metadata.
+
+#### `POST /wp-json/gn/v1/discounts/transactions`
+
+* **Purpose:** Persist a completed discount redemption and update usage counters.
+* **Authentication:** Same bearer token requirement as `/discounts/lookup`.
+* **Request body:**
+  * `qr_token` *(string, required)* – Ensures atomic consumption of the entitlement.
+  * `member_id` *(int, required)* – WordPress user ID receiving the discount.
+  * `vendor_id` *(int, required)* – Vendor performing the redemption.
+  * `gross_amount` *(number, required)* – Pre-discount amount in the site currency.
+  * `discount_amount` *(number, required)* – Monetary value of the discount.
+  * `net_amount` *(number, required)* – `gross_amount - discount_amount` (validated server-side).
+  * `currency` *(string, optional, default site currency)* – ISO 4217 code.
+  * `metadata` *(object, optional)* – POS references (register, cashier, notes). Stored as JSON.
+* **Success response:**
+  ```json
+  {
+    "success": true,
+    "transaction": {
+      "id": 987,
+      "member_id": 123,
+      "vendor_id": 456,
+      "plan_tier": "gold",
+      "gross_amount": 250,
+      "discount_amount": 25,
+      "net_amount": 225,
+      "currency": "THB",
+      "created_at": "2024-07-12T04:15:22+00:00"
+    }
+  }
+  ```
+* **Failure cases:**
+  * Missing/invalid monetary values → `400 gn_discount_amount_invalid`.
+  * Token already consumed → `409 gn_discount_already_redeemed`.
+  * Authentication mismatch → `401 gn_not_authenticated` / `403 gn_rest_forbidden`.
+
+#### `GET /wp-json/gn/v1/discounts/history`
+
+* **Purpose:** Surface transaction history and roll-up totals for members and vendors.
+* **Authentication:** `Authorization: Bearer {api_token}`. Members see their own transactions; vendors see those tied to their outlets. Admins can pass explicit filters for audits.
+* **Query parameters:**
+  * `page` *(int, optional, default 1)* and `per_page` *(int, optional, default 25, max 100)*.
+  * `member_id`, `vendor_id`, `plan_tier` *(optional)* – Require elevated capability when querying other accounts.
+  * `date_start`, `date_end` *(string, optional ISO8601)* – Filter by redemption window.
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "totals": {
+      "count": 42,
+      "gross_sum": 10250,
+      "discount_sum": 1025,
+      "net_sum": 9225
+    },
+    "transactions": [
+      {
+        "id": 987,
+        "member_id": 123,
+        "vendor_id": 456,
+        "plan_tier": "gold",
+        "gross_amount": 250,
+        "discount_amount": 25,
+        "net_amount": 225,
+        "currency": "THB",
+        "created_at": "2024-07-12T04:15:22+00:00"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "per_page": 25,
+      "total_pages": 2
+    }
+  }
+  ```
+* **Notes:** Responses include `X-WP-Total`/`X-WP-TotalPages` headers plus the `totals` object for quick dashboard KPIs (gross, discount, net).
 
 ### 2.2 JWT Compatibility (`/wp-json/jwt-auth/v1/*`)
 
