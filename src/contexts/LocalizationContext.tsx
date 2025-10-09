@@ -1,11 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Language,
   TranslationDictionary,
   TranslationValue,
   translations,
 } from '../localization/translations';
+import deviceLog from '../utils/deviceLog';
 
 const LANGUAGE_STORAGE_KEY = '@tcnapp/language';
 const FALLBACK_LANGUAGE: Language = 'en';
@@ -95,6 +102,7 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
   const [language, setLanguageState] = useState<Language>(FALLBACK_LANGUAGE);
+  const missingTranslationKeysRef = useRef(new Set<string>());
 
   useEffect(() => {
     const bootstrap = async () => {
@@ -102,11 +110,21 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
         const storedLanguage = await AsyncStorage.getItem(LANGUAGE_STORAGE_KEY);
         if (storedLanguage === 'en' || storedLanguage === 'th') {
           setLanguageState(storedLanguage);
+          deviceLog.info('localization.bootstrap.success', {
+            language: storedLanguage,
+          });
           return;
         }
+        deviceLog.debug('localization.bootstrap.noStoredLanguage');
       } catch (error) {
-        // Ignore storage errors and fall back to default language.
+        deviceLog.warn('localization.bootstrap.storageError', {
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
+
+      deviceLog.info('localization.bootstrap.fallback', {
+        language: FALLBACK_LANGUAGE,
+      });
     };
 
     void bootstrap();
@@ -128,6 +146,15 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
         return formatTranslation(options.defaultValue, options.replace);
       }
 
+      const missingKeyIdentifier = `${language}:${key}`;
+      if (!missingTranslationKeysRef.current.has(missingKeyIdentifier)) {
+        missingTranslationKeysRef.current.add(missingKeyIdentifier);
+        deviceLog.warn('localization.translation.missing', {
+          language,
+          key,
+        });
+      }
+
       return key;
     },
     [language],
@@ -137,8 +164,14 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
     setLanguageState(newLanguage);
     try {
       await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, newLanguage);
+      deviceLog.info('localization.language.updated', {
+        language: newLanguage,
+      });
     } catch (error) {
-      // Ignore persistence errors; language will still update for current session.
+      deviceLog.warn('localization.language.persistError', {
+        language: newLanguage,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }, []);
 
@@ -154,12 +187,16 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
         errorMessageToKeyMap[value] ??
         (value.startsWith('errors.') ? value : undefined);
       if (key) {
+        deviceLog.debug('localization.translateError', {
+          key,
+          language,
+        });
         return translate(key);
       }
 
       return value;
     },
-    [translate],
+    [language, translate],
   );
 
   const contextValue = useMemo<LocalizationContextValue>(

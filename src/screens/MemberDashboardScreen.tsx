@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -15,6 +15,7 @@ import { TopVendorsChart } from '../components/analytics/TopVendorsChart';
 import { TransactionStatusChart } from '../components/analytics/TransactionStatusChart';
 import { COLORS } from '../config/theme';
 import { TransactionStatus } from '../types/transactions';
+import deviceLog from '../utils/deviceLog';
 
 interface MemberDashboardScreenProps {
   onBack?: () => void;
@@ -45,6 +46,12 @@ export const MemberDashboardScreen: React.FC<MemberDashboardScreenProps> = ({
     lastUpdated,
     refresh,
   } = useMemberTransactions();
+  const logEvent = useCallback(
+    (event: string, payload?: Record<string, unknown>) => {
+      deviceLog.info(`memberDashboard.${event}`, payload);
+    },
+    [],
+  );
 
   const monthFormatter = useMemo(
     () =>
@@ -94,6 +101,27 @@ export const MemberDashboardScreen: React.FC<MemberDashboardScreenProps> = ({
     [completedCount, t],
   );
 
+  useEffect(() => {
+    logEvent('screen.entered', {
+      isLoading,
+      isEmpty,
+      error: error ?? null,
+    });
+    return () => {
+      logEvent('screen.exited');
+    };
+  }, [error, isEmpty, isLoading, logEvent]);
+
+  const handleRefreshPress = useCallback(() => {
+    logEvent('refresh.requested');
+    void refresh();
+  }, [logEvent, refresh]);
+
+  const handleBackPress = useCallback(() => {
+    logEvent('navigation.back');
+    onBack?.();
+  }, [logEvent, onBack]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -106,7 +134,7 @@ export const MemberDashboardScreen: React.FC<MemberDashboardScreenProps> = ({
             {onBack ? (
               <Pressable
                 accessibilityRole="button"
-                onPress={onBack}
+                onPress={handleBackPress}
                 style={styles.backButton}
               >
                 <Text style={styles.backButtonText}>{t('analytics.shared.back')}</Text>
@@ -114,7 +142,7 @@ export const MemberDashboardScreen: React.FC<MemberDashboardScreenProps> = ({
             ) : null}
             <Pressable
               accessibilityRole="button"
-              onPress={() => void refresh()}
+              onPress={handleRefreshPress}
               style={styles.refreshButton}
             >
               <Text style={styles.refreshButtonText}>{t('analytics.shared.refresh')}</Text>

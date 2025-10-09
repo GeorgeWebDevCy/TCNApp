@@ -27,6 +27,7 @@ import { MembershipPlan } from '../types/auth';
 import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import deviceLog from '../utils/deviceLog';
 
 type MembershipScreenProps = {
   onBack?: () => void;
@@ -122,7 +123,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
   onBack,
 }) => {
   const { t, language } = useLocalization();
-  const { getSessionToken, refreshSession } = useAuthContext();
+  const { getSessionToken, refreshSession, state } = useAuthContext();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const layout = useResponsiveLayout();
   const numColumns = layout.isLargeTablet ? 3 : layout.isTablet ? 2 : 1;
@@ -179,6 +180,15 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const logEvent = useCallback(
+    (event: string, payload?: Record<string, unknown>) => {
+      deviceLog.info(`membership.${event}`, {
+        selectedPlanId,
+        ...payload,
+      });
+    },
+    [selectedPlanId],
+  );
 
   const locale = language === 'th' ? 'th-TH' : 'en-US';
   const intervalLabels = useMemo(
@@ -196,6 +206,15 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
     [plans, selectedPlanId],
   );
 
+  useEffect(() => {
+    logEvent('screen.entered', {
+      membershipTier: state.user?.membership?.tier ?? null,
+    });
+    return () => {
+      logEvent('screen.exited');
+    };
+  }, [logEvent, state.user?.membership?.tier]);
+
   const applyPlans = useCallback((availablePlans: MembershipPlan[]) => {
     const normalizedPlans =
       availablePlans.length > 0 ? availablePlans : DEFAULT_MEMBERSHIP_PLANS;
@@ -206,14 +225,23 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         normalizedPlans[0]?.id ??
         null,
     );
-  }, []);
+    logEvent('plans.applied', { count: normalizedPlans.length });
+  }, [logEvent]);
+
+  const handleSelectPlan = useCallback(
+    (planId: string) => {
+      setSelectedPlanId(planId);
+      logEvent('plan.selected', { planId });
+    },
+    [logEvent],
+  );
 
   const renderPlan = useCallback(
     ({ item }: { item: MembershipPlan }) => (
       <PlanCard
         plan={item}
         selected={item.id === selectedPlanId}
-        onSelect={setSelectedPlanId}
+        onSelect={handleSelectPlan}
         locale={locale}
         descriptionLabel={t('membership.screen.planDescription')}
         featureLabel={t('membership.screen.planFeatures')}
@@ -225,7 +253,14 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         layoutStyles={planCardLayoutStyles}
       />
     ),
-    [intervalLabels, locale, planCardLayoutStyles, selectedPlanId, t],
+    [
+      handleSelectPlan,
+      intervalLabels,
+      locale,
+      planCardLayoutStyles,
+      selectedPlanId,
+      t,
+    ],
   );
 
   const renderSeparator = useCallback(
@@ -237,9 +272,11 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
     try {
       setLoading(true);
       setError(null);
+      logEvent('plans.load.start');
       const token = await getSessionToken();
       const fetchedPlans = await fetchMembershipPlans(token ?? undefined);
       applyPlans(fetchedPlans);
+      logEvent('plans.load.success', { count: fetchedPlans.length });
     } catch (loadError) {
       const message =
         loadError instanceof Error
@@ -247,10 +284,11 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           : t('membership.screen.loadError');
       setError(message);
       applyPlans([]);
+      logEvent('plans.load.error', { message });
     } finally {
       setLoading(false);
     }
-  }, [applyPlans, getSessionToken, t]);
+  }, [applyPlans, getSessionToken, logEvent, t]);
 
   useEffect(() => {
     loadPlans();
@@ -258,11 +296,13 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
 
   const handleCheckout = useCallback(async () => {
     if (!selectedPlan) {
+      logEvent('checkout.missingPlan');
       return;
     }
 
     try {
       setProcessing(true);
+      logEvent('checkout.start', { planId: selectedPlan.id });
       const token = await getSessionToken();
       const paymentSession = await createMembershipPaymentSession(
         selectedPlan.id,
@@ -294,9 +334,16 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         );
       } catch (confirmError) {
         console.warn('Membership confirmation failed', confirmError);
+        logEvent('checkout.confirmationError', {
+          message:
+            confirmError instanceof Error
+              ? confirmError.message
+              : String(confirmError),
+        });
       }
 
       await refreshSession();
+      logEvent('checkout.success', { planId: selectedPlan.id });
       Alert.alert(
         t('membership.screen.successTitle'),
         t('membership.screen.successMessage'),
@@ -313,11 +360,13 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           ? checkoutError.message
           : t('membership.screen.checkoutError');
       Alert.alert(t('membership.screen.checkoutErrorTitle'), message);
+      logEvent('checkout.error', { message });
     } finally {
       setProcessing(false);
     }
   }, [
     getSessionToken,
+    logEvent,
     initPaymentSheet,
     onBack,
     presentPaymentSheet,
@@ -325,6 +374,11 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
     selectedPlan,
     t,
   ]);
+
+  const handleBackPress = useCallback(() => {
+    logEvent('navigation.back');
+    onBack?.();
+  }, [logEvent, onBack]);
 
   const headerActionLabel = useMemo(() => t('membership.screen.back'), [t]);
 
@@ -339,7 +393,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         </View>
         <View style={[styles.header, responsiveStyles.header]}>
           <Pressable
-            onPress={onBack}
+            onPress={handleBackPress}
             accessibilityRole="button"
             accessibilityLabel={headerActionLabel}
             style={[styles.backButton, responsiveStyles.backButton]}
@@ -368,7 +422,10 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
             <Text style={styles.errorText}>{error}</Text>
             <Pressable
               style={[styles.secondaryButton, responsiveStyles.secondaryButton]}
-              onPress={loadPlans}
+              onPress={() => {
+                logEvent('plans.retry');
+                void loadPlans();
+              }}
               accessibilityRole="button"
             >
               <Text style={styles.secondaryButtonText}>

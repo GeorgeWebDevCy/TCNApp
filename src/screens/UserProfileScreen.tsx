@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -23,6 +23,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 import { getUserDisplayName, getUserInitials } from '../utils/user';
 import { PasswordVisibilityToggle } from '../components/PasswordVisibilityToggle';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import deviceLog from '../utils/deviceLog';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -48,6 +49,18 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     loading: availabilityLoading,
     refresh: refreshAuthAvailability,
   } = useAuthAvailability();
+  const logEvent = useCallback(
+    (event: string, payload?: Record<string, unknown>) => {
+      deviceLog.info(`profile.${event}`, {
+        userId: user?.id ?? null,
+        hasPin,
+        biometricsEnabled,
+        biometricsSupported,
+        ...payload,
+      });
+    },
+    [biometricsEnabled, biometricsSupported, hasPin, user?.id],
+  );
   const layout = useResponsiveLayout();
   const responsiveStyles = useMemo(() => {
     const stackAvatar = layout.width < 640;
@@ -162,8 +175,16 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     });
   }, [user?.accountType, t]);
 
+  useEffect(() => {
+    logEvent('screen.entered');
+    return () => {
+      logEvent('screen.exited');
+    };
+  }, [logEvent]);
+
   const handleChangeAvatar = useCallback(async () => {
     try {
+      logEvent('avatar.change.start');
       const result = await launchImageLibrary({
         mediaType: 'photo',
         selectionLimit: 1,
@@ -171,11 +192,13 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       });
 
       if (result.didCancel || !result.assets || result.assets.length === 0) {
+        logEvent('avatar.change.cancelled');
         return;
       }
 
       const asset = result.assets[0];
       if (!asset?.uri) {
+        logEvent('avatar.change.invalidSelection');
         throw new Error(t('profile.avatar.errors.invalidSelection'));
       }
 
@@ -185,6 +208,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         fileName: asset.fileName ?? undefined,
         mimeType: asset.type ?? undefined,
       });
+      logEvent('avatar.change.success');
 
       Alert.alert(
         t('profile.avatar.successTitle'),
@@ -194,6 +218,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       const translated = translateError(
         error instanceof Error ? error.message : null,
       );
+      logEvent('avatar.change.error', {
+        message:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
       Alert.alert(
         t('profile.avatar.errorTitle'),
         translated ?? t('profile.avatar.errorMessage'),
@@ -201,12 +229,14 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     } finally {
       setAvatarSubmitting(false);
     }
-  }, [t, translateError, updateProfileAvatar]);
+  }, [logEvent, t, translateError, updateProfileAvatar]);
 
   const performRemoveAvatar = useCallback(async () => {
     try {
       setAvatarSubmitting(true);
+      logEvent('avatar.remove.start');
       await deleteProfileAvatar();
+      logEvent('avatar.remove.success');
       Alert.alert(
         t('profile.avatar.removeSuccessTitle'),
         t('profile.avatar.removeSuccessMessage'),
@@ -215,6 +245,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       const translated = translateError(
         error instanceof Error ? error.message : null,
       );
+      logEvent('avatar.remove.error', {
+        message:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
       Alert.alert(
         t('profile.avatar.errorTitle'),
         translated ?? t('profile.avatar.removeErrorMessage'),
@@ -222,9 +256,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     } finally {
       setAvatarSubmitting(false);
     }
-  }, [deleteProfileAvatar, t, translateError]);
+  }, [deleteProfileAvatar, logEvent, t, translateError]);
 
   const handleRemoveAvatar = useCallback(() => {
+    logEvent('avatar.remove.prompt');
     Alert.alert(
       t('profile.avatar.removeConfirmTitle'),
       t('profile.avatar.removeConfirmMessage'),
@@ -236,28 +271,40 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         {
           text: t('profile.avatar.removeConfirmAction'),
           style: 'destructive',
-          onPress: performRemoveAvatar,
+          onPress: () => {
+            logEvent('avatar.remove.confirmed');
+            void performRemoveAvatar();
+          },
         },
       ],
     );
-  }, [performRemoveAvatar, t]);
+  }, [logEvent, performRemoveAvatar, t]);
 
   const handlePasswordSubmit = useCallback(async () => {
     setPasswordError(null);
+    logEvent('password.change.attempt', {
+      hasCurrentPassword: Boolean(currentPassword),
+      hasNewPassword: Boolean(newPassword),
+      hasConfirmPassword: Boolean(confirmPassword),
+    });
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       setPasswordError(t('profile.password.errors.incomplete'));
+      logEvent('password.change.validationFailed', { reason: 'incomplete' });
       return;
     }
 
     if (newPassword !== confirmPassword) {
       setPasswordError(t('errors.passwordMismatch'));
+      logEvent('password.change.validationFailed', { reason: 'mismatch' });
       return;
     }
 
     try {
       setPasswordSubmitting(true);
+      logEvent('password.change.start');
       await changePassword({ currentPassword, newPassword });
+      logEvent('password.change.success');
       Alert.alert(
         t('profile.password.successTitle'),
         t('profile.password.successMessage'),
@@ -270,6 +317,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         error instanceof Error ? error.message : 'Unable to change password.',
       );
       setPasswordError(translated ?? t('errors.changePassword'));
+      logEvent('password.change.error', {
+        message:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
     } finally {
       setPasswordSubmitting(false);
     }
@@ -277,6 +328,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     changePassword,
     confirmPassword,
     currentPassword,
+    logEvent,
     newPassword,
     t,
     translateError,
@@ -284,21 +336,29 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
 
   const handlePinSubmit = useCallback(async () => {
     setPinError(null);
+    logEvent('pin.create.attempt', {
+      length: newPin.length,
+      matches: newPin === confirmPin,
+    });
 
     if (newPin.length < 4) {
       setPinError(t('errors.pinLength'));
+      logEvent('pin.create.validationFailed', { reason: 'length' });
       return;
     }
 
     if (newPin !== confirmPin) {
       setPinError(t('errors.pinMismatch'));
+      logEvent('pin.create.validationFailed', { reason: 'mismatch' });
       return;
     }
 
     try {
       setPinSubmitting(true);
+      logEvent('pin.create.start');
       await registerPin(newPin);
       await refreshAuthAvailability();
+      logEvent('pin.create.success');
       Alert.alert(
         t('profile.pin.successTitle'),
         t('profile.pin.successMessage'),
@@ -312,11 +372,16 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           : 'Something went wrong while saving your PIN.',
       );
       setPinError(translated ?? t('errors.pinSaveGeneric'));
+      logEvent('pin.create.error', {
+        message:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
     } finally {
       setPinSubmitting(false);
     }
   }, [
     confirmPin,
+    logEvent,
     newPin,
     registerPin,
     refreshAuthAvailability,
@@ -325,6 +390,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   ]);
 
   const confirmRemovePin = useCallback(() => {
+    logEvent('pin.remove.prompt');
     Alert.alert(
       t('profile.pin.removeConfirmTitle'),
       t('profile.pin.removeConfirmMessage'),
@@ -339,8 +405,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           onPress: async () => {
             try {
               setPinSubmitting(true);
+              logEvent('pin.remove.start');
               await removePin();
               await refreshAuthAvailability();
+              logEvent('pin.remove.success');
               Alert.alert(
                 t('profile.pin.removedTitle'),
                 t('profile.pin.removedMessage'),
@@ -354,6 +422,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                   : 'Something went wrong while removing your PIN.',
               );
               setPinError(translated ?? t('errors.pinRemoveGeneric'));
+              logEvent('pin.remove.error', {
+                message:
+                  error instanceof Error ? error.message : String(error ?? 'unknown'),
+              });
             } finally {
               setPinSubmitting(false);
             }
@@ -361,7 +433,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         },
       ],
     );
-  }, [refreshAuthAvailability, removePin, t, translateError]);
+  }, [logEvent, refreshAuthAvailability, removePin, t, translateError]);
 
   const handleEnableBiometrics = useCallback(async () => {
     if (biometricSubmitting) {
@@ -369,9 +441,11 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
     }
 
     setBiometricError(null);
+    logEvent('biometric.enable.attempt');
 
     if (!biometricsSupported) {
       setBiometricError(t('errors.biometricsUnavailable'));
+      logEvent('biometric.enable.validationFailed', { reason: 'unsupported' });
       return;
     }
 
@@ -381,11 +455,13 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
 
       if (!success) {
         setBiometricError(t('errors.biometricsCancelled'));
+        logEvent('biometric.enable.cancelled');
         return;
       }
 
       await setBiometricLoginEnabled(true);
       await refreshAuthAvailability();
+      logEvent('biometric.enable.success');
       Alert.alert(
         t('profile.biometric.enabledTitle'),
         t('profile.biometric.enabledMessage', {
@@ -399,12 +475,17 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           : 'Unable to complete biometric login.',
       );
       setBiometricError(translated ?? t('errors.biometricLogin'));
+      logEvent('biometric.enable.error', {
+        message:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
     } finally {
       setBiometricSubmitting(false);
     }
   }, [
     biometricLabel,
     biometricSubmitting,
+    logEvent,
     biometricsSupported,
     refreshAuthAvailability,
     t,
@@ -412,6 +493,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   ]);
 
   const handleDisableBiometrics = useCallback(() => {
+    logEvent('biometric.disable.prompt');
     Alert.alert(
       t('profile.biometric.disableConfirmTitle'),
       t('profile.biometric.disableConfirmMessage'),
@@ -427,8 +509,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             setBiometricSubmitting(true);
             setBiometricError(null);
             try {
+              logEvent('biometric.disable.start');
               await setBiometricLoginEnabled(false);
               await refreshAuthAvailability();
+              logEvent('biometric.disable.success');
               Alert.alert(
                 t('profile.biometric.disabledTitle'),
                 t('profile.biometric.disabledMessage'),
@@ -440,6 +524,12 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                   : 'Unable to complete biometric login.',
               );
               setBiometricError(translated ?? t('errors.biometricLogin'));
+              logEvent('biometric.disable.error', {
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : String(error ?? 'unknown'),
+              });
             } finally {
               setBiometricSubmitting(false);
             }
@@ -448,10 +538,16 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       ],
     );
   }, [
+    logEvent,
     refreshAuthAvailability,
     t,
     translateError,
   ]);
+
+  const handleBackPress = useCallback(() => {
+    logEvent('navigation.back');
+    onBack?.();
+  }, [logEvent, onBack]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -869,7 +965,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
 
         {onBack ? (
           <Pressable
-            onPress={onBack}
+            onPress={handleBackPress}
             style={[styles.backButton, responsiveStyles.backButton]}
             accessibilityRole="button"
           >

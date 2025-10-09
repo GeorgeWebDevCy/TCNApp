@@ -26,6 +26,7 @@ import {
   getUserInitials,
 } from '../utils/user';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import deviceLog from '../utils/deviceLog';
 
 export const getMaxDiscount = (
   benefits: MembershipBenefit[],
@@ -184,6 +185,26 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   }, [isAdminAccount, onOpenAdminConsole, t]);
 
   const layout = useResponsiveLayout();
+  const logEvent = useCallback(
+    (event: string, payload?: Record<string, unknown>) => {
+      deviceLog.info(`home.${event}`, {
+        userId: user?.id ?? null,
+        ...payload,
+      });
+    },
+    [user?.id],
+  );
+
+  useEffect(() => {
+    logEvent('view.entered', {
+      membershipTier: membership?.tier ?? null,
+      accountType: user?.accountType ?? null,
+    });
+
+    return () => {
+      logEvent('view.exited');
+    };
+  }, [logEvent, membership?.tier, user?.accountType]);
   const responsiveStyles = useMemo(() => {
     const stackProfile = layout.width < 640;
     const stackNotificationActions = layout.width < 420;
@@ -258,26 +279,31 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const handleQuickAction = useCallback(
     (action: QuickAction) => {
+      logEvent('quickAction.selected', { action: action.key });
       if (action.key === 'upgrade') {
         if (onUpgradeMembership) {
+          logEvent('navigation.membership');
           onUpgradeMembership();
           return;
         }
       } else if (action.key === 'admin') {
         if (onOpenAdminConsole) {
+          logEvent('navigation.adminConsole');
           onOpenAdminConsole();
           return;
         }
       } else if (action.key === 'analytics') {
         if (onViewAnalytics) {
+          logEvent('navigation.memberAnalytics');
           onViewAnalytics();
           return;
         }
       }
 
+      logEvent('quickAction.unavailable', { action: action.key });
       Alert.alert(t('home.quickActions.comingSoonTitle'), action.message);
     },
-    [onOpenAdminConsole, onUpgradeMembership, onViewAnalytics, t],
+    [logEvent, onOpenAdminConsole, onUpgradeMembership, onViewAnalytics, t],
   );
 
   const recentTransactions = useMemo(
@@ -311,6 +337,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     return t('home.notifications.genericTitle');
   }, [activeNotification, t]);
 
+  useEffect(() => {
+    if (!activeNotification) {
+      return;
+    }
+
+    logEvent('notification.received', {
+      category: activeNotification.category,
+      origin: activeNotificationOrigin,
+      target: activeNotification.target ?? null,
+    });
+  }, [activeNotification, activeNotificationOrigin, logEvent]);
+
   const handleNotificationNavigate = useCallback(() => {
     if (!activeNotification) {
       return;
@@ -324,6 +362,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       });
     } else if (activeNotification.target === 'membership') {
       if (onUpgradeMembership) {
+        logEvent('notification.navigate.membership');
         onUpgradeMembership();
       } else {
         Alert.alert(
@@ -333,24 +372,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
       }
     }
 
+    logEvent('notification.consumed', {
+      target: activeNotification.target ?? null,
+    });
     clearActiveNotification();
   }, [
     activeNotification,
     clearActiveNotification,
     handleQuickAction,
+    logEvent,
     onUpgradeMembership,
     t,
   ]);
 
   const handleNotificationDismiss = useCallback(() => {
+    logEvent('notification.dismissed');
     clearActiveNotification();
-  }, [clearActiveNotification]);
+  }, [clearActiveNotification, logEvent]);
 
   useEffect(() => {
     if (!pendingNavigationTarget) {
       return;
     }
 
+    logEvent('notification.pendingNavigation', {
+      target: pendingNavigationTarget,
+    });
     if (pendingNavigationTarget === 'vendors') {
       handleQuickAction({
         key: 'vendors',
@@ -374,10 +421,16 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     clearActiveNotification,
     consumeNavigationTarget,
     handleQuickAction,
+    logEvent,
     pendingNavigationTarget,
     onUpgradeMembership,
     t,
   ]);
+
+  const handleManageProfilePress = useCallback(() => {
+    logEvent('navigation.manageProfile');
+    onManageProfile?.();
+  }, [logEvent, onManageProfile]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -429,7 +482,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {onManageProfile ? (
           <Pressable
-            onPress={onManageProfile}
+            onPress={handleManageProfilePress}
             style={[styles.manageProfileButton, responsiveStyles.manageProfileButton]}
             accessibilityRole="button"
           >
@@ -533,6 +586,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Switch
               value={preferences.marketing}
               onValueChange={value => {
+                logEvent('preferences.updated', {
+                  preference: 'marketing',
+                  value,
+                });
                 void updatePreference('marketing', value);
               }}
               accessibilityRole="switch"
@@ -551,6 +608,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             <Switch
               value={preferences.reminders}
               onValueChange={value => {
+                logEvent('preferences.updated', {
+                  preference: 'reminders',
+                  value,
+                });
                 void updatePreference('reminders', value);
               }}
               accessibilityRole="switch"

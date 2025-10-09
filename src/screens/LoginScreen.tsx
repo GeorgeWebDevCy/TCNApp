@@ -23,6 +23,7 @@ import { RegisterOptions } from '../types/auth';
 import { COLORS } from '../config/theme';
 import { getUserDisplayName } from '../utils/user';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import deviceLog from '../utils/deviceLog';
 
 type AuthTabId = 'password' | 'pin';
 
@@ -47,6 +48,16 @@ export const LoginScreen: React.FC = () => {
     refresh,
   } = useAuthAvailability();
   const { t, translateError } = useLocalization();
+  const logEvent = useCallback(
+    (event: string, payload?: Record<string, unknown>) => {
+      deviceLog.info(`login.${event}`, {
+        userId: state.user?.id ?? null,
+        locked: state.isLocked,
+        ...payload,
+      });
+    },
+    [state.isLocked, state.user?.id],
+  );
   const [activeTab, setActiveTab] = useState<AuthTabId>('password');
   const [lastAttempt, setLastAttempt] = useState<
     'password' | 'pin' | 'biometric' | null
@@ -54,6 +65,23 @@ export const LoginScreen: React.FC = () => {
   const [pinError, setPinError] = useState<string | null>(null);
   const [isForgotPasswordVisible, setForgotPasswordVisible] = useState(false);
   const [isRegisterVisible, setRegisterVisible] = useState(false);
+
+  useEffect(() => {
+    logEvent('screen.entered', {
+      hasStoredPin,
+      biometricsEnabled,
+      biometricsSupported,
+    });
+
+    return () => {
+      logEvent('screen.exited');
+    };
+  }, [
+    biometricsEnabled,
+    biometricsSupported,
+    hasStoredPin,
+    logEvent,
+  ]);
 
   const authTabs = useMemo(() => {
     const tabs: Array<{ id: AuthTabId; label: string }> = [
@@ -69,24 +97,31 @@ export const LoginScreen: React.FC = () => {
 
   useEffect(() => {
     if (hasStoredPin && state.isLocked) {
+      logEvent('state.lockedWithPin');
       setActiveTab('pin');
     }
-  }, [hasStoredPin, state.isLocked]);
+  }, [hasStoredPin, logEvent, state.isLocked]);
 
   useEffect(() => {
     if (!hasStoredPin && activeTab === 'pin') {
+      logEvent('state.pinUnavailable');
       setActiveTab('password');
     }
-  }, [activeTab, hasStoredPin]);
+  }, [activeTab, hasStoredPin, logEvent]);
+
+  useEffect(() => {
+    logEvent('tab.changed', { tab: activeTab });
+  }, [activeTab, logEvent]);
 
   const handlePasswordSubmit = useCallback(
     async ({ email, password }: { email: string; password: string }) => {
       setLastAttempt('password');
       resetError();
+      logEvent('password.submit', { hasEmail: Boolean(email) });
       // Persist credentials for secure re-auth fallback
       await loginWithPassword({ email, password, remember: true });
     },
-    [loginWithPassword, resetError],
+    [logEvent, loginWithPassword, resetError],
   );
 
   const handlePinSubmit = useCallback(
@@ -94,17 +129,20 @@ export const LoginScreen: React.FC = () => {
       setLastAttempt('pin');
       setPinError(null);
       resetError();
+      logEvent('pin.submit');
       await loginWithPin({ pin });
     },
-    [loginWithPin, resetError],
+    [logEvent, loginWithPin, resetError],
   );
 
   const handlePinCreate = useCallback(
     async (pin: string) => {
       setLastAttempt('pin');
       try {
+        logEvent('pin.create.start');
         await registerPin(pin);
         await refresh();
+        logEvent('pin.create.success');
         Alert.alert(
           t('login.alerts.pinSaved.title'),
           t('login.alerts.pinSaved.message'),
@@ -113,15 +151,18 @@ export const LoginScreen: React.FC = () => {
         const message =
           error instanceof Error ? error.message : 'errors.pinSaveGeneric';
         setPinError(message);
+        logEvent('pin.create.error', { message });
       }
     },
-    [refresh, registerPin, t],
+    [logEvent, refresh, registerPin, t],
   );
 
   const handleRemovePin = useCallback(async () => {
     try {
+      logEvent('pin.remove.start');
       await removePin();
       await refresh();
+      logEvent('pin.remove.success');
       Alert.alert(
         t('login.alerts.pinRemoved.title'),
         t('login.alerts.pinRemoved.message'),
@@ -130,23 +171,46 @@ export const LoginScreen: React.FC = () => {
       const message =
         error instanceof Error ? error.message : 'errors.pinRemoveGeneric';
       setPinError(message);
+      logEvent('pin.remove.error', { message });
     }
-  }, [refresh, removePin, t]);
+  }, [logEvent, refresh, removePin, t]);
 
   const handleBiometricLogin = useCallback(async () => {
     setLastAttempt('biometric');
     resetError();
+    logEvent('biometric.attempt', {
+      supported: biometricsSupported,
+      enabled: biometricsEnabled,
+    });
     await loginWithBiometrics(t('biometrics.prompt'));
-  }, [loginWithBiometrics, resetError, t]);
+  }, [
+    biometricsEnabled,
+    biometricsSupported,
+    logEvent,
+    loginWithBiometrics,
+    resetError,
+    t,
+  ]);
 
   const handleRequestPasswordReset = useCallback(
-    (identifier: string) => requestPasswordReset(identifier),
-    [requestPasswordReset],
+    (identifier: string) => {
+      logEvent('passwordReset.requested', {
+        hasIdentifier: Boolean(identifier),
+      });
+      return requestPasswordReset(identifier);
+    },
+    [logEvent, requestPasswordReset],
   );
 
   const handleRegisterAccount = useCallback(
-    (options: RegisterOptions) => registerAccount(options),
-    [registerAccount],
+    (options: RegisterOptions) => {
+      logEvent('register.submitted', {
+        hasEmail: Boolean(options.email),
+        isVendor: options.accountType === 'vendor',
+      });
+      return registerAccount(options);
+    },
+    [logEvent, registerAccount],
   );
 
   const changeTab = useCallback(
@@ -155,9 +219,30 @@ export const LoginScreen: React.FC = () => {
       setLastAttempt(null);
       setPinError(null);
       resetError();
+      logEvent('tab.manualChange', { tab: tabId });
     },
-    [resetError],
+    [logEvent, resetError],
   );
+
+  const handleShowForgotPassword = useCallback(() => {
+    logEvent('modal.forgotPassword.opened');
+    setForgotPasswordVisible(true);
+  }, [logEvent]);
+
+  const handleHideForgotPassword = useCallback(() => {
+    logEvent('modal.forgotPassword.closed');
+    setForgotPasswordVisible(false);
+  }, [logEvent]);
+
+  const handleShowRegister = useCallback(() => {
+    logEvent('modal.register.opened');
+    setRegisterVisible(true);
+  }, [logEvent]);
+
+  const handleHideRegister = useCallback(() => {
+    logEvent('modal.register.closed');
+    setRegisterVisible(false);
+  }, [logEvent]);
 
   const activeError = useMemo(() => {
     if (lastAttempt === 'pin') {
@@ -247,6 +332,18 @@ export const LoginScreen: React.FC = () => {
     };
   }, [layout]);
 
+  useEffect(() => {
+    if (state.error) {
+      logEvent('error', { message: state.error });
+    }
+  }, [logEvent, state.error]);
+
+  useEffect(() => {
+    if (pinError) {
+      logEvent('pin.validationError', { message: pinError });
+    }
+  }, [logEvent, pinError]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.surface} />
@@ -299,8 +396,8 @@ export const LoginScreen: React.FC = () => {
               loading={isLoading && lastAttempt === 'password'}
               error={passwordError}
               onSubmit={handlePasswordSubmit}
-              onForgotPassword={() => setForgotPasswordVisible(true)}
-              onRegister={() => setRegisterVisible(true)}
+              onForgotPassword={handleShowForgotPassword}
+              onRegister={handleShowRegister}
             />
           ) : hasStoredPin ? (
             <PinLoginForm
@@ -342,16 +439,16 @@ export const LoginScreen: React.FC = () => {
           ) : null}
         </View>
       </ScrollView>
-      <ForgotPasswordModal
-        visible={isForgotPasswordVisible}
-        onClose={() => setForgotPasswordVisible(false)}
-        onSubmit={handleRequestPasswordReset}
-      />
-      <RegisterModal
-        visible={isRegisterVisible}
-        onClose={() => setRegisterVisible(false)}
-        onSubmit={handleRegisterAccount}
-      />
+  <ForgotPasswordModal
+    visible={isForgotPasswordVisible}
+    onClose={handleHideForgotPassword}
+    onSubmit={handleRequestPasswordReset}
+  />
+  <RegisterModal
+    visible={isRegisterVisible}
+    onClose={handleHideRegister}
+    onSubmit={handleRegisterAccount}
+  />
     </SafeAreaView>
   );
 };
