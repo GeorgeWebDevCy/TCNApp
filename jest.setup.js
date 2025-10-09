@@ -10,6 +10,14 @@ globalThis.process = globalProcess;
 
 jest.mock('react-native-qrcode-svg', () => 'QRCodeSVG');
 
+jest.mock('react-native-camera-kit', () => {
+  const React = require('react');
+  return {
+    CameraScreen: ({ children, ...props }) =>
+      React.createElement('camera-screen', props, children),
+  };
+});
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const createElement = React.createElement;

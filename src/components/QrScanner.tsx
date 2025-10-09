@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   PermissionsAndroid,
   Platform,
@@ -8,7 +8,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import QrWebScanner from './QrWebScanner';
+import { CameraScreen } from 'react-native-camera-kit';
 import deviceLog from '../utils/deviceLog';
 
 type QrScannerProps = {
@@ -22,42 +22,17 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
   const [permission, setPermission] = useState<'granted' | 'denied' | 'unknown'>(
     Platform.OS === 'android' ? 'unknown' : 'granted',
   );
-  const [nativeModule, setNativeModule] = useState<null | {
-    // Try a handful of common export names; we'll pick the first that exists at runtime
-    default?: React.ComponentType<any>;
-    Scanner?: React.ComponentType<any>;
-    QRScanner?: React.ComponentType<any>;
-    BarcodeScanner?: React.ComponentType<any>;
-    CameraScanner?: React.ComponentType<any>;
-  }>(null);
-  const loggedWebFallbackRef = useRef(false);
+  const cameraKitAvailable = Platform.OS !== 'web';
   const blockedPermissionLoggedRef = useRef<'granted' | 'denied' | 'unknown' | null>(
     null,
   );
 
   useEffect(() => {
-    // Dynamically require to avoid hard dependency at build time.
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const mod = require('react-native-scanner');
-      if (mod && typeof mod === 'object') {
-        setNativeModule(mod);
-        deviceLog.debug('qrScanner.nativeModule.detected', {
-          exports: Object.keys(mod).slice(0, 5),
-        });
-      } else {
-        setNativeModule(null);
-        deviceLog.info('qrScanner.nativeModule.unavailable', {
-          reason: 'invalid_module',
-        });
-      }
-    } catch (error) {
-      setNativeModule(null);
-      deviceLog.warn('qrScanner.nativeModule.error', {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }, []);
+    deviceLog.debug('qrScanner.cameraKit.detected', {
+      available: cameraKitAvailable,
+      platform: Platform.OS,
+    });
+  }, [cameraKitAvailable]);
 
   useEffect(() => {
     const request = async () => {
@@ -110,6 +85,10 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
         if (!value) return null;
         if (typeof value === 'string') return value.trim();
         if (typeof value === 'object') {
+          if (value.nativeEvent) {
+            const nested = tryExtract(value.nativeEvent);
+            if (nested) return nested;
+          }
           const candidates = [
             value?.data,
             value?.text,
@@ -136,18 +115,6 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
     [onScan],
   );
 
-  const NativeComponent = useMemo(() => {
-    if (!nativeModule) return null;
-    return (
-      nativeModule.Scanner ||
-      nativeModule.QRScanner ||
-      nativeModule.BarcodeScanner ||
-      nativeModule.CameraScanner ||
-      nativeModule.default ||
-      null
-    ) as React.ComponentType<any> | null;
-  }, [nativeModule]);
-
   if (Platform.OS === 'android' && permission !== 'granted') {
     if (blockedPermissionLoggedRef.current !== permission) {
       deviceLog.info('qrScanner.permission.blocked', {
@@ -167,32 +134,28 @@ export const QrScanner: React.FC<QrScannerProps> = ({ onScan, style }) => {
     );
   }
 
-  if (NativeComponent) {
-    // Pass multiple potential prop names so whichever the library expects will be wired.
+  if (!cameraKitAvailable) {
     return (
       <View style={[styles.container, style]}>
-        <NativeComponent
-          style={styles.native}
-          onRead={handleNativeScan}
-          onScan={handleNativeScan}
-          onCodeScanned={handleNativeScan}
-          onScanned={handleNativeScan}
-          onBarCodeRead={handleNativeScan}
-        />
+        <View style={styles.permissionBanner}>
+          <Text style={styles.permissionText}>
+            QR scanning is not available on this device.
+          </Text>
+        </View>
       </View>
     );
   }
 
-  // Fallback to WebView-based scanner if the native module is not installed.
-  if (!loggedWebFallbackRef.current) {
-    deviceLog.info('qrScanner.webScanner.fallback', {
-      hasNativeModule: Boolean(nativeModule),
-    });
-    loggedWebFallbackRef.current = true;
-  }
   return (
     <View style={[styles.container, style]}>
-      <QrWebScanner onScan={onScan} style={StyleSheet.absoluteFill} />
+      <CameraScreen
+        style={styles.native}
+        cameraType="back"
+        scanBarcode
+        hideControls
+        showFrame
+        onReadCode={handleNativeScan}
+      />
     </View>
   );
 };
