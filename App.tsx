@@ -23,6 +23,7 @@ import { HomeScreen } from './src/screens/HomeScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
 import { MembershipScreen } from './src/screens/MembershipScreen';
+import { VendorScanScreen } from './src/screens/VendorScanScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
 import { COLORS } from './src/config/theme';
 
@@ -32,7 +33,7 @@ import { COLORS } from './src/config/theme';
 // interactions, keeping the top-level App component focused on wiring.
 const AppContent: React.FC = () => {
   const {
-    state: { isAuthenticated, isLoading },
+    state: { isAuthenticated, isLoading, user },
   } = useAuthContext();
   // Track which high-level screen the authenticated user is currently viewing.
   // We model the navigation stack as a discriminated union to keep the state strict.
@@ -63,6 +64,10 @@ const AppContent: React.FC = () => {
     // No authenticated session found, so we show the login experience. The AuthProvider
     // will update the context once the user signs in.
     return <LoginScreen />;
+  }
+
+  if ((user?.accountType ?? '').toLowerCase() === 'vendor') {
+    return <VendorScanScreen />;
   }
 
   if (activeScreen === 'profile') {

@@ -130,6 +130,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       planSummary: 'Plan: {{plan}}',
       logout: 'Log out',
       manageProfile: 'Manage profile',
+      roleBadge: {
+        member: 'Member account',
+        vendor: 'Vendor account',
+        staff: 'Staff account',
+        admin: 'Admin account',
+        default: '{{type}} account',
+      },
       membership: {
         heading: 'Membership status',
         tierLabel: 'Tier',
@@ -203,6 +210,39 @@ export const translations: Record<Language, TranslationDictionary> = {
         back: 'Back',
       },
     },
+    vendor: {
+      screen: {
+        title: 'Member scanner',
+        subtitle: 'Scan member QR codes to confirm eligibility and discounts.',
+        permissionDenied:
+          'Camera permission is required to scan QR codes. Use manual entry if access is not granted.',
+        cameraPermission: {
+          title: 'Camera access',
+          message: 'TCN needs camera access to scan member QR codes.',
+          accept: 'Allow',
+          decline: 'Deny',
+        },
+        manualTitle: 'Manual entry',
+        manualPlaceholder: 'Enter member QR token',
+        manualSubmit: 'Validate code',
+        errors: {
+          empty: 'Enter a QR token to validate.',
+          generic: 'Unable to validate the QR token. Please try again.',
+        },
+        status: {
+          valid: 'Membership validated',
+          invalid: 'Unable to validate membership',
+          invalidMessage: 'QR code not recognized. Verify the member details.',
+        },
+        result: {
+          memberName: 'Member: {{name}}',
+          membershipTier: 'Tier: {{tier}}',
+          discount: 'Allowed discount: {{discount}}',
+        },
+        logout: 'Sign out',
+        operator: 'Signed in as {{name}}',
+      },
+    },
     profile: {
       title: 'Your profile',
       subtitle: 'Manage your account security preferences.',
@@ -228,6 +268,22 @@ export const translations: Record<Language, TranslationDictionary> = {
           'Please try again or ensure the WordPress avatar endpoint supports removal.',
         errors: {
           invalidSelection: 'Select a valid image to continue.',
+        },
+      },
+      qr: {
+        title: 'Membership QR code',
+        subtitle: 'Present this code at the till to receive member pricing.',
+        roleLabel: 'Account type',
+        hint: 'Show this QR code to the cashier to validate membership.',
+        empty: 'A QR code will appear here once your membership is active.',
+        tokenLabel: 'Token: {{token}}',
+        issuedAt: 'Issued {{date}}',
+        expiresAt: 'Expires {{date}}',
+        accountTypes: {
+          member: 'Member account',
+          vendor: 'Vendor account',
+          staff: 'Staff account',
+          admin: 'Admin account',
         },
       },
       password: {
@@ -443,6 +499,13 @@ export const translations: Record<Language, TranslationDictionary> = {
       planSummary: 'แผน: {{plan}}',
       logout: 'ออกจากระบบ',
       manageProfile: 'จัดการโปรไฟล์',
+      roleBadge: {
+        member: 'บัญชีสมาชิก',
+        vendor: 'บัญชีร้านค้า',
+        staff: 'บัญชีเจ้าหน้าที่',
+        admin: 'บัญชีผู้ดูแล',
+        default: 'บัญชี{{type}}',
+      },
       membership: {
         heading: 'สถานะสมาชิก',
         tierLabel: 'ระดับสมาชิก',
@@ -511,6 +574,39 @@ export const translations: Record<Language, TranslationDictionary> = {
         back: 'ย้อนกลับ',
       },
     },
+    vendor: {
+      screen: {
+        title: 'สแกนสมาชิก',
+        subtitle: 'สแกนโค้ด QR ของสมาชิกเพื่อยืนยันสิทธิ์และส่วนลด',
+        permissionDenied:
+          'ต้องอนุญาตการใช้กล้องเพื่อสแกนโค้ด QR โปรดกรอกโค้ดด้วยตนเองหากไม่สามารถใช้กล้องได้.',
+        cameraPermission: {
+          title: 'การเข้าถึงกล้อง',
+          message: 'แอปต้องใช้กล้องเพื่อสแกนโค้ดของสมาชิก',
+          accept: 'อนุญาต',
+          decline: 'ปฏิเสธ',
+        },
+        manualTitle: 'กรอกโค้ดด้วยตนเอง',
+        manualPlaceholder: 'ใส่โทเคน QR ของสมาชิก',
+        manualSubmit: 'ตรวจสอบโค้ด',
+        errors: {
+          empty: 'กรุณาใส่โทเคนเพื่อทำการตรวจสอบ',
+          generic: 'ไม่สามารถตรวจสอบโค้ดได้ โปรดลองอีกครั้ง',
+        },
+        status: {
+          valid: 'ยืนยันสมาชิกเรียบร้อย',
+          invalid: 'ไม่สามารถยืนยันสมาชิกได้',
+          invalidMessage: 'ไม่พบโค้ด QR โปรดตรวจสอบสถานะสมาชิก',
+        },
+        result: {
+          memberName: 'สมาชิก: {{name}}',
+          membershipTier: 'ระดับ: {{tier}}',
+          discount: 'ส่วนลดที่อนุญาต: {{discount}}',
+        },
+        logout: 'ออกจากระบบ',
+        operator: 'เข้าสู่ระบบในชื่อ {{name}}',
+      },
+    },
     profile: {
       title: 'โปรไฟล์ของคุณ',
       subtitle: 'จัดการการตั้งค่าความปลอดภัยของบัญชีคุณ.',
@@ -533,6 +629,22 @@ export const translations: Record<Language, TranslationDictionary> = {
           'โปรดลองอีกครั้งหรือตรวจสอบว่าเอ็นด์พอยต์รองรับการลบรูปภาพ.',
         errors: {
           invalidSelection: 'โปรดเลือกรูปภาพที่ถูกต้องเพื่อดำเนินการต่อ.',
+        },
+      },
+      qr: {
+        title: 'รหัส QR สำหรับสมาชิก',
+        subtitle: 'แสดงโค้ดนี้ที่จุดชำระเงินเพื่อรับสิทธิ์สมาชิก.',
+        roleLabel: 'ประเภทบัญชี',
+        hint: 'แสดงรหัสนี้ให้พนักงานเพื่อยืนยันสถานะสมาชิกของคุณ.',
+        empty: 'โค้ด QR จะปรากฏเมื่อสมาชิกของคุณเปิดใช้งานแล้ว.',
+        tokenLabel: 'โทเคน: {{token}}',
+        issuedAt: 'ออกเมื่อ {{date}}',
+        expiresAt: 'หมดอายุ {{date}}',
+        accountTypes: {
+          member: 'บัญชีสมาชิก',
+          vendor: 'บัญชีร้านค้า',
+          staff: 'บัญชีเจ้าหน้าที่',
+          admin: 'บัญชีผู้ดูแล',
         },
       },
       password: {

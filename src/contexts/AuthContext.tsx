@@ -33,6 +33,7 @@ import {
   ensureCookieSession,
   uploadProfileAvatar as uploadWordPressProfileAvatar,
   deleteProfileAvatar as deleteWordPressProfileAvatar,
+  ensureMemberQrCode,
 } from '../services/wordpressAuthService';
 import { useTokenLogin } from '../providers/TokenLoginProvider';
 import type { PersistedSession } from '../services/wordpressAuthService';
@@ -42,6 +43,7 @@ import {
   AuthUser,
   LoginOptions,
   MembershipInfo,
+  MemberQrCode,
   PinLoginOptions,
   RegisterOptions,
   ResetPasswordOptions,
@@ -52,6 +54,7 @@ interface LoginSuccessPayload {
   method: AuthState['authMethod'];
   passwordAuthenticated: boolean;
   membership: MembershipInfo | null;
+  memberQrCode: MemberQrCode | null;
 }
 
 type AuthAction =
@@ -63,6 +66,7 @@ type AuthAction =
         locked: boolean;
         passwordAuthenticated: boolean;
         membership: MembershipInfo | null;
+        memberQrCode: MemberQrCode | null;
       };
     }
   | { type: 'LOGIN_START' }
@@ -75,6 +79,7 @@ type AuthAction =
         user: AuthUser | null;
         passwordAuthenticated: boolean;
         membership: MembershipInfo | null;
+        memberQrCode: MemberQrCode | null;
       };
     }
   | { type: 'LOGOUT' }
@@ -86,6 +91,7 @@ const initialState: AuthState = {
   isLoading: true,
   user: null,
   membership: null,
+  memberQrCode: null,
   authMethod: null,
   error: null,
   hasPasswordAuthenticated: false,
@@ -106,6 +112,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLocked: action.payload.locked,
         user: action.payload.user,
         membership: action.payload.membership,
+        memberQrCode: action.payload.memberQrCode,
         hasPasswordAuthenticated: action.payload.passwordAuthenticated,
       };
     case 'LOGIN_START':
@@ -122,6 +129,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLocked: false,
         user: action.payload.user,
         membership: action.payload.membership,
+        memberQrCode: action.payload.memberQrCode,
         authMethod: action.payload.method,
         error: null,
         hasPasswordAuthenticated: action.payload.passwordAuthenticated,
@@ -139,6 +147,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLocked: action.payload.locked,
         user: action.payload.user,
         membership: action.payload.membership,
+        memberQrCode: action.payload.memberQrCode,
         authMethod: null,
         isLoading: false,
         hasPasswordAuthenticated: action.payload.passwordAuthenticated,
@@ -157,6 +166,9 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       return state;
   }
 };
+
+export const __initialAuthStateForTests = initialState;
+export const __authReducerForTests = authReducer;
 
 export const AuthContext = React.createContext<AuthContextValue | undefined>(
   undefined,
@@ -189,7 +201,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         }
       }
     },
-    [],
+    [persistSessionSnapshot],
   );
 
   const logCookieHydration = useCallback(
@@ -211,6 +223,69 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     [],
   );
 
+  const fetchMemberQrCode = useCallback(
+    async (session: PersistedSession | null): Promise<MemberQrCode | null> => {
+      const snapshot = session ?? sessionRef.current;
+
+      if (!snapshot?.token) {
+        return null;
+      }
+
+      const user = snapshot.user;
+      if (!user) {
+        return null;
+      }
+
+      const normalizedAccountType = user.accountType
+        ? user.accountType.toLowerCase()
+        : null;
+
+      if (normalizedAccountType === 'vendor') {
+        return null;
+      }
+
+      if (user.qrToken) {
+        return {
+          token: user.qrToken,
+          payload: user.qrPayload ?? null,
+        };
+      }
+
+      try {
+        const qrCode = await ensureMemberQrCode({
+          token: snapshot.token,
+          payload: user.qrPayload ?? null,
+        });
+
+        if (qrCode) {
+          const updatedUser: AuthUser = {
+            ...user,
+            qrToken: qrCode.token,
+            qrPayload: qrCode.payload ?? user.qrPayload ?? null,
+          };
+          const updatedSession: PersistedSession = {
+            ...snapshot,
+            user: updatedUser,
+          };
+          sessionRef.current = updatedSession;
+          await persistSessionSnapshot(updatedSession);
+          return {
+            ...qrCode,
+            payload: qrCode.payload ?? updatedUser.qrPayload ?? null,
+          };
+        }
+      } catch (error) {
+        deviceLog.warn('auth.memberQr.fetchFailed', {
+          message: error instanceof Error ? error.message : String(error),
+          userId: user.id,
+        });
+      }
+
+      return null;
+    },
+    [],
+  );
+
   const bootstrap = useCallback(async () => {
     dispatch({ type: 'BOOTSTRAP_START' });
 
@@ -221,6 +296,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       Boolean(session) &&
       !session?.locked;
 
+    const memberQrCode = await fetchMemberQrCode(session);
+
     dispatch({
       type: 'BOOTSTRAP_COMPLETE',
       payload: {
@@ -228,9 +305,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         locked: session?.locked ?? false,
         membership: session?.user?.membership ?? null,
         passwordAuthenticated,
+        memberQrCode,
       },
     });
-  }, []);
+  }, [fetchMemberQrCode]);
 
   useEffect(() => {
     bootstrap();
@@ -262,13 +340,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         }
       }
 
+      const memberQrCode = await fetchMemberQrCode(session);
+      const resolvedUser = sessionRef.current?.user ?? session.user;
+
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
-          user: session.user,
+          user: resolvedUser,
           method: 'password',
-          membership: session.user?.membership ?? null,
+          membership: resolvedUser?.membership ?? null,
           passwordAuthenticated: true,
+          memberQrCode,
         },
       });
       deviceLog.success('Password login succeeded');
@@ -280,7 +362,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       deviceLog.error('Password login failed', error);
       dispatch({ type: 'LOGIN_ERROR', payload: message });
     }
-  }, [hydrateTokenLogin, logCookieHydration]);
+  }, [fetchMemberQrCode, hydrateTokenLogin, logCookieHydration]);
 
   const loginWithPin = useCallback(
     async ({ pin }: PinLoginOptions) => {
@@ -341,6 +423,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           }
 
           sessionRef.current = { ...session, user: refreshedUser };
+          const memberQrCode = await fetchMemberQrCode(sessionRef.current);
           dispatch({
             type: 'LOGIN_SUCCESS',
             payload: {
@@ -348,19 +431,25 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
               method: 'pin',
               membership: refreshedUser?.membership ?? null,
               passwordAuthenticated: state.hasPasswordAuthenticated,
+              memberQrCode,
             },
           });
           deviceLog.success('PIN login succeeded for refreshed user');
           return;
         }
 
+        const memberQrCode = await fetchMemberQrCode(session);
+        const resolvedUser = sessionRef.current?.user ?? session.user;
+
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: session.user,
+            user: resolvedUser,
             method: 'pin',
-            membership: session.user?.membership ?? state.membership,
+            membership:
+              resolvedUser?.membership ?? state.membership,
             passwordAuthenticated: state.hasPasswordAuthenticated,
+            memberQrCode,
           },
         });
         deviceLog.success('PIN login succeeded');
@@ -375,6 +464,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       }
     },
     [
+      fetchMemberQrCode,
       hydrateTokenLogin,
       logCookieHydration,
       logSessionSnapshot,
@@ -454,6 +544,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           }
 
           sessionRef.current = { ...session, user: refreshedUser };
+          const memberQrCode = await fetchMemberQrCode(sessionRef.current);
           dispatch({
             type: 'LOGIN_SUCCESS',
             payload: {
@@ -461,19 +552,25 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
               method: 'biometric',
               membership: refreshedUser?.membership ?? null,
               passwordAuthenticated: state.hasPasswordAuthenticated,
+              memberQrCode,
             },
           });
           deviceLog.success('Biometric login succeeded for refreshed user');
           return;
         }
 
+        const memberQrCode = await fetchMemberQrCode(session);
+        const resolvedUser = sessionRef.current?.user ?? session.user;
+
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: {
-            user: session.user,
+            user: resolvedUser,
             method: 'biometric',
-            membership: session.user?.membership ?? state.membership,
+            membership:
+              resolvedUser?.membership ?? state.membership,
             passwordAuthenticated: state.hasPasswordAuthenticated,
+            memberQrCode,
           },
         });
         deviceLog.success('Biometric login succeeded');
@@ -488,6 +585,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       }
     },
     [
+      fetchMemberQrCode,
       hydrateTokenLogin,
       logCookieHydration,
       logSessionSnapshot,
@@ -587,9 +685,15 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         user: state.user,
         membership: state.membership,
         passwordAuthenticated: false,
+        memberQrCode: state.memberQrCode,
       },
     });
-  }, [logSessionSnapshot, state.membership, state.user]);
+  }, [
+    logSessionSnapshot,
+    state.memberQrCode,
+    state.membership,
+    state.user,
+  ]);
 
   const resetError = useCallback(() => {
     dispatch({ type: 'RESET_ERROR' });
@@ -655,6 +759,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             method: state.authMethod,
             membership: updatedUser?.membership ?? state.membership,
             passwordAuthenticated: state.hasPasswordAuthenticated,
+            memberQrCode: state.memberQrCode,
           },
         });
 
@@ -666,8 +771,13 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           ? error
           : new Error('Unable to update profile photo.');
       }
-    },
-    [state.authMethod, state.hasPasswordAuthenticated, state.membership],
+  },
+    [
+      state.authMethod,
+      state.hasPasswordAuthenticated,
+      state.memberQrCode,
+      state.membership,
+    ],
   );
 
   const deleteProfileAvatar = useCallback(async () => {
@@ -694,6 +804,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           method: state.authMethod,
           membership: updatedUser?.membership ?? state.membership,
           passwordAuthenticated: state.hasPasswordAuthenticated,
+          memberQrCode: state.memberQrCode,
         },
       });
 
@@ -709,6 +820,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     deleteWordPressProfileAvatar,
     state.authMethod,
     state.hasPasswordAuthenticated,
+    state.memberQrCode,
     state.membership,
   ]);
 
@@ -726,6 +838,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     const passwordAuthenticated =
       (await hasPasswordAuthenticated()) && !session.locked;
 
+    const memberQrCode = await fetchMemberQrCode(session);
+
     if (session.locked) {
       dispatch({
         type: 'SET_LOCKED',
@@ -734,6 +848,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           user: session.user ?? state.user,
           membership: session.user?.membership ?? state.membership,
           passwordAuthenticated: false,
+          memberQrCode: memberQrCode ?? state.memberQrCode,
         },
       });
       return;
@@ -746,9 +861,16 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         method: state.authMethod,
         membership: session.user?.membership ?? state.membership,
         passwordAuthenticated,
+        memberQrCode,
       },
     });
-  }, [state.authMethod, state.membership, state.user]);
+  }, [
+    fetchMemberQrCode,
+    state.authMethod,
+    state.memberQrCode,
+    state.membership,
+    state.user,
+  ]);
 
   const getSessionToken = useCallback(async () => {
     const session = await ensureValidSession();

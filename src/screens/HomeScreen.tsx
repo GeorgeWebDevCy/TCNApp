@@ -84,6 +84,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     });
   }, [displayName, fullName, t]);
 
+  const roleLabel = useMemo(() => {
+    const normalized = (user?.accountType ?? '').toLowerCase();
+    const fallback = t('home.roleBadge.default', {
+      replace: { type: user?.accountType ?? t('home.roleBadge.member') },
+    });
+    if (!normalized) {
+      return fallback;
+    }
+
+    const key = `home.roleBadge.${normalized}`;
+    const label = t(key, {
+      defaultValue: fallback,
+      replace: { type: user?.accountType ?? fallback },
+    });
+    return label || fallback;
+  }, [t, user?.accountType]);
+
   const expiryLabel = useMemo(() => {
     if (!membership) {
       return t('home.membership.noExpiry');
@@ -342,6 +359,9 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                 {user.email}
               </Text>
             ) : null}
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>{roleLabel}</Text>
+            </View>
             {membership ? (
               <View style={styles.planSummary}>
                 <Text style={styles.planLabel}>
@@ -555,6 +575,20 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     backgroundColor: COLORS.surfaceMuted,
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: COLORS.surfaceMuted,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
   },
   avatarFallback: {
     width: 64,

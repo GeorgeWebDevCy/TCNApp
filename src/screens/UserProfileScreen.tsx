@@ -18,6 +18,7 @@ import { authenticateWithBiometrics } from '../services/biometricService';
 import { setBiometricLoginEnabled } from '../services/biometricPreferenceService';
 import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
+import { MemberQrCard } from '../components/MemberQrCard';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { getUserDisplayName, getUserInitials } from '../utils/user';
 import { PasswordVisibilityToggle } from '../components/PasswordVisibilityToggle';
@@ -31,7 +32,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   onBack,
 }) => {
   const {
-    state: { user },
+    state: { user, memberQrCode },
     changePassword,
     registerPin,
     removePin,
@@ -516,6 +517,14 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             </View>
           </View>
         </View>
+
+        {(user?.accountType ?? '').toLowerCase() !== 'vendor' ? (
+          <MemberQrCard
+            qrCode={memberQrCode}
+            accountType={user?.accountType ?? null}
+            style={[styles.section, responsiveStyles.section]}
+          />
+        ) : null}
 
         <View style={[styles.section, responsiveStyles.section]}>
           <Text style={styles.sectionTitle}>
