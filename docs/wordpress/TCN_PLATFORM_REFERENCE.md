@@ -37,6 +37,7 @@ The password login service powers the mobile authentication flow, rate-limits br
 | `/discounts/lookup` | POST | Bearer token with `tcn_discount_redemptions` capability | Validate a QR token and return the member + discount context required to complete a redemption. |
 | `/discounts/transactions` | POST | Bearer token with `tcn_discount_redemptions` capability | Persist a redeemed discount transaction and snapshot the plan tier + monetary breakdown. |
 | `/discounts/history` | GET | Bearer token (member sees personal history, vendor sees outlet history) | Paginate prior redemptions and return aggregated totals for dashboards. |
+| `/vendors/tiers` | GET | Public | Return the vendor tier catalogue (Sapphire/Diamond) with discount and promotion benefits for onboarding flows. |
 
 #### Shared request & response behaviour
 
@@ -52,7 +53,7 @@ The password login service powers the mobile authentication flow, rate-limits br
   * `username` *(string, required)* – WordPress username or email.
   * `password` *(string, required)*.
 * **Success response:** `{ success: true, user: {...}, token, api_token, expires_in, auth? }` where `auth.woocommerce` mirrors the constants when present. The `token` supports the `/wp-login.php?action=gn_token_login` redirect flow.
-  * `user.account_type`, `user.account_status`, and `user.vendor_status` are included so the mobile app can gate vendor access until an administrator approves the account. Pending or rejected vendors must receive the translated error strings outlined in §1.2 when they attempt to log in.
+  * `user.account_type`, `user.account_status`, and `user.vendor_status` are included so the mobile app can gate vendor access until an administrator approves the account. Pending or rejected vendors must receive the translated error strings outlined in §1.2 when they attempt to log in. Vendor accounts also expose `user.vendor_tier` so onboarding flows can highlight Sapphire vs. Diamond benefits immediately after authentication.
 * **Failure cases:**
   * Missing credentials → `400 gn_missing_credentials`.
   * Rate limited → `429 gn_rate_limited`.
@@ -65,6 +66,7 @@ The password login service powers the mobile authentication flow, rate-limits br
   * `username`, `email`, `password` *(required)*.
   * `first_name`, `last_name` *(optional)*.
   * `account_type` *(string, optional)* – pass `vendor` to create a vendor record awaiting approval. Defaults to `member`.
+  * `vendor_tier` *(string, optional when `account_type` is `vendor`)* – One of `sapphire` or `diamond`. Unknown tiers return `400 gn_invalid_vendor_tier`. Omitted values default to `sapphire`.
 * **Success response:** `{ success: true, user: {...} }`. Subsequent hooks assign the default membership level (`blue`), ensure a sponsor, and create a WooCommerce welcome order when applicable.【F:includes/Auth/PasswordLoginService.php†L210-L272】【F:includes/Membership/MembershipModule.php†L143-L210】
   * When `account_type` is `vendor`, the service sets `account_status` and `vendor_status` to `pending`, suppresses all welcome emails, and skips the auto-generated membership order so the account remains locked until an administrator approves it.
 * **Failure cases:** Username/email already taken (`409`), invalid input (`400`), or creation errors (`500`).
@@ -100,7 +102,7 @@ The password login service powers the mobile authentication flow, rate-limits br
 
 * **Purpose:** Resolve the user linked to an API token issued by `/login`.
 * **Headers:** `Authorization: Bearer {api_token}`.
-* **Success response:** `{ user: {...} }` using the same payload as `/login`.
+* **Success response:** `{ user: {...} }` using the same payload as `/login`. Vendor accounts include `vendor_tier` so the app can surface Sapphire/Diamond benefits on dashboards without re-authenticating.
 * **Failure cases:** Missing/invalid bearer header returns `401 gn_unauth`.
 
 #### `POST /wp-json/gn/v1/log`
@@ -223,6 +225,42 @@ The password login service powers the mobile authentication flow, rate-limits br
   }
   ```
 * **Notes:** Responses include `X-WP-Total`/`X-WP-TotalPages` headers plus the `totals` object for quick dashboard KPIs (gross, discount, net).
+
+#### `GET /wp-json/gn/v1/vendors/tiers`
+
+* **Purpose:** Provide the mobile registration and marketing screens with the vendor tier catalogue and benefits so they can explain the Sapphire vs. Diamond offerings without hard-coding copy.
+* **Authentication:** Public. The route only returns published tiers and marketing metadata.
+* **Response:**
+  ```json
+  {
+    "success": true,
+    "tiers": [
+      {
+        "slug": "sapphire",
+        "name": "Sapphire",
+        "discounts": { "gold": 0.025, "platinum": 0.05, "black": 0.1 },
+        "promotion_allowance": "1 per quarter",
+        "fees": "฿0",
+        "benefits": [
+          "Quarterly free promotion",
+          "Member-facing discount defaults"
+        ]
+      },
+      {
+        "slug": "diamond",
+        "name": "Diamond",
+        "discounts": { "gold": 0.05, "platinum": 0.1, "black": 0.2 },
+        "promotion_allowance": "1 per month",
+        "fees": "฿0",
+        "benefits": [
+          "Monthly free promotion",
+          "Premium placement in member newsletters"
+        ]
+      }
+    ]
+  }
+  ```
+* **Notes:** The response includes translated benefit strings when multiple locales are configured. Clients should cache the payload for the session and re-fetch sparingly (24-hour TTL recommended).
 
 ### 2.2 JWT Compatibility (`/wp-json/jwt-auth/v1/*`)
 
@@ -374,10 +412,12 @@ Only bearer tokens belonging to administrators or staff members (capable of `man
 | `/accounts` | GET | Admin/staff bearer token | Return a directory of members and vendors including `account_type`, `account_status`, `vendor_status`, and contact details. Supports `page`/`per_page` for pagination. |
 | `/vendors/{id}/approve` | POST | Admin/staff bearer token | Mark the vendor as active (`account_status = vendor_status = active`) and unblock login. |
 | `/vendors/{id}/reject` | POST | Admin/staff bearer token | Mark the vendor as rejected (`vendor_status = rejected`) and optionally persist a rejection `reason` in the JSON body. |
+| `/vendors/{id}/tier` | POST | Admin/staff bearer token | Change the vendor’s tier (`sapphire` or `diamond`) and log the update for audit purposes. |
 
 #### Shared behaviour
 
 * **Status conventions:** `pending` blocks vendor access pending review, `active` unlocks the vendor tools, `rejected` prevents login with an explanatory error, and `suspended` indicates an administrator hold.
+* **Tier updates:** The moderation UI calls `POST /vendors/{id}/tier` with `{ "vendor_tier": "diamond" }`. Invalid tiers return `400 gn_invalid_vendor_tier`. Successful updates persist to user meta and propagate to `/gn/v1/login`/`/gn/v1/me` payloads immediately.
 * **Error format:** Failures mirror `WP_Error` responses. The mobile client surfaces the returned `message` so admins understand what went wrong.
 
 ## 3. Class & Function Reference
