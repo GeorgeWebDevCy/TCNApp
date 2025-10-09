@@ -107,10 +107,17 @@ export const translations: Record<Language, TranslationDictionary> = {
         firstNamePlaceholder: 'Optional',
         lastNameLabel: 'Last name',
         lastNamePlaceholder: 'Optional',
+        accountTypeLabel: 'Register as',
+        memberOption: 'Member',
+        vendorOption: 'Vendor',
+        vendorDescription:
+          'Vendors require admin approval before they can access the app.',
         submit: 'Create account',
         cancel: 'Cancel',
         closeAfterSuccess: 'Close',
         success: 'Account created successfully. Please log in to continue.',
+        successVendor:
+          'Thank you! Your vendor application is pending review. We will notify you once an administrator activates your account.',
       },
     },
     biometrics: {
@@ -162,6 +169,9 @@ export const translations: Record<Language, TranslationDictionary> = {
         upgradeOptions: 'Upgrade membership',
         upgradeOptionsMessage:
           'Securely upgrade your membership without leaving the app.',
+        openAdminConsole: 'Open admin console',
+        openAdminConsoleMessage:
+          'Review user accounts, approve vendors, and manage statuses.',
         comingSoonTitle: 'Coming soon',
       },
       transactions: {
@@ -222,6 +232,55 @@ export const translations: Record<Language, TranslationDictionary> = {
         checkoutError:
           'Something went wrong while processing your payment. Please try again.',
         back: 'Back',
+      },
+    },
+    admin: {
+      dashboard: {
+        title: 'Admin console',
+        subtitle:
+          'Review user accounts, approve vendor applications, and track statuses.',
+        viewMemberApp: 'Open member experience',
+        refreshHint: 'Pull down to refresh the latest account data.',
+        pendingSummary: '{{count}} vendor application(s) awaiting review',
+        pendingSummaryNone: 'No vendor applications are waiting for approval.',
+        sections: {
+          pending: 'Pending vendor approvals',
+          directory: 'All accounts',
+        },
+        tableHeaders: {
+          name: 'Name',
+          email: 'Email',
+          type: 'Type',
+          status: 'Status',
+        },
+        empty: {
+          pending: 'Great! There are no vendors waiting for approval.',
+          directory: 'No accounts match the current filters.',
+        },
+        actions: {
+          approve: 'Approve',
+          reject: 'Reject',
+          cancel: 'Cancel',
+        },
+        confirmations: {
+          approveTitle: 'Approve vendor',
+          approveMessage:
+            'Activate {{name}} as a vendor? They will immediately gain access to the vendor tools.',
+          rejectTitle: 'Reject vendor',
+          rejectMessage:
+            'Reject {{name}}? They will not be able to access the vendor tools until they reapply.',
+        },
+        errors: {
+          load: 'Unable to load admin data. Pull to refresh to try again.',
+          approve: 'Unable to approve the vendor. Please try again.',
+          reject: 'Unable to reject the vendor. Please try again.',
+        },
+        statusLabels: {
+          active: 'Active',
+          pending: 'Pending review',
+          rejected: 'Rejected',
+          suspended: 'Suspended',
+        },
       },
     },
     vendor: {
@@ -464,6 +523,10 @@ export const translations: Record<Language, TranslationDictionary> = {
       passwordMismatch: 'Passwords do not match.',
       changePassword: 'Unable to change password.',
       pinMismatch: 'PIN entries do not match.',
+      vendorPending: 'Your vendor account is pending approval.',
+      vendorRejected: 'Your vendor application has been rejected.',
+      vendorSuspended:
+        'Your vendor account has been suspended. Contact support for assistance.',
     },
   },
   th: {
@@ -564,10 +627,17 @@ export const translations: Record<Language, TranslationDictionary> = {
         firstNamePlaceholder: 'ไม่บังคับ',
         lastNameLabel: 'นามสกุล',
         lastNamePlaceholder: 'ไม่บังคับ',
+        accountTypeLabel: 'สมัครเป็น',
+        memberOption: 'สมาชิก',
+        vendorOption: 'ร้านค้า',
+        vendorDescription:
+          'ร้านค้าต้องได้รับการอนุมัติโดยผู้ดูแลระบบก่อนจึงจะเข้าใช้งานได้.',
         submit: 'สร้างบัญชี',
         cancel: 'ยกเลิก',
         closeAfterSuccess: 'ปิด',
         success: 'สร้างบัญชีเรียบร้อย กรุณาเข้าสู่ระบบเพื่อเริ่มต้น.',
+        successVendor:
+          'ขอบคุณ! คำขอสมัครเป็นร้านค้าของคุณกำลังรอการตรวจสอบ เราจะแจ้งให้ทราบเมื่อเปิดใช้งาน.',
       },
     },
     biometrics: {
@@ -616,6 +686,9 @@ export const translations: Record<Language, TranslationDictionary> = {
         viewAnalyticsMessage: 'เปิดแดชบอร์ดสรุปการออมของคุณ',
         upgradeOptions: 'อัปเกรดสมาชิก',
         upgradeOptionsMessage: 'อัปเกรดสถานะสมาชิกของคุณได้ทันทีภายในแอป.',
+        openAdminConsole: 'เปิดคอนโซลผู้ดูแล',
+        openAdminConsoleMessage:
+          'ตรวจสอบบัญชีผู้ใช้ อนุมัติร้านค้า และจัดการสถานะ.',
         comingSoonTitle: 'เร็ว ๆ นี้',
       },
       transactions: {
@@ -674,6 +747,54 @@ export const translations: Record<Language, TranslationDictionary> = {
         checkoutErrorTitle: 'การชำระเงินถูกขัดจังหวะ',
         checkoutError: 'เกิดข้อผิดพลาดระหว่างการชำระเงิน โปรดลองใหม่อีกครั้ง.',
         back: 'ย้อนกลับ',
+      },
+    },
+    admin: {
+      dashboard: {
+        title: 'คอนโซลผู้ดูแล',
+        subtitle: 'ตรวจสอบบัญชีผู้ใช้ อนุมัติร้านค้า และติดตามสถานะ.',
+        viewMemberApp: 'เปิดมุมมองสมาชิก',
+        refreshHint: 'ลากลงเพื่อรีเฟรชข้อมูลล่าสุด.',
+        pendingSummary: 'มีคำขอร้านค้า {{count}} รายการที่รอการอนุมัติ',
+        pendingSummaryNone: 'ขณะนี้ไม่มีคำขอร้านค้าที่รอการอนุมัติ.',
+        sections: {
+          pending: 'รายการร้านค้าที่รออนุมัติ',
+          directory: 'บัญชีทั้งหมด',
+        },
+        tableHeaders: {
+          name: 'ชื่อ',
+          email: 'อีเมล',
+          type: 'ประเภท',
+          status: 'สถานะ',
+        },
+        empty: {
+          pending: 'เยี่ยม! ไม่มีร้านค้าที่รออนุมัติ.',
+          directory: 'ไม่พบบัญชีที่ตรงกับตัวกรอง.',
+        },
+        actions: {
+          approve: 'อนุมัติ',
+          reject: 'ปฏิเสธ',
+          cancel: 'ยกเลิก',
+        },
+        confirmations: {
+          approveTitle: 'อนุมัติร้านค้า',
+          approveMessage:
+            'ต้องการเปิดใช้งาน {{name}} ในฐานะร้านค้าหรือไม่? พวกเขาจะเข้าถึงเครื่องมือร้านค้าได้ทันที.',
+          rejectTitle: 'ปฏิเสธร้านค้า',
+          rejectMessage:
+            'ต้องการปฏิเสธ {{name}} หรือไม่? พวกเขาจะไม่สามารถใช้งานได้จนกว่าจะสมัครใหม่.',
+        },
+        errors: {
+          load: 'ไม่สามารถโหลดข้อมูลผู้ดูแลได้ โปรดลองรีเฟรชอีกครั้ง.',
+          approve: 'ไม่สามารถอนุมัติร้านค้าได้ โปรดลองอีกครั้ง.',
+          reject: 'ไม่สามารถปฏิเสธร้านค้าได้ โปรดลองอีกครั้ง.',
+        },
+        statusLabels: {
+          active: 'ใช้งาน',
+          pending: 'รอตรวจสอบ',
+          rejected: 'ถูกปฏิเสธ',
+          suspended: 'ถูกระงับ',
+        },
       },
     },
     vendor: {
@@ -914,6 +1035,9 @@ export const translations: Record<Language, TranslationDictionary> = {
       passwordMismatch: 'รหัสผ่านไม่ตรงกัน',
       changePassword: 'ไม่สามารถเปลี่ยนรหัสผ่านได้',
       pinMismatch: 'พินไม่ตรงกัน',
+      vendorPending: 'บัญชีร้านค้าของคุณกำลังรอการอนุมัติ.',
+      vendorRejected: 'คำขอสมัครเป็นร้านค้าของคุณถูกปฏิเสธ.',
+      vendorSuspended: 'บัญชีร้านค้าของคุณถูกระงับ โปรดติดต่อฝ่ายสนับสนุน.',
     },
   },
 };

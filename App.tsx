@@ -3,7 +3,7 @@
 // state and supporting services (authentication, localization, payments, logging, etc.)
 // rather than hold any domain-specific logic. Because the composition of providers can
 // be non-trivial for new contributors, we comment each section in detail.
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -27,6 +27,7 @@ import { MembershipScreen } from './src/screens/MembershipScreen';
 import { VendorScanScreen } from './src/screens/VendorScanScreen';
 import { MemberDashboardScreen } from './src/screens/MemberDashboardScreen';
 import { VendorDashboardScreen } from './src/screens/VendorDashboardScreen';
+import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
 import { COLORS } from './src/config/theme';
 
@@ -47,10 +48,14 @@ const AppContent: React.FC = () => {
     | 'memberAnalytics'
     | 'vendorScan'
     | 'vendorAnalytics'
+    | 'adminDashboard'
   >('home');
 
   const normalizedAccountType = (user?.accountType ?? '').toLowerCase();
   const isVendor = normalizedAccountType === 'vendor';
+  const isAdmin =
+    normalizedAccountType === 'admin' || normalizedAccountType === 'staff';
+  const adminInitialisedRef = useRef(false);
 
   useEffect(() => {
     // Whenever the user signs out we reset the active screen to "home". This prevents
@@ -69,13 +74,36 @@ const AppContent: React.FC = () => {
           : 'vendorScan';
       }
 
+      if (isAdmin) {
+        if (current === 'vendorScan' || current === 'vendorAnalytics') {
+          return 'adminDashboard';
+        }
+        return current;
+      }
+
       if (current === 'vendorScan' || current === 'vendorAnalytics') {
+        return 'home';
+      }
+
+      if (current === 'adminDashboard') {
         return 'home';
       }
 
       return current;
     });
-  }, [isVendor]);
+  }, [isAdmin, isVendor]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      adminInitialisedRef.current = false;
+      return;
+    }
+
+    if (!adminInitialisedRef.current) {
+      adminInitialisedRef.current = true;
+      setActiveScreen('adminDashboard');
+    }
+  }, [isAdmin]);
 
   if (isLoading) {
     // While authentication is bootstrapping (e.g., validating stored tokens) we display
@@ -91,6 +119,14 @@ const AppContent: React.FC = () => {
     // No authenticated session found, so we show the login experience. The AuthProvider
     // will update the context once the user signs in.
     return <LoginScreen />;
+  }
+
+  if (isAdmin && activeScreen === 'adminDashboard') {
+    return (
+      <AdminDashboardScreen
+        onOpenMemberExperience={() => setActiveScreen('home')}
+      />
+    );
   }
 
   if (isVendor) {
@@ -133,6 +169,7 @@ const AppContent: React.FC = () => {
       onManageProfile={() => setActiveScreen('profile')}
       onUpgradeMembership={() => setActiveScreen('membership')}
       onViewAnalytics={() => setActiveScreen('memberAnalytics')}
+      onOpenAdminConsole={() => setActiveScreen('adminDashboard')}
     />
   );
 };

@@ -219,6 +219,7 @@ describe('wordpressAuthService', () => {
       username: 'newmember',
       email: 'newmember@example.com',
       password: 'aSecurePassword123',
+      accountType: 'member',
     });
 
     const registerRequestInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
@@ -403,6 +404,7 @@ describe('wordpressAuthService', () => {
         username: 'newmember',
         email: 'newmember@example.com',
         password: 'aSecurePassword123',
+        accountType: 'member',
       });
     } finally {
       jest.useRealTimers();
@@ -483,6 +485,38 @@ describe('wordpressAuthService', () => {
     );
   });
 
+  it('marks vendor registrations as pending approval without creating membership orders', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(createJsonResponse(200, { success: true }));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await registerAccount({
+      username: 'newvendor',
+      email: 'vendor@example.com',
+      password: 'StrongPassword!2',
+      accountType: 'vendor',
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestInit = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse((requestInit?.body as string) ?? '{}');
+
+    expect(body.role).toBe('vendor');
+    expect(body.account_status).toBe('pending');
+    expect(body.vendor_status).toBe('pending');
+    expect(body.membership_status).toBeUndefined();
+    expect(body.woocommerce_order).toBeUndefined();
+    expect(body.woocommerce_customer).toEqual(
+      expect.objectContaining({
+        role: 'vendor',
+        email: 'vendor@example.com',
+        username: 'newvendor',
+      }),
+    );
+  });
+
   it('attaches WooCommerce REST API credentials when calling WooCommerce endpoints', async () => {
     const originalRegisterEndpoint = WORDPRESS_CONFIG.endpoints.register;
     const originalConsumerKey = WORDPRESS_CONFIG.woocommerce.consumerKey;
@@ -503,6 +537,7 @@ describe('wordpressAuthService', () => {
         username: 'woo-member',
         email: 'woo-member@example.com',
         password: 'aSecurePassword123',
+        accountType: 'member',
       });
     } finally {
       WORDPRESS_CONFIG.endpoints.register = originalRegisterEndpoint;

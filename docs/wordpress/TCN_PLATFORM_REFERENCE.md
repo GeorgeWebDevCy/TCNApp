@@ -52,6 +52,7 @@ The password login service powers the mobile authentication flow, rate-limits br
   * `username` *(string, required)* – WordPress username or email.
   * `password` *(string, required)*.
 * **Success response:** `{ success: true, user: {...}, token, api_token, expires_in, auth? }` where `auth.woocommerce` mirrors the constants when present. The `token` supports the `/wp-login.php?action=gn_token_login` redirect flow.
+  * `user.account_type`, `user.account_status`, and `user.vendor_status` are included so the mobile app can gate vendor access until an administrator approves the account. Pending or rejected vendors must receive the translated error strings outlined in §1.2 when they attempt to log in.
 * **Failure cases:**
   * Missing credentials → `400 gn_missing_credentials`.
   * Rate limited → `429 gn_rate_limited`.
@@ -63,7 +64,9 @@ The password login service powers the mobile authentication flow, rate-limits br
 * **Request body:**
   * `username`, `email`, `password` *(required)*.
   * `first_name`, `last_name` *(optional)*.
+  * `account_type` *(string, optional)* – pass `vendor` to create a vendor record awaiting approval. Defaults to `member`.
 * **Success response:** `{ success: true, user: {...} }`. Subsequent hooks assign the default membership level (`blue`), ensure a sponsor, and create a WooCommerce welcome order when applicable.【F:includes/Auth/PasswordLoginService.php†L210-L272】【F:includes/Membership/MembershipModule.php†L143-L210】
+  * When `account_type` is `vendor`, the service sets `account_status` and `vendor_status` to `pending`, suppresses all welcome emails, and skips the auto-generated membership order so the account remains locked until an administrator approves it.
 * **Failure cases:** Username/email already taken (`409`), invalid input (`400`), or creation errors (`500`).
 
 #### `POST /wp-json/gn/v1/forgot-password`
@@ -361,6 +364,21 @@ These endpoints bridge mobile clients to WooCommerce without exposing the entire
   * `status` *(string, optional, default `completed`).
 * **Behaviour:** Creates an order, attaches products via `add_product()`, adds shipping line items, calculates totals, optionally marks the order paid, sets the requested status, and returns `{ id, data }` with HTTP 201. Validation ensures line items exist, product IDs resolve, and customer IDs map to users before creation.【F:includes/Rest/WooCommerceEndpoints.php†L125-L205】【F:includes/Rest/WooCommerceEndpoints.php†L376-L462】
 * **Errors:** Missing line items (`400 tcn_missing_line_items`), invalid customer (`400 tcn_invalid_customer`), missing product IDs (`400 tcn_missing_product_id`), or unknown products (`400 tcn_invalid_product`).
+
+### 2.6 Admin Directory API (`/wp-json/tcn/v1/admin/*`)
+
+Only bearer tokens belonging to administrators or staff members (capable of `manage_options`) may call these endpoints. Responses normalise account metadata so the mobile moderation console can surface user and vendor status consistently.
+
+| Route | Method | Auth | Purpose |
+| ----- | ------ | ---- | ------- |
+| `/accounts` | GET | Admin/staff bearer token | Return a directory of members and vendors including `account_type`, `account_status`, `vendor_status`, and contact details. Supports `page`/`per_page` for pagination. |
+| `/vendors/{id}/approve` | POST | Admin/staff bearer token | Mark the vendor as active (`account_status = vendor_status = active`) and unblock login. |
+| `/vendors/{id}/reject` | POST | Admin/staff bearer token | Mark the vendor as rejected (`vendor_status = rejected`) and optionally persist a rejection `reason` in the JSON body. |
+
+#### Shared behaviour
+
+* **Status conventions:** `pending` blocks vendor access pending review, `active` unlocks the vendor tools, `rejected` prevents login with an explanatory error, and `suspended` indicates an administrator hold.
+* **Error format:** Failures mirror `WP_Error` responses. The mobile client surfaces the returned `message` so admins understand what went wrong.
 
 ## 3. Class & Function Reference
 

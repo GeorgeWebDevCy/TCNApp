@@ -49,7 +49,7 @@ export const getMaxDiscount = (
 };
 
 type QuickAction = {
-  key: 'vendors' | 'upgrade' | 'analytics';
+  key: 'vendors' | 'upgrade' | 'analytics' | 'admin';
   label: string;
   message: string;
 };
@@ -58,12 +58,14 @@ type HomeScreenProps = {
   onManageProfile?: () => void;
   onUpgradeMembership?: () => void;
   onViewAnalytics?: () => void;
+  onOpenAdminConsole?: () => void;
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   onManageProfile,
   onUpgradeMembership,
   onViewAnalytics,
+  onOpenAdminConsole,
 }) => {
   const { state, logout } = useAuthContext();
   const user = state.user;
@@ -147,8 +149,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     });
   }, [membership, t]);
 
-  const quickActions: QuickAction[] = useMemo(
-    () => [
+  const normalizedAccountType = (user?.accountType ?? '').toLowerCase();
+  const isAdminAccount =
+    normalizedAccountType === 'admin' || normalizedAccountType === 'staff';
+
+  const quickActions: QuickAction[] = useMemo(() => {
+    const actions: QuickAction[] = [
       {
         key: 'vendors',
         label: t('home.quickActions.viewVendors'),
@@ -164,9 +170,18 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         label: t('home.quickActions.upgradeOptions'),
         message: t('home.quickActions.upgradeOptionsMessage'),
       },
-    ],
-    [t],
-  );
+    ];
+
+    if (isAdminAccount && onOpenAdminConsole) {
+      actions.unshift({
+        key: 'admin',
+        label: t('home.quickActions.openAdminConsole'),
+        message: t('home.quickActions.openAdminConsoleMessage'),
+      });
+    }
+
+    return actions;
+  }, [isAdminAccount, onOpenAdminConsole, t]);
 
   const layout = useResponsiveLayout();
   const responsiveStyles = useMemo(() => {
@@ -244,20 +259,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const handleQuickAction = useCallback(
     (action: QuickAction) => {
       if (action.key === 'upgrade') {
-      if (onUpgradeMembership) {
-        onUpgradeMembership();
-        return;
+        if (onUpgradeMembership) {
+          onUpgradeMembership();
+          return;
+        }
+      } else if (action.key === 'admin') {
+        if (onOpenAdminConsole) {
+          onOpenAdminConsole();
+          return;
+        }
+      } else if (action.key === 'analytics') {
+        if (onViewAnalytics) {
+          onViewAnalytics();
+          return;
+        }
       }
-    } else if (action.key === 'analytics') {
-      if (onViewAnalytics) {
-        onViewAnalytics();
-        return;
-      }
-    }
 
-    Alert.alert(t('home.quickActions.comingSoonTitle'), action.message);
-  },
-  [onUpgradeMembership, onViewAnalytics, t],
+      Alert.alert(t('home.quickActions.comingSoonTitle'), action.message);
+    },
+    [onOpenAdminConsole, onUpgradeMembership, onViewAnalytics, t],
   );
 
   const recentTransactions = useMemo(
