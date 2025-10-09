@@ -9,7 +9,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { RNCamera } from 'react-native-camera';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { useTransactionContext } from '../contexts/TransactionContext';
@@ -42,8 +41,6 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
   const [result, setResult] = useState<MemberLookupResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const [permissionDenied, setPermissionDenied] = useState(false);
-  const [lastScannedToken, setLastScannedToken] = useState<string | null>(null);
   const [grossAmount, setGrossAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -62,7 +59,6 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         const sessionToken = await getSessionToken();
         const validation = await lookupMember(trimmed, sessionToken);
         setResult(validation);
-        setLastScannedToken(trimmed);
         if (!validation.valid) {
           setError(
             validation.message ?? t('vendor.screen.status.invalidMessage'),
@@ -83,17 +79,6 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
       }
     },
     [getSessionToken, t],
-  );
-
-  const handleBarCodeRead = useCallback(
-    (event: { data?: string } | undefined) => {
-      const token = event?.data?.trim();
-      if (!token || isValidating || token === lastScannedToken) {
-        return;
-      }
-      void handleValidation(token);
-    },
-    [handleValidation, isValidating, lastScannedToken],
   );
 
   const handleManualSubmit = useCallback(() => {
@@ -300,27 +285,11 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         ) : null}
 
         <View style={styles.cameraContainer}>
-          {permissionDenied ? (
-            <Text style={styles.permissionText} testID="vendor-camera-permission">
-              {t('vendor.screen.permissionDenied')}
+          <View style={styles.cameraPlaceholder} testID="vendor-camera-unavailable">
+            <Text style={styles.permissionText}>
+              {t('vendor.screen.cameraUnavailable')}
             </Text>
-          ) : (
-            <RNCamera
-              style={styles.camera}
-              captureAudio={false}
-              onBarCodeRead={handleBarCodeRead}
-              barCodeTypes={[RNCamera.Constants.BarCodeType.qr]}
-              androidCameraPermissionOptions={{
-                title: t('vendor.screen.cameraPermission.title'),
-                message: t('vendor.screen.cameraPermission.message'),
-                buttonPositive: t('vendor.screen.cameraPermission.accept'),
-                buttonNegative: t('vendor.screen.cameraPermission.decline'),
-              }}
-              onStatusChange={({ cameraStatus }) => {
-                setPermissionDenied(cameraStatus === 'NOT_AUTHORIZED');
-              }}
-            />
-          )}
+          </View>
         </View>
 
         <View style={styles.manualEntry}>
@@ -568,8 +537,12 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     backgroundColor: COLORS.surfaceMuted,
   },
-  camera: {
+  cameraPlaceholder: {
     flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    backgroundColor: COLORS.surfaceMuted,
   },
   permissionText: {
     padding: 24,

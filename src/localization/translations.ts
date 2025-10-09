@@ -231,6 +231,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         viewAnalytics: 'View analytics',
         permissionDenied:
           'Camera permission is required to scan QR codes. Use manual entry if access is not granted.',
+        cameraUnavailable:
+          'Camera scanning is unavailable in this build. Enter QR codes manually until support returns.',
         cameraPermission: {
           title: 'Camera access',
           message: 'TCN needs camera access to scan member QR codes.',
@@ -681,6 +683,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         viewAnalytics: 'ดูแดชบอร์ดวิเคราะห์',
         permissionDenied:
           'ต้องอนุญาตการใช้กล้องเพื่อสแกนโค้ด QR โปรดกรอกโค้ดด้วยตนเองหากไม่สามารถใช้กล้องได้.',
+        cameraUnavailable:
+          'ขณะนี้ไม่สามารถใช้การสแกนด้วยกล้องได้ โปรดกรอกโค้ด QR ด้วยตนเองชั่วคราว.',
         cameraPermission: {
           title: 'การเข้าถึงกล้อง',
           message: 'แอปต้องใช้กล้องเพื่อสแกนโค้ดของสมาชิก',
