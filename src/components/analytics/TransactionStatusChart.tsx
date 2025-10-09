@@ -1,6 +1,5 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { VictoryPie } from 'victory-native';
 import { AnalyticsCard, AnalyticsCardProps } from './AnalyticsCard';
 import { COLORS } from '../../config/theme';
 
@@ -25,7 +24,8 @@ export const TransactionStatusChart: React.FC<TransactionStatusChartProps> = ({
   emptyMessage,
   totalLabel,
 }) => {
-  const hasValues = data.some(point => point.value > 0);
+  const total = data.reduce((sum, point) => sum + point.value, 0);
+  const hasValues = total > 0;
 
   return (
     <AnalyticsCard
@@ -36,16 +36,25 @@ export const TransactionStatusChart: React.FC<TransactionStatusChartProps> = ({
       emptyMessage={emptyMessage}
     >
       <View style={styles.container}>
-        <View style={styles.chartWrapper}>
-          <VictoryPie
-            data={data.map(point => ({ x: point.label, y: point.value }))}
-            colorScale={STATUS_COLORS}
-            innerRadius={60}
-            animate={{ duration: 400 }}
-            labels={() => ''}
-          />
-          <View style={styles.centerLabel}>
-            <Text style={styles.totalValue}>{totalLabel}</Text>
+        <View style={styles.summary}>
+          <Text style={styles.totalValue}>{totalLabel}</Text>
+          <View style={styles.stackedBar}>
+            {data.map((point, index) => {
+              const ratio = total ? point.value / total : 0;
+              return (
+                <View
+                  key={point.label}
+                  style={[
+                    styles.segment,
+                    {
+                      flexGrow: ratio,
+                      minWidth: ratio > 0 ? 12 : 0,
+                      backgroundColor: STATUS_COLORS[index % STATUS_COLORS.length],
+                    },
+                  ]}
+                />
+              );
+            })}
           </View>
         </View>
         <View style={styles.legend}>
@@ -71,22 +80,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 16,
   },
-  chartWrapper: {
-    width: 180,
-    height: 180,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerLabel: {
-    position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   totalValue: {
     fontSize: 16,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    textAlign: 'center',
+  },
+  summary: {
+    width: 180,
+    gap: 16,
+    alignItems: 'center',
+  },
+  stackedBar: {
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.mutedBackground,
+    flexDirection: 'row',
+    overflow: 'hidden',
+  },
+  segment: {
+    minWidth: 0,
+    flexBasis: 0,
+    flexGrow: 0,
   },
   legend: {
     flex: 1,
