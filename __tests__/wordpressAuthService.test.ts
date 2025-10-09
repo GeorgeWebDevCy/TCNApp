@@ -14,6 +14,8 @@ import {
   registerAccount,
   updatePassword,
   deleteProfileAvatar,
+  ensureMemberQrCode,
+  validateMemberQrCode,
 } from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -92,13 +94,18 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      `${WORDPRESS_CONFIG.baseUrl}/wp-json/jwt-auth/v1/token`,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.passwordLogin}`,
       expect.objectContaining({ method: 'POST' }),
+    );
+
+    const restRoutePath = WORDPRESS_CONFIG.endpoints.passwordLogin.replace(
+      /^\/wp-json/,
+      '',
     );
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
-      `${WORDPRESS_CONFIG.baseUrl}/?rest_route=/jwt-auth/v1/token`,
+      `${WORDPRESS_CONFIG.baseUrl}/?rest_route=${restRoutePath}`,
       expect.objectContaining({ method: 'POST' }),
     );
 
@@ -336,7 +343,7 @@ describe('wordpressAuthService', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      `${WORDPRESS_CONFIG.baseUrl}/wp-json/jwt-auth/v1/token`,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.passwordLogin}`,
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
@@ -534,29 +541,108 @@ describe('wordpressAuthService', () => {
 
     global.fetch = fetchMock as unknown as typeof fetch;
 
-    await updatePassword({
-      token: 'token-value',
-      currentPassword: 'OldPass123!',
-      newPassword: 'NewPass456!',
-      tokenLoginUrl: null,
-      restNonce: null,
-    });
+    await expect(
+      updatePassword({
+        token: 'token-value',
+        currentPassword: 'OldPass123!',
+        newPassword: 'NewPass456!',
+        tokenLoginUrl: null,
+        restNonce: null,
+      }),
+    ).rejects.toThrow('REST endpoint unavailable');
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      `${WORDPRESS_CONFIG.baseUrl}/wp-json/gn/v1/change-password`,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.changePassword}`,
       expect.objectContaining({ method: 'POST' }),
     );
+  });
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
-      expect.objectContaining({ method: 'GET' }),
+  it('returns null when ensuring a member QR code without a token', async () => {
+    await expect(ensureMemberQrCode({ token: null })).resolves.toBeNull();
+    await expect(ensureMemberQrCode({ token: '' })).resolves.toBeNull();
+  });
+
+  it('requests and parses a member QR code when a token is provided', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(
+        createJsonResponse(200, {
+          token: 'qr-123',
+          payload: 'payload-xyz',
+          issued_at: '2024-01-02T03:04:05.000Z',
+          expires_at: '2024-02-02T03:04:05.000Z',
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await ensureMemberQrCode({
+      token: 'member-token',
+      payload: 'fallback-payload',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.membershipQr}`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer member-token',
+        }),
+      }),
     );
 
-    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
-      AUTH_STORAGE_KEYS.userProfile,
-      expect.stringContaining('Member Example'),
+    expect(result).toEqual({
+      token: 'qr-123',
+      payload: 'payload-xyz',
+      issuedAt: '2024-01-02T03:04:05.000Z',
+      expiresAt: '2024-02-02T03:04:05.000Z',
+    });
+  });
+
+  it('requires a QR token when validating membership', async () => {
+    await expect(validateMemberQrCode('', 'auth-token')).resolves.toEqual({
+      token: '',
+      valid: false,
+      message: 'QR token is required.',
+    });
+  });
+
+  it('validates a member QR token and returns membership details', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValue(
+        createJsonResponse(200, {
+          valid: true,
+          member_name: 'Alex Member',
+          membership_tier: 'Gold',
+          allowed_discount: 12.5,
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await validateMemberQrCode('qr-123', 'member-token');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.validateQr}`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer member-token',
+        }),
+        body: JSON.stringify({ token: 'qr-123' }),
+      }),
     );
+
+    expect(result).toEqual({
+      token: 'qr-123',
+      valid: true,
+      memberName: 'Alex Member',
+      membershipTier: 'Gold',
+      allowedDiscount: 12.5,
+      membership: null,
+      message: null,
+    });
   });
 });

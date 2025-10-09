@@ -35,6 +35,8 @@ export const WORDPRESS_CONFIG = {
     passwordReset: '/wp-json/gn/v1/forgot-password',
     directPasswordReset: '/wp-json/gn/v1/reset-password',
     register: '/wp-json/gn/v1/register',
+    membershipQr: '/wp-json/gn/v1/membership/qr',
+    validateQr: '/wp-json/gn/v1/membership/qr/validate',
   },
   links: {
     register: `${BASE_URL}/register`,

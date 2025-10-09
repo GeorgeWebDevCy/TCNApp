@@ -18,6 +18,8 @@ import {
 import {
   AuthUser,
   LoginOptions,
+  MemberQrCode,
+  MemberValidationResult,
   MembershipBenefit,
   MembershipInfo,
   RegisterOptions,
@@ -693,10 +695,145 @@ const pickAvatarUrlFromMap = (value: unknown): string | null => {
   return null;
 };
 
+const parseStringArray = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map(entry => (typeof entry === 'string' ? entry : getString(entry)))
+      .filter((entry): entry is string => Boolean(entry));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return value
+      .split(',')
+      .map(segment => segment.trim())
+      .filter(segment => segment.length > 0);
+  }
+
+  return [];
+};
+
+const normalizeAccountTypeValue = (
+  value: string | null | undefined,
+): AuthUser['accountType'] | null => {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.toLowerCase();
+
+  if (normalized === 'administrator' || normalized === 'admin') {
+    return 'admin';
+  }
+
+  if (
+    normalized === 'shop_manager' ||
+    normalized === 'manager' ||
+    normalized === 'staff'
+  ) {
+    return 'staff';
+  }
+
+  if (
+    normalized === 'vendor' ||
+    normalized === 'store_vendor' ||
+    normalized === 'seller'
+  ) {
+    return 'vendor';
+  }
+
+  if (
+    normalized === 'customer' ||
+    normalized === 'member' ||
+    normalized === 'subscriber'
+  ) {
+    return 'member';
+  }
+
+  return normalized as AuthUser['accountType'];
+};
+
+const parseAccountMetadata = (
+  payload: Record<string, unknown>,
+): Pick<
+  AuthUser,
+  'accountType' | 'vendorTier' | 'qrPayload' | 'qrToken'
+> => {
+  const meta =
+    (payload.meta as Record<string, unknown> | undefined) ?? undefined;
+
+  const candidateTypes = [
+    getString(payload.account_type),
+    getString(payload.accountType),
+    getString(meta?.account_type),
+    getString(meta?.accountType),
+    getString(payload.role),
+    getString(meta?.role),
+  ];
+
+  let accountType: AuthUser['accountType'] | null = null;
+  for (const candidate of candidateTypes) {
+    const normalized = normalizeAccountTypeValue(candidate);
+    if (normalized) {
+      accountType = normalized;
+      break;
+    }
+  }
+
+  if (!accountType) {
+    const roles = [
+      ...parseStringArray(payload.roles),
+      ...parseStringArray(meta?.roles),
+      ...parseStringArray(payload.capabilities),
+      ...parseStringArray(meta?.capabilities),
+    ];
+
+    for (const role of roles) {
+      const normalized = normalizeAccountTypeValue(role);
+      if (normalized) {
+        accountType = normalized;
+        break;
+      }
+    }
+  }
+
+  const vendorTier =
+    getString(payload.vendor_tier) ??
+    getString(payload.vendorTier) ??
+    getString(meta?.vendor_tier) ??
+    getString(meta?.vendorTier) ??
+    null;
+
+  const qrPayload =
+    getString(payload.qr_payload) ??
+    getString(payload.qrPayload) ??
+    getString(meta?.qr_payload) ??
+    getString(meta?.qrPayload) ??
+    null;
+
+  const qrToken =
+    getString(payload.qr_token) ??
+    getString(payload.qrToken) ??
+    getString(meta?.qr_token) ??
+    getString(meta?.qrToken) ??
+    null;
+
+  return {
+    accountType: accountType ?? null,
+    vendorTier: vendorTier ?? null,
+    qrPayload: qrPayload ?? null,
+    qrToken: qrToken ?? null,
+  };
+};
+
 const parseProfileUserPayload = (
   payload: Record<string, unknown>,
 ): AuthUser => {
   const membership = parseMembershipInfo(payload);
+  const accountMetadata = parseAccountMetadata(payload);
 
   const idSource = payload.id ?? (payload.ID as unknown);
   const parsedId =
@@ -750,6 +887,7 @@ const parseProfileUserPayload = (
     lastName: getString(lastNameSource),
     avatarUrl: cacheBustedAvatarUrl ?? undefined,
     membership,
+    ...accountMetadata,
   };
 };
 
@@ -815,6 +953,10 @@ const parseLoginUserPayload = (
         | Record<string, unknown>
         | undefined) ??
       undefined,
+  );
+
+  const accountMetadata = parseAccountMetadata(
+    source as unknown as Record<string, unknown>,
   );
 
   const wooCredentials =
@@ -884,6 +1026,7 @@ const parseLoginUserPayload = (
     avatarUrl: cacheBustedAvatarSource ?? undefined,
     membership,
     woocommerceCredentials: wooCredentials,
+    ...accountMetadata,
   };
 };
 
@@ -1047,12 +1190,251 @@ const parseMembershipInfo = (
   };
 };
 
+const parseMemberQrCodePayload = (
+  payload: Record<string, unknown> | null | undefined,
+  fallbackPayload?: string | null,
+): MemberQrCode | null => {
+  if (!payload) {
+    return null;
+  }
+
+  const token =
+    getString(payload.token) ??
+    getString(payload.qr_token) ??
+    getString(payload.code) ??
+    null;
+
+  if (!token) {
+    return null;
+  }
+
+  const payloadValue =
+    getString(payload.payload) ??
+    getString(payload.qr_payload) ??
+    fallbackPayload ??
+    null;
+
+  const issuedAt =
+    getString(payload.issued_at) ??
+    getString(payload.issuedAt) ??
+    getString(payload.created_at) ??
+    getString(payload.createdAt) ??
+    null;
+
+  const expiresAt =
+    getString(payload.expires_at) ??
+    getString(payload.expiresAt) ??
+    null;
+
+  return {
+    token,
+    payload: payloadValue ?? null,
+    issuedAt,
+    expiresAt,
+  };
+};
+
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
     const result = await fetchSessionUser(token);
     return result.user;
   } catch (error) {
     return null;
+  }
+};
+
+export const ensureMemberQrCode = async ({
+  token,
+  payload,
+}: {
+  token?: string | null;
+  payload?: string | null;
+}): Promise<MemberQrCode | null> => {
+  const normalizedToken = normalizeApiToken(token);
+  if (!normalizedToken) {
+    deviceLog.debug('wordpressAuth.ensureMemberQrCode.skip', {
+      reason: 'missing_token',
+    });
+    return null;
+  }
+
+  const endpoint =
+    WORDPRESS_CONFIG.endpoints.membershipQr ?? '/wp-json/gn/v1/membership/qr';
+
+  try {
+    const response = await fetchWithRouteFallback(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${normalizedToken}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(
+        payload && payload.trim().length > 0 ? { payload } : {},
+      ),
+    });
+
+    deviceLog.debug('wordpressAuth.ensureMemberQrCode.response', {
+      status: response.status,
+      ok: response.ok,
+    });
+
+    const json = await parseJsonResponse<Record<string, unknown> | null>(
+      response,
+    );
+
+    if (!response.ok) {
+      const message =
+        (json?.message && typeof json.message === 'string'
+          ? sanitizeErrorMessage(json.message)
+          : null) ?? null;
+      deviceLog.warn('wordpressAuth.ensureMemberQrCode.failed', {
+        status: response.status,
+        message,
+      });
+      return null;
+    }
+
+    const qrCode = parseMemberQrCodePayload(json ?? undefined, payload ?? null);
+    if (!qrCode) {
+      deviceLog.warn('wordpressAuth.ensureMemberQrCode.emptyPayload', {
+        status: response.status,
+      });
+    } else {
+      deviceLog.debug('wordpressAuth.ensureMemberQrCode.success', {
+        tokenPreview: qrCode.token.slice(-4),
+      });
+    }
+    return qrCode;
+  } catch (error) {
+    deviceLog.warn('wordpressAuth.ensureMemberQrCode.error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
+
+export const validateMemberQrCode = async (
+  qrToken: string,
+  authToken?: string | null,
+): Promise<MemberValidationResult> => {
+  const trimmedToken = (qrToken ?? '').trim();
+  if (!trimmedToken) {
+    return {
+      token: '',
+      valid: false,
+      message: 'QR token is required.',
+    };
+  }
+
+  const normalizedAuth = normalizeApiToken(authToken);
+  if (!normalizedAuth) {
+    throw new Error(
+      'Authentication token is required to validate member QR codes.',
+    );
+  }
+
+  const endpoint =
+    WORDPRESS_CONFIG.endpoints.validateQr ??
+    '/wp-json/gn/v1/membership/qr/validate';
+
+  try {
+    const response = await fetchWithRouteFallback(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${normalizedAuth}`,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ token: trimmedToken }),
+    });
+
+    const json = await parseJsonResponse<Record<string, unknown> | null>(
+      response,
+    );
+
+    if (!response.ok) {
+      const message =
+        (json?.message && typeof json.message === 'string'
+          ? sanitizeErrorMessage(json.message)
+          : 'Unable to validate member QR code.');
+      deviceLog.warn('wordpressAuth.validateMemberQrCode.failed', {
+        status: response.status,
+        message,
+      });
+      return {
+        token: trimmedToken,
+        valid: false,
+        message,
+      };
+    }
+
+    const membership = parseMembershipInfo(
+      (json?.membership as Record<string, unknown> | undefined) ??
+        (json?.member as Record<string, unknown> | undefined)?.membership ??
+        undefined,
+    );
+
+    const membershipTier =
+      membership?.tier ??
+      getString(json?.membership_tier) ??
+      getString(
+        (json?.member as Record<string, unknown> | undefined)?.membership_tier,
+      ) ??
+      null;
+
+    const allowedDiscount =
+      parseDiscountValue(json?.allowed_discount) ??
+      parseDiscountValue(json?.discount) ??
+      parseDiscountValue(
+        (json?.member as Record<string, unknown> | undefined)?.discount,
+      ) ??
+      null;
+
+    const memberName =
+      getString(
+        (json?.member as Record<string, unknown> | undefined)?.name ??
+          json?.member_name ??
+          json?.customer_name ??
+          json?.user_name,
+      ) ?? null;
+
+    const validFlag = json?.valid;
+    const isValid =
+      typeof validFlag === 'boolean'
+        ? validFlag
+        : typeof validFlag === 'string'
+        ? validFlag.toLowerCase() === 'true'
+        : typeof validFlag === 'number'
+        ? validFlag === 1
+        : true;
+
+    const result: MemberValidationResult = {
+      token: trimmedToken,
+      valid: Boolean(isValid),
+      memberName,
+      membershipTier,
+      allowedDiscount: allowedDiscount ?? null,
+      membership: membership ?? null,
+      message: getString(json?.message) ?? null,
+    };
+
+    deviceLog.debug('wordpressAuth.validateMemberQrCode.success', {
+      tokenPreview: trimmedToken.slice(-4),
+      valid: result.valid,
+      membershipTier: result.membershipTier ?? null,
+      discount: result.allowedDiscount ?? null,
+    });
+
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    deviceLog.warn('wordpressAuth.validateMemberQrCode.error', { message });
+    return {
+      token: trimmedToken,
+      valid: false,
+      message,
+    };
   }
 };
 
@@ -2192,6 +2574,10 @@ export const loginWithPassword = async ({
         lastName: null,
         membership: null,
         woocommerceCredentials: defaultWooCredentials,
+        accountType: null,
+        vendorTier: null,
+        qrPayload: null,
+        qrToken: null,
       };
 
   const session: PersistedSession = {

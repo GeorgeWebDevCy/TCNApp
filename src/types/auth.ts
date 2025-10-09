@@ -1,5 +1,13 @@
 export type AuthMethod = 'password' | 'pin' | 'biometric';
 
+export type AccountType =
+  | 'member'
+  | 'vendor'
+  | 'staff'
+  | 'admin'
+  | 'guest'
+  | (string & {});
+
 export interface MembershipBenefit {
   id: string;
   title: string;
@@ -11,6 +19,13 @@ export interface MembershipInfo {
   tier: string;
   expiresAt: string | null;
   benefits: MembershipBenefit[];
+}
+
+export interface MemberQrCode {
+  token: string;
+  payload?: string | null;
+  issuedAt?: string | null;
+  expiresAt?: string | null;
 }
 
 export interface MembershipPlan {
@@ -40,6 +55,10 @@ export interface AuthUser {
   avatarUrl?: string;
   membership?: MembershipInfo | null;
   woocommerceCredentials?: WooCommerceCredentialBundle | null;
+  accountType?: AccountType | null;
+  vendorTier?: string | null;
+  qrPayload?: string | null;
+  qrToken?: string | null;
 }
 
 export interface AuthState {
@@ -48,6 +67,7 @@ export interface AuthState {
   isLoading: boolean;
   user: AuthUser | null;
   membership: MembershipInfo | null;
+  memberQrCode: MemberQrCode | null;
   authMethod: AuthMethod | null;
   error: string | null;
   hasPasswordAuthenticated: boolean;
@@ -106,4 +126,14 @@ export interface AuthContextValue {
     mimeType?: string;
   }) => Promise<AuthUser>;
   deleteProfileAvatar: () => Promise<AuthUser>;
+}
+
+export interface MemberValidationResult {
+  token: string;
+  valid: boolean;
+  memberName?: string | null;
+  membershipTier?: string | null;
+  allowedDiscount?: number | null;
+  membership?: MembershipInfo | null;
+  message?: string | null;
 }
