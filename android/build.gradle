@@ -6,6 +6,10 @@ buildscript {
         targetSdkVersion = 36
         ndkVersion = "27.1.12297006"
         kotlinVersion = "2.1.20"
+        // Some third-party libraries still reference the legacy "kotlin_version"
+        // Gradle property name. Expose it alongside the canonical "kotlinVersion"
+        // so those dependencies can resolve the version correctly.
+        kotlin_version = kotlinVersion
     }
     repositories {
         google()
