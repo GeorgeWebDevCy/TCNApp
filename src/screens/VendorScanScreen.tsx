@@ -24,6 +24,7 @@ import {
   TransactionRecord,
 } from '../types/transactions';
 import { COLORS } from '../config/theme';
+import { QrWebScanner } from '../components/QrWebScanner';
 
 type VendorScanScreenProps = {
   onShowAnalytics?: () => void;
@@ -353,11 +354,13 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         ) : null}
 
         <View style={styles.cameraContainer}>
-          <View style={styles.cameraPlaceholder} testID="vendor-camera-unavailable">
-            <Text style={styles.permissionText}>
-              {t('vendor.screen.cameraUnavailable')}
-            </Text>
-          </View>
+          <QrWebScanner
+            style={{ flex: 1 }}
+            onScan={(text: string) => {
+              setManualToken(text);
+              void handleValidation(text);
+            }}
+          />
         </View>
 
         <View style={styles.manualEntry}>
@@ -774,4 +777,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-

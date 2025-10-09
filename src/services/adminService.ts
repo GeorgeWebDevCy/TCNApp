@@ -42,6 +42,7 @@ const normalizeAccountType = (value: unknown): AccountType | null => {
 
   if (
     normalized === 'vendor' ||
+    normalized === 'tcn_vendor' ||
     normalized === 'store_vendor' ||
     normalized === 'seller'
   ) {
