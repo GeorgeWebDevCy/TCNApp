@@ -71,10 +71,21 @@ type MembershipPlansResponse = {
   plans?: WordPressMembershipPlan[];
 } & Record<string, unknown>;
 
-type PaymentSessionResponse = StripePaymentSession & {
-  publishableKey?: string;
-  paymentIntentId?: string;
+type BasePaymentSession = {
+  paymentIntentId?: string | null;
+  publishableKey?: string | null;
 };
+
+type PaidPaymentSession = BasePaymentSession &
+  StripePaymentSession & {
+    requiresPayment: true;
+  };
+
+type FreePaymentSession = BasePaymentSession & {
+  requiresPayment: false;
+};
+
+type PaymentSessionResponse = PaidPaymentSession | FreePaymentSession;
 
 type ConfirmUpgradeResponse = {
   success: boolean;
@@ -273,6 +284,21 @@ export const fetchMembershipPlans = async (
   }
 };
 
+type PaymentSessionApiResponse = {
+  requiresPayment?: boolean;
+  requires_payment?: boolean;
+  paymentIntentId?: string | null;
+  payment_intent?: string | null;
+  paymentIntentClientSecret?: string | null;
+  payment_intent_client_secret?: string | null;
+  customerId?: string | null;
+  customer?: string | null;
+  customerEphemeralKeySecret?: string | null;
+  customer_ephemeral_key_secret?: string | null;
+  publishableKey?: string | null;
+  publishable_key?: string | null;
+} & Record<string, unknown>;
+
 export const createMembershipPaymentSession = async (
   plan: string,
   token?: string,
@@ -308,44 +334,113 @@ export const createMembershipPaymentSession = async (
 
     await syncWordPressCookiesFromResponse(response);
 
-    const payload = await handleResponse<PaymentSessionResponse>(response);
+    const payload = await handleResponse<PaymentSessionApiResponse>(response);
 
-    if (
-      !payload.paymentIntentClientSecret ||
-      !payload.customerEphemeralKeySecret
-    ) {
-      throw new Error('Incomplete payment session details received.');
-    }
+    const requiresPayment =
+      typeof payload.requiresPayment === 'boolean'
+        ? payload.requiresPayment
+        : typeof payload.requires_payment === 'boolean'
+          ? payload.requires_payment
+          : true;
+
+    const paymentIntentId =
+      payload.paymentIntentId ??
+      (typeof payload.payment_intent === 'string'
+        ? payload.payment_intent
+        : null);
+    const paymentIntentClientSecret =
+      payload.paymentIntentClientSecret ??
+      (typeof payload.payment_intent_client_secret === 'string'
+        ? payload.payment_intent_client_secret
+        : null);
+    const customerId =
+      payload.customerId ??
+      (typeof payload.customer === 'string' ? payload.customer : null);
+    const customerEphemeralKeySecret =
+      payload.customerEphemeralKeySecret ??
+      (typeof payload.customer_ephemeral_key_secret === 'string'
+        ? payload.customer_ephemeral_key_secret
+        : null);
+    const publishableKey =
+      payload.publishableKey ??
+      (typeof payload.publishable_key === 'string'
+        ? payload.publishable_key
+        : null);
+
+    const normalizedPayload: PaymentSessionResponse = requiresPayment
+      ? (() => {
+          if (
+            !paymentIntentClientSecret ||
+            !customerEphemeralKeySecret ||
+            !customerId
+          ) {
+            throw new Error('Incomplete payment session details received.');
+          }
+
+          return {
+            requiresPayment: true,
+            paymentIntentClientSecret,
+            customerEphemeralKeySecret,
+            customerId,
+            paymentIntentId,
+            publishableKey,
+          };
+        })()
+      : {
+          requiresPayment: false,
+          paymentIntentId,
+          publishableKey,
+        };
 
     deviceLog.success('membership.paymentSession.create.success', {
       plan,
-      hasPublishableKey: Boolean(payload.publishableKey),
-      hasPaymentIntentSecret: Boolean(payload.paymentIntentClientSecret),
-      hasCustomerKey: Boolean(payload.customerEphemeralKeySecret),
+      requiresPayment: normalizedPayload.requiresPayment,
+      hasPublishableKey: Boolean(normalizedPayload.publishableKey),
+      hasPaymentIntentSecret: Boolean(
+        'paymentIntentClientSecret' in normalizedPayload
+          ? normalizedPayload.paymentIntentClientSecret
+          : null,
+      ),
+      hasCustomerKey: Boolean(
+        'customerEphemeralKeySecret' in normalizedPayload
+          ? normalizedPayload.customerEphemeralKeySecret
+          : null,
+      ),
     });
 
     deviceLog.debug('membership.paymentSession.create.details', {
       plan,
+      requiresPayment: normalizedPayload.requiresPayment,
       customerIdSuffix:
-        payload.customerId && payload.customerId.length > 6
-          ? payload.customerId.slice(-6)
-          : payload.customerId ?? null,
+        'customerId' in normalizedPayload && normalizedPayload.customerId
+          ? normalizedPayload.customerId.length > 6
+            ? normalizedPayload.customerId.slice(-6)
+            : normalizedPayload.customerId
+          : null,
       paymentIntentIdSuffix:
-        payload.paymentIntentId && payload.paymentIntentId.length > 6
-          ? payload.paymentIntentId.slice(-6)
-          : payload.paymentIntentId ?? null,
+        normalizedPayload.paymentIntentId &&
+        normalizedPayload.paymentIntentId.length > 6
+          ? normalizedPayload.paymentIntentId.slice(-6)
+          : normalizedPayload.paymentIntentId ?? null,
       ...summarizeSecretForLog(
         'paymentIntentSecret',
-        payload.paymentIntentClientSecret,
+        'paymentIntentClientSecret' in normalizedPayload
+          ? normalizedPayload.paymentIntentClientSecret
+          : null,
       ),
       ...summarizeSecretForLog(
         'customerEphemeralKeySecret',
-        payload.customerEphemeralKeySecret,
+        'customerEphemeralKeySecret' in normalizedPayload
+          ? normalizedPayload.customerEphemeralKeySecret
+          : null,
       ),
-      ...summarizeSecretForLog('publishableKey', payload.publishableKey ?? null),
+      ...summarizeSecretForLog(
+        'publishableKey',
+        normalizedPayload.publishableKey ?? null,
+      ),
     });
 
-    return payload;
+    return normalizedPayload;
   } catch (error) {
     deviceLog.error(
       'membership.paymentSession.create.error',

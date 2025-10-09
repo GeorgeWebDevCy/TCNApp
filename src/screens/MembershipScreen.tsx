@@ -329,57 +329,72 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
               : null,
       });
 
+      const customerIdValue =
+        'customerId' in paymentSession ? paymentSession.customerId : null;
+      const paymentIntentSecretValue =
+        'paymentIntentClientSecret' in paymentSession
+          ? paymentSession.paymentIntentClientSecret
+          : null;
+      const customerEphemeralKeySecretValue =
+        'customerEphemeralKeySecret' in paymentSession
+          ? paymentSession.customerEphemeralKeySecret
+          : null;
+
       deviceLog.debug('membership.checkout.paymentSession.received', {
         planId: selectedPlan.id,
+        requiresPayment: paymentSession.requiresPayment,
         customerIdSuffix:
-          paymentSession.customerId && paymentSession.customerId.length > 6
-            ? paymentSession.customerId.slice(-6)
-            : paymentSession.customerId ?? null,
+          customerIdValue && customerIdValue.length > 6
+            ? customerIdValue.slice(-6)
+            : customerIdValue,
         paymentIntentIdSuffix:
           paymentSession.paymentIntentId &&
           paymentSession.paymentIntentId.length > 6
             ? paymentSession.paymentIntentId.slice(-6)
             : paymentSession.paymentIntentId ?? null,
-        paymentIntentSecret: summarizeSecret(
-          paymentSession.paymentIntentClientSecret,
-        ),
-        customerKey: summarizeSecret(
-          paymentSession.customerEphemeralKeySecret,
-        ),
+        paymentIntentSecret: summarizeSecret(paymentIntentSecretValue),
+        customerKey: summarizeSecret(customerEphemeralKeySecretValue),
       });
 
-      deviceLog.debug('membership.checkout.paymentSheet.init.start', {
-        planId: selectedPlan.id,
-      });
-      const initResult = await initPaymentSheet({
-        paymentIntentClientSecret: paymentSession.paymentIntentClientSecret,
-        customerEphemeralKeySecret: paymentSession.customerEphemeralKeySecret,
-        customerId: paymentSession.customerId,
-        merchantDisplayName: STRIPE_CONFIG.merchantDisplayName,
-        allowsDelayedPaymentMethods: false,
-      });
+      if (paymentSession.requiresPayment) {
+        deviceLog.debug('membership.checkout.paymentSheet.init.start', {
+          planId: selectedPlan.id,
+        });
+        const initResult = await initPaymentSheet({
+          paymentIntentClientSecret: paymentSession.paymentIntentClientSecret,
+          customerEphemeralKeySecret:
+            paymentSession.customerEphemeralKeySecret,
+          customerId: paymentSession.customerId,
+          merchantDisplayName: STRIPE_CONFIG.merchantDisplayName,
+          allowsDelayedPaymentMethods: false,
+        });
 
-      deviceLog.debug('membership.checkout.paymentSheet.init.complete', {
-        planId: selectedPlan.id,
-        success: !initResult.error,
-        errorMessage: initResult.error?.message ?? null,
-      });
+        deviceLog.debug('membership.checkout.paymentSheet.init.complete', {
+          planId: selectedPlan.id,
+          success: !initResult.error,
+          errorMessage: initResult.error?.message ?? null,
+        });
 
-      if (initResult.error) {
-        throw new Error(initResult.error.message);
-      }
+        if (initResult.error) {
+          throw new Error(initResult.error.message);
+        }
 
-      deviceLog.debug('membership.checkout.paymentSheet.present.start', {
-        planId: selectedPlan.id,
-      });
-      const presentResult = await presentPaymentSheet();
-      deviceLog.debug('membership.checkout.paymentSheet.present.complete', {
-        planId: selectedPlan.id,
-        success: !presentResult.error,
-        errorMessage: presentResult.error?.message ?? null,
-      });
-      if (presentResult.error) {
-        throw new Error(presentResult.error.message);
+        deviceLog.debug('membership.checkout.paymentSheet.present.start', {
+          planId: selectedPlan.id,
+        });
+        const presentResult = await presentPaymentSheet();
+        deviceLog.debug('membership.checkout.paymentSheet.present.complete', {
+          planId: selectedPlan.id,
+          success: !presentResult.error,
+          errorMessage: presentResult.error?.message ?? null,
+        });
+        if (presentResult.error) {
+          throw new Error(presentResult.error.message);
+        }
+      } else {
+        deviceLog.debug('membership.checkout.paymentSession.freeUpgrade', {
+          planId: selectedPlan.id,
+        });
       }
 
       try {
