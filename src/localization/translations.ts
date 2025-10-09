@@ -157,6 +157,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         heading: 'Quick actions',
         viewVendors: 'View vendors',
         viewVendorsMessage: 'Browse participating vendors in your area.',
+        viewAnalytics: 'View analytics',
+        viewAnalyticsMessage: 'Open your savings analytics dashboard.',
         upgradeOptions: 'Upgrade membership',
         upgradeOptionsMessage:
           'Securely upgrade your membership without leaving the app.',
@@ -226,6 +228,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       screen: {
         title: 'Member scanner',
         subtitle: 'Scan member QR codes to confirm eligibility and discounts.',
+        viewAnalytics: 'View analytics',
         permissionDenied:
           'Camera permission is required to scan QR codes. Use manual entry if access is not granted.',
         cameraPermission: {
@@ -280,6 +283,50 @@ export const translations: Record<Language, TranslationDictionary> = {
         },
         logout: 'Sign out',
         operator: 'Signed in as {{name}}',
+      },
+    },
+    analytics: {
+      shared: {
+        unknownVendor: 'Unknown vendor',
+        totalSavings: 'Total savings (THB)',
+        completedTransactions: 'Completed transactions',
+        pendingTransactions: 'Pending transactions',
+        transactionsCount: '{{count}} completed',
+        refresh: 'Refresh',
+        back: 'Back',
+        lastUpdated: 'Last updated {{timestamp}}',
+      },
+      status: {
+        completed: 'Completed',
+        pending: 'Pending',
+        failed: 'Failed',
+      },
+      member: {
+        title: 'Savings analytics',
+        subtitle: 'Track how your member perks perform each month.',
+        empty: 'Once you record transactions, charts will appear here.',
+      },
+      vendor: {
+        title: 'Transaction analytics',
+        subtitle: 'Review member activity and savings at your location.',
+        empty: 'Record transactions to see your analytics summary.',
+      },
+      charts: {
+        monthlySavings: {
+          title: 'Monthly savings',
+          tooltip: 'Total discount captured per month.',
+          empty: 'No savings recorded for this period.',
+        },
+        topVendors: {
+          title: 'Top vendors',
+          tooltip: 'Where you save the most based on discount totals.',
+          empty: 'No vendor data available yet.',
+        },
+        transactionStatus: {
+          title: 'Transaction status',
+          tooltip: 'Completed vs pending vs failed transactions.',
+          empty: 'No transaction history to chart yet.',
+        },
       },
     },
     profile: {
@@ -563,6 +610,8 @@ export const translations: Record<Language, TranslationDictionary> = {
         heading: 'เมนูลัด',
         viewVendors: 'ดูร้านค้าพันธมิตร',
         viewVendorsMessage: 'สำรวจร้านค้าที่เข้าร่วมในพื้นที่ของคุณ',
+        viewAnalytics: 'ดูภาพรวมวิเคราะห์',
+        viewAnalyticsMessage: 'เปิดแดชบอร์ดสรุปการออมของคุณ',
         upgradeOptions: 'อัปเกรดสมาชิก',
         upgradeOptionsMessage: 'อัปเกรดสถานะสมาชิกของคุณได้ทันทีภายในแอป.',
         comingSoonTitle: 'เร็ว ๆ นี้',
@@ -629,6 +678,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       screen: {
         title: 'สแกนสมาชิก',
         subtitle: 'สแกนโค้ด QR ของสมาชิกเพื่อยืนยันสิทธิ์และส่วนลด',
+        viewAnalytics: 'ดูแดชบอร์ดวิเคราะห์',
         permissionDenied:
           'ต้องอนุญาตการใช้กล้องเพื่อสแกนโค้ด QR โปรดกรอกโค้ดด้วยตนเองหากไม่สามารถใช้กล้องได้.',
         cameraPermission: {
@@ -683,6 +733,51 @@ export const translations: Record<Language, TranslationDictionary> = {
         },
         logout: 'ออกจากระบบ',
         operator: 'เข้าสู่ระบบในชื่อ {{name}}',
+      },
+    },
+    analytics: {
+      shared: {
+        unknownVendor: 'ร้านค้าที่ไม่ทราบชื่อ',
+        totalSavings: 'ยอดประหยัดรวม (บาท)',
+        completedTransactions: 'รายการที่เสร็จสมบูรณ์',
+        pendingTransactions: 'รายการที่รอดำเนินการ',
+        transactionsCount: 'เสร็จสิ้น {{count}} รายการ',
+        refresh: 'รีเฟรช',
+        back: 'ย้อนกลับ',
+        lastUpdated: 'อัปเดตล่าสุด {{timestamp}}',
+      },
+      status: {
+        completed: 'เสร็จสมบูรณ์',
+        pending: 'รอดำเนินการ',
+        failed: 'ไม่สำเร็จ',
+      },
+      member: {
+        title: 'การวิเคราะห์การประหยัด',
+        subtitle: 'ติดตามประสิทธิภาพสิทธิประโยชน์สมาชิกของคุณในแต่ละเดือน',
+        empty: 'เมื่อมีการบันทึกรายการ ข้อมูลจะแสดงที่นี่',
+      },
+      vendor: {
+        title: 'การวิเคราะห์ธุรกรรม',
+        subtitle: 'ตรวจสอบกิจกรรมของสมาชิกและยอดส่วนลดที่สาขาของคุณ',
+        empty: 'บันทึกรายการเพื่อดูภาพรวมการวิเคราะห์ของคุณ',
+      },
+      charts: {
+        monthlySavings: {
+          title: 'ยอดประหยัดรายเดือน',
+          tooltip: 'ยอดส่วนลดรวมที่ได้รับในแต่ละเดือน',
+          empty: 'ยังไม่มีข้อมูลการประหยัดสำหรับช่วงนี้',
+        },
+        topVendors: {
+          title: 'ร้านค้าที่มอบส่วนลดสูงสุด',
+          tooltip: 'จัดอันดับตามยอดส่วนลดสะสม',
+          empty: 'ยังไม่มีข้อมูลร้านค้า',
+        },
+        transactionStatus: {
+          title: 'สถานะธุรกรรม',
+          tooltip:
+            'เปรียบเทียบรายการที่เสร็จสมบูรณ์ รอดำเนินการ และไม่สำเร็จ',
+          empty: 'ยังไม่มีประวัติธุรกรรมสำหรับสร้างกราฟ',
+        },
       },
     },
     profile: {

@@ -25,6 +25,8 @@ import { LoginScreen } from './src/screens/LoginScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
 import { MembershipScreen } from './src/screens/MembershipScreen';
 import { VendorScanScreen } from './src/screens/VendorScanScreen';
+import { MemberDashboardScreen } from './src/screens/MemberDashboardScreen';
+import { VendorDashboardScreen } from './src/screens/VendorDashboardScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
 import { COLORS } from './src/config/theme';
 
@@ -39,8 +41,16 @@ const AppContent: React.FC = () => {
   // Track which high-level screen the authenticated user is currently viewing.
   // We model the navigation stack as a discriminated union to keep the state strict.
   const [activeScreen, setActiveScreen] = useState<
-    'home' | 'profile' | 'membership'
+    | 'home'
+    | 'profile'
+    | 'membership'
+    | 'memberAnalytics'
+    | 'vendorScan'
+    | 'vendorAnalytics'
   >('home');
+
+  const normalizedAccountType = (user?.accountType ?? '').toLowerCase();
+  const isVendor = normalizedAccountType === 'vendor';
 
   useEffect(() => {
     // Whenever the user signs out we reset the active screen to "home". This prevents
@@ -50,6 +60,22 @@ const AppContent: React.FC = () => {
       setActiveScreen('home');
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    setActiveScreen(current => {
+      if (isVendor) {
+        return current === 'vendorScan' || current === 'vendorAnalytics'
+          ? current
+          : 'vendorScan';
+      }
+
+      if (current === 'vendorScan' || current === 'vendorAnalytics') {
+        return 'home';
+      }
+
+      return current;
+    });
+  }, [isVendor]);
 
   if (isLoading) {
     // While authentication is bootstrapping (e.g., validating stored tokens) we display
@@ -67,8 +93,20 @@ const AppContent: React.FC = () => {
     return <LoginScreen />;
   }
 
-  if ((user?.accountType ?? '').toLowerCase() === 'vendor') {
-    return <VendorScanScreen />;
+  if (isVendor) {
+    if (activeScreen === 'vendorAnalytics') {
+      return (
+        <VendorDashboardScreen
+          onBack={() => setActiveScreen('vendorScan')}
+        />
+      );
+    }
+
+    return (
+      <VendorScanScreen
+        onShowAnalytics={() => setActiveScreen('vendorAnalytics')}
+      />
+    );
   }
 
   if (activeScreen === 'profile') {
@@ -84,12 +122,17 @@ const AppContent: React.FC = () => {
     return <MembershipScreen onBack={() => setActiveScreen('home')} />;
   }
 
+  if (activeScreen === 'memberAnalytics') {
+    return <MemberDashboardScreen onBack={() => setActiveScreen('home')} />;
+  }
+
   return (
     // The home screen is the default route once authenticated. We pass callbacks that
     // simply mutate the local activeScreen state, emulating a navigation push.
     <HomeScreen
       onManageProfile={() => setActiveScreen('profile')}
       onUpgradeMembership={() => setActiveScreen('membership')}
+      onViewAnalytics={() => setActiveScreen('memberAnalytics')}
     />
   );
 };

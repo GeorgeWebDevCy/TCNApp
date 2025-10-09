@@ -37,3 +37,36 @@ jest.mock('react-native-safe-area-context', () => {
     },
   };
 });
+
+jest.mock('react-native-svg', () => {
+  const React = require('react');
+  const Mock = ({ children }) => React.createElement('svg', null, children);
+  return {
+    __esModule: true,
+    default: Mock,
+    Svg: Mock,
+    Circle: 'SvgCircle',
+    Rect: 'SvgRect',
+    Path: 'SvgPath',
+    G: 'SvgGroup',
+    Text: 'SvgText',
+    TSpan: 'SvgTSpan',
+    Defs: 'SvgDefs',
+    Stop: 'SvgStop',
+    LinearGradient: 'SvgLinearGradient',
+  };
+});
+
+jest.mock('victory-native', () => {
+  const React = require('react');
+  const createElement = React.createElement;
+
+  return {
+    VictoryChart: ({ children, ...props }) =>
+      createElement('victory-chart', props, children),
+    VictoryAxis: props => createElement('victory-axis', props),
+    VictoryBar: props => createElement('victory-bar', props),
+    VictoryPie: props => createElement('victory-pie', props),
+    VictoryTheme: { material: {} },
+  };
+});

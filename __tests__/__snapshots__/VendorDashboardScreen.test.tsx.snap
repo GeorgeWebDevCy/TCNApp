@@ -1,0 +1,827 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`VendorDashboardScreen renders the vendor analytics snapshot 1`] = `
+<safe-area-view
+  style={
+    {
+      "backgroundColor": "#F8FAFC",
+      "flex": 1,
+    }
+  }
+>
+  <RCTScrollView
+    contentContainerStyle={
+      {
+        "gap": 24,
+        "padding": 24,
+      }
+    }
+  >
+    <View>
+      <View
+        style={
+          [
+            {
+              "gap": 16,
+              "justifyContent": "space-between",
+            },
+            {
+              "flexDirection": "row",
+            },
+          ]
+        }
+      >
+        <View
+          style={
+            {
+              "flexShrink": 1,
+              "gap": 8,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#0F172A",
+                "fontSize": 24,
+                "fontWeight": "700",
+              }
+            }
+          >
+            Transaction analytics
+          </Text>
+          <Text
+            style={
+              {
+                "color": "#475569",
+                "fontSize": 16,
+              }
+            }
+          >
+            Review member activity and savings at your location.
+          </Text>
+        </View>
+        <View
+          style={
+            {
+              "alignItems": "center",
+              "flexDirection": "row",
+              "gap": 12,
+            }
+          }
+        >
+          <View
+            accessibilityRole="button"
+            accessibilityState={
+              {
+                "busy": undefined,
+                "checked": undefined,
+                "disabled": undefined,
+                "expanded": undefined,
+                "selected": undefined,
+              }
+            }
+            accessibilityValue={
+              {
+                "max": undefined,
+                "min": undefined,
+                "now": undefined,
+                "text": undefined,
+              }
+            }
+            accessible={true}
+            collapsable={false}
+            focusable={true}
+            onBlur={[Function]}
+            onClick={[Function]}
+            onFocus={[Function]}
+            onResponderGrant={[Function]}
+            onResponderMove={[Function]}
+            onResponderRelease={[Function]}
+            onResponderTerminate={[Function]}
+            onResponderTerminationRequest={[Function]}
+            onStartShouldSetResponder={[Function]}
+            style={
+              {
+                "backgroundColor": "#2563EB",
+                "borderRadius": 12,
+                "paddingHorizontal": 16,
+                "paddingVertical": 10,
+              }
+            }
+          >
+            <Text
+              style={
+                {
+                  "color": "#FFFFFF",
+                  "fontSize": 14,
+                  "fontWeight": "600",
+                }
+              }
+            >
+              Refresh
+            </Text>
+          </View>
+        </View>
+      </View>
+      <View
+        style={
+          {
+            "flexDirection": "row",
+            "flexWrap": "wrap",
+            "gap": 16,
+          }
+        }
+      >
+        <View
+          style={
+            {
+              "backgroundColor": "#FFFFFF",
+              "borderRadius": 16,
+              "elevation": 1,
+              "flex": 1,
+              "gap": 8,
+              "minWidth": 160,
+              "padding": 16,
+              "shadowColor": "#000000",
+              "shadowOffset": {
+                "height": 2,
+                "width": 0,
+              },
+              "shadowOpacity": 0.06,
+              "shadowRadius": 6,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#475569",
+                "fontSize": 14,
+              }
+            }
+          >
+            Total savings (THB)
+          </Text>
+          <Text
+            style={
+              {
+                "color": "#0F172A",
+                "fontSize": 22,
+                "fontWeight": "700",
+              }
+            }
+          >
+            200.00
+          </Text>
+        </View>
+        <View
+          style={
+            {
+              "backgroundColor": "#FFFFFF",
+              "borderRadius": 16,
+              "elevation": 1,
+              "flex": 1,
+              "gap": 8,
+              "minWidth": 160,
+              "padding": 16,
+              "shadowColor": "#000000",
+              "shadowOffset": {
+                "height": 2,
+                "width": 0,
+              },
+              "shadowOpacity": 0.06,
+              "shadowRadius": 6,
+            }
+          }
+        >
+          <Text
+            style={
+              {
+                "color": "#475569",
+                "fontSize": 14,
+              }
+            }
+          >
+            Pending transactions
+          </Text>
+          <Text
+            style={
+              {
+                "color": "#0F172A",
+                "fontSize": 22,
+                "fontWeight": "700",
+              }
+            }
+          >
+            2
+          </Text>
+        </View>
+      </View>
+      <Text
+        style={
+          {
+            "color": "#64748B",
+            "fontSize": 12,
+          }
+        }
+      >
+        Last updated 3/11/2024, 8:30:00 AM
+      </Text>
+      <View
+        style={
+          {
+            "gap": 24,
+          }
+        }
+      >
+        <View
+          style={
+            [
+              {
+                "backgroundColor": "#FFFFFF",
+                "borderRadius": 16,
+                "elevation": 2,
+                "gap": 16,
+                "padding": 16,
+                "shadowColor": "#000000",
+                "shadowOffset": {
+                  "height": 2,
+                  "width": 0,
+                },
+                "shadowOpacity": 0.08,
+                "shadowRadius": 8,
+              },
+              undefined,
+            ]
+          }
+        >
+          <View
+            style={
+              {
+                "alignItems": "flex-start",
+                "flexDirection": "row",
+                "gap": 12,
+                "justifyContent": "space-between",
+              }
+            }
+          >
+            <View
+              style={
+                {
+                  "flex": 1,
+                }
+              }
+            >
+              <Text
+                accessibilityRole="header"
+                style={
+                  {
+                    "color": "#0F172A",
+                    "fontSize": 18,
+                    "fontWeight": "600",
+                  }
+                }
+              >
+                Monthly savings
+              </Text>
+            </View>
+            <Text
+              style={
+                {
+                  "color": "#64748B",
+                  "flexShrink": 1,
+                  "fontSize": 12,
+                  "textAlign": "right",
+                }
+              }
+            >
+              Total discount captured per month.
+            </Text>
+          </View>
+          <View
+            style={
+              {
+                "justifyContent": "center",
+                "minHeight": 180,
+              }
+            }
+          >
+            <victory-chart
+              domainPadding={
+                {
+                  "x": 24,
+                  "y": 12,
+                }
+              }
+              height={220}
+              padding={
+                {
+                  "bottom": 48,
+                  "left": 56,
+                  "right": 24,
+                  "top": 24,
+                }
+              }
+              theme={{}}
+            >
+              <victory-axis
+                style={
+                  {
+                    "axis": {
+                      "stroke": "#CBD5E1",
+                    },
+                    "grid": {
+                      "stroke": "transparent",
+                    },
+                    "tickLabels": {
+                      "angle": 0,
+                      "fill": "#475569",
+                      "fontSize": 12,
+                      "padding": 10,
+                    },
+                  }
+                }
+                tickFormat={
+                  [
+                    "Jan",
+                  ]
+                }
+              />
+              <victory-axis
+                dependentAxis={true}
+                style={
+                  {
+                    "axis": {
+                      "stroke": "#CBD5E1",
+                    },
+                    "grid": {
+                      "stroke": "#CBD5E1",
+                      "strokeDasharray": "4 4",
+                    },
+                    "tickLabels": {
+                      "fill": "#64748B",
+                      "fontSize": 12,
+                      "padding": 6,
+                    },
+                  }
+                }
+                tickFormat={[Function]}
+              />
+              <victory-bar
+                animate={
+                  {
+                    "duration": 400,
+                  }
+                }
+                data={
+                  [
+                    {
+                      "x": "Jan",
+                      "y": 200,
+                    },
+                  ]
+                }
+                style={
+                  {
+                    "data": {
+                      "borderRadius": 6,
+                      "fill": "#2563EB",
+                      "width": 16,
+                    },
+                  }
+                }
+              />
+            </victory-chart>
+          </View>
+        </View>
+        <View
+          style={
+            [
+              {
+                "backgroundColor": "#FFFFFF",
+                "borderRadius": 16,
+                "elevation": 2,
+                "gap": 16,
+                "padding": 16,
+                "shadowColor": "#000000",
+                "shadowOffset": {
+                  "height": 2,
+                  "width": 0,
+                },
+                "shadowOpacity": 0.08,
+                "shadowRadius": 8,
+              },
+              undefined,
+            ]
+          }
+        >
+          <View
+            style={
+              {
+                "alignItems": "flex-start",
+                "flexDirection": "row",
+                "gap": 12,
+                "justifyContent": "space-between",
+              }
+            }
+          >
+            <View
+              style={
+                {
+                  "flex": 1,
+                }
+              }
+            >
+              <Text
+                accessibilityRole="header"
+                style={
+                  {
+                    "color": "#0F172A",
+                    "fontSize": 18,
+                    "fontWeight": "600",
+                  }
+                }
+              >
+                Top vendors
+              </Text>
+            </View>
+            <Text
+              style={
+                {
+                  "color": "#64748B",
+                  "flexShrink": 1,
+                  "fontSize": 12,
+                  "textAlign": "right",
+                }
+              }
+            >
+              Where you save the most based on discount totals.
+            </Text>
+          </View>
+          <View
+            style={
+              {
+                "justifyContent": "center",
+                "minHeight": 180,
+              }
+            }
+          >
+            <victory-chart
+              domainPadding={
+                {
+                  "x": 16,
+                  "y": 24,
+                }
+              }
+              height={220}
+              horizontal={true}
+              padding={
+                {
+                  "bottom": 24,
+                  "left": 120,
+                  "right": 24,
+                  "top": 24,
+                }
+              }
+              theme={{}}
+            >
+              <victory-axis
+                style={
+                  {
+                    "axis": {
+                      "stroke": "#CBD5E1",
+                    },
+                    "grid": {
+                      "stroke": "#CBD5E1",
+                      "strokeDasharray": "4 4",
+                    },
+                    "tickLabels": {
+                      "fill": "#64748B",
+                      "fontSize": 12,
+                      "padding": 4,
+                    },
+                  }
+                }
+              />
+              <victory-axis
+                dependentAxis={true}
+                style={
+                  {
+                    "axis": {
+                      "stroke": "#CBD5E1",
+                    },
+                    "grid": {
+                      "stroke": "transparent",
+                    },
+                    "tickLabels": {
+                      "fill": "#475569",
+                      "fontSize": 12,
+                    },
+                  }
+                }
+                tickFormat={
+                  [
+                    "Main Branch",
+                  ]
+                }
+              />
+              <victory-bar
+                animate={
+                  {
+                    "duration": 400,
+                  }
+                }
+                data={
+                  [
+                    {
+                      "x": "Main Branch",
+                      "y": 200,
+                    },
+                  ]
+                }
+                style={
+                  {
+                    "data": {
+                      "borderRadius": 6,
+                      "fill": "#60A5FA",
+                      "width": 16,
+                    },
+                  }
+                }
+              />
+            </victory-chart>
+          </View>
+        </View>
+        <View
+          style={
+            [
+              {
+                "backgroundColor": "#FFFFFF",
+                "borderRadius": 16,
+                "elevation": 2,
+                "gap": 16,
+                "padding": 16,
+                "shadowColor": "#000000",
+                "shadowOffset": {
+                  "height": 2,
+                  "width": 0,
+                },
+                "shadowOpacity": 0.08,
+                "shadowRadius": 8,
+              },
+              undefined,
+            ]
+          }
+        >
+          <View
+            style={
+              {
+                "alignItems": "flex-start",
+                "flexDirection": "row",
+                "gap": 12,
+                "justifyContent": "space-between",
+              }
+            }
+          >
+            <View
+              style={
+                {
+                  "flex": 1,
+                }
+              }
+            >
+              <Text
+                accessibilityRole="header"
+                style={
+                  {
+                    "color": "#0F172A",
+                    "fontSize": 18,
+                    "fontWeight": "600",
+                  }
+                }
+              >
+                Transaction status
+              </Text>
+            </View>
+            <Text
+              style={
+                {
+                  "color": "#64748B",
+                  "flexShrink": 1,
+                  "fontSize": 12,
+                  "textAlign": "right",
+                }
+              }
+            >
+              Completed vs pending vs failed transactions.
+            </Text>
+          </View>
+          <View
+            style={
+              {
+                "justifyContent": "center",
+                "minHeight": 180,
+              }
+            }
+          >
+            <View
+              style={
+                {
+                  "flexDirection": "row",
+                  "gap": 16,
+                  "justifyContent": "space-between",
+                }
+              }
+            >
+              <View
+                style={
+                  {
+                    "alignItems": "center",
+                    "height": 180,
+                    "justifyContent": "center",
+                    "width": 180,
+                  }
+                }
+              >
+                <victory-pie
+                  animate={
+                    {
+                      "duration": 400,
+                    }
+                  }
+                  colorScale={
+                    [
+                      "#2563EB",
+                      "#F59E0B",
+                      "#DC2626",
+                    ]
+                  }
+                  data={
+                    [
+                      {
+                        "x": "Completed",
+                        "y": 4,
+                      },
+                      {
+                        "x": "Pending",
+                        "y": 2,
+                      },
+                      {
+                        "x": "Failed",
+                        "y": 1,
+                      },
+                    ]
+                  }
+                  innerRadius={60}
+                  labels={[Function]}
+                />
+                <View
+                  style={
+                    {
+                      "alignItems": "center",
+                      "justifyContent": "center",
+                      "position": "absolute",
+                    }
+                  }
+                >
+                  <Text
+                    style={
+                      {
+                        "color": "#0F172A",
+                        "fontSize": 16,
+                        "fontWeight": "600",
+                        "textAlign": "center",
+                      }
+                    }
+                  >
+                    4 completed
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={
+                  {
+                    "flex": 1,
+                    "gap": 12,
+                    "justifyContent": "center",
+                  }
+                }
+              >
+                <View
+                  style={
+                    {
+                      "alignItems": "center",
+                      "flexDirection": "row",
+                      "gap": 8,
+                    }
+                  }
+                >
+                  <View
+                    style={
+                      [
+                        {
+                          "borderRadius": 6,
+                          "height": 12,
+                          "width": 12,
+                        },
+                        {
+                          "backgroundColor": "#2563EB",
+                        },
+                      ]
+                    }
+                  />
+                  <Text
+                    style={
+                      {
+                        "color": "#475569",
+                        "fontSize": 14,
+                      }
+                    }
+                  >
+                    Completed
+                     · 
+                    4
+                  </Text>
+                </View>
+                <View
+                  style={
+                    {
+                      "alignItems": "center",
+                      "flexDirection": "row",
+                      "gap": 8,
+                    }
+                  }
+                >
+                  <View
+                    style={
+                      [
+                        {
+                          "borderRadius": 6,
+                          "height": 12,
+                          "width": 12,
+                        },
+                        {
+                          "backgroundColor": "#F59E0B",
+                        },
+                      ]
+                    }
+                  />
+                  <Text
+                    style={
+                      {
+                        "color": "#475569",
+                        "fontSize": 14,
+                      }
+                    }
+                  >
+                    Pending
+                     · 
+                    2
+                  </Text>
+                </View>
+                <View
+                  style={
+                    {
+                      "alignItems": "center",
+                      "flexDirection": "row",
+                      "gap": 8,
+                    }
+                  }
+                >
+                  <View
+                    style={
+                      [
+                        {
+                          "borderRadius": 6,
+                          "height": 12,
+                          "width": 12,
+                        },
+                        {
+                          "backgroundColor": "#DC2626",
+                        },
+                      ]
+                    }
+                  />
+                  <Text
+                    style={
+                      {
+                        "color": "#475569",
+                        "fontSize": 14,
+                      }
+                    }
+                  >
+                    Failed
+                     · 
+                    1
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </View>
+    </View>
+  </RCTScrollView>
+</safe-area-view>
+`;

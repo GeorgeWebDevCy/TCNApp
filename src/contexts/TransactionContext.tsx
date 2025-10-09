@@ -17,6 +17,7 @@ type TransactionAction =
   | { type: 'ADD'; payload: TransactionRecord }
   | { type: 'UPDATE'; payload: { id: string; record: TransactionRecord } }
   | { type: 'PATCH'; payload: { id: string; updates: Partial<TransactionRecord> } }
+  | { type: 'SET_ALL'; payload: TransactionRecord[] }
   | { type: 'RESET' };
 
 const initialState: TransactionState = {
@@ -85,6 +86,8 @@ const transactionReducer = (
 
       return { transactions: deduped };
     }
+    case 'SET_ALL':
+      return { transactions: [...action.payload] };
     case 'RESET':
       return initialState;
     default:
@@ -103,6 +106,7 @@ type TransactionContextValue = {
     id: string,
     updates: Partial<TransactionRecord>,
   ) => TransactionRecord | null;
+  setTransactions: (records: TransactionRecord[]) => void;
 };
 
 const TransactionContext = createContext<TransactionContextValue | undefined>(
@@ -143,6 +147,8 @@ export const TransactionProvider: React.FC<PropsWithChildren> = ({
         });
         return nextRecord;
       },
+      setTransactions: records =>
+        dispatch({ type: 'SET_ALL', payload: records }),
     }),
     [state.transactions],
   );

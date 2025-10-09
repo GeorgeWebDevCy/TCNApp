@@ -22,7 +22,13 @@ import { calculateDiscountForAmount } from '../utils/discount';
 import { MemberLookupResult, TransactionRecord } from '../types/transactions';
 import { COLORS } from '../config/theme';
 
-export const VendorScanScreen: React.FC = () => {
+type VendorScanScreenProps = {
+  onShowAnalytics?: () => void;
+};
+
+export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
+  onShowAnalytics,
+}) => {
   const {
     state: { user },
     logout,
@@ -280,6 +286,18 @@ export const VendorScanScreen: React.FC = () => {
       >
         <Text style={styles.title}>{t('vendor.screen.title')}</Text>
         <Text style={styles.subtitle}>{t('vendor.screen.subtitle')}</Text>
+        {onShowAnalytics ? (
+          <Pressable
+            style={styles.analyticsButton}
+            accessibilityRole="button"
+            onPress={onShowAnalytics}
+            testID="vendor-analytics-button"
+          >
+            <Text style={styles.analyticsButtonText}>
+              {t('vendor.screen.viewAnalytics')}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View style={styles.cameraContainer}>
           {permissionDenied ? (
@@ -525,6 +543,22 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: COLORS.textSecondary,
+  },
+  analyticsButton: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: COLORS.mutedBorder,
+    backgroundColor: COLORS.surface,
+  },
+  analyticsButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '500',
   },
   cameraContainer: {
     height: 260,
