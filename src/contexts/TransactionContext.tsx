@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { useAuthContext } from './AuthContext';
 import { TransactionRecord } from '../types/transactions';
+import deviceLog from '../utils/deviceLog';
 
 interface TransactionState {
   transactions: TransactionRecord[];
@@ -123,6 +124,7 @@ export const TransactionProvider: React.FC<PropsWithChildren> = ({
 
   useEffect(() => {
     if (!isAuthenticated) {
+      deviceLog.debug('transactions.reset');
       dispatch({ type: 'RESET' });
     }
   }, [isAuthenticated]);
@@ -130,25 +132,43 @@ export const TransactionProvider: React.FC<PropsWithChildren> = ({
   const value = useMemo<TransactionContextValue>(
     () => ({
       transactions: state.transactions,
-      addTransaction: transaction => dispatch({ type: 'ADD', payload: transaction }),
-      replaceTransaction: (id, record) =>
-        dispatch({ type: 'UPDATE', payload: { id, record } }),
+      addTransaction: transaction => {
+        deviceLog.info('transactions.add', {
+          id: transaction.id,
+          status: transaction.status,
+        });
+        dispatch({ type: 'ADD', payload: transaction });
+      },
+      replaceTransaction: (id, record) => {
+        deviceLog.debug('transactions.replace', {
+          id,
+          status: record.status,
+        });
+        dispatch({ type: 'UPDATE', payload: { id, record } });
+      },
       patchTransaction: (id, updates) => {
         const existing = state.transactions.find(
           transaction => transaction.id === id,
         );
         if (!existing) {
+          deviceLog.warn('transactions.patch.missing', { id });
           return null;
         }
         const nextRecord = { ...existing, ...updates };
+        deviceLog.debug('transactions.patch', {
+          id,
+          updates: Object.keys(updates ?? {}),
+        });
         dispatch({
           type: 'PATCH',
           payload: { id, updates },
         });
         return nextRecord;
       },
-      setTransactions: records =>
-        dispatch({ type: 'SET_ALL', payload: records }),
+      setTransactions: records => {
+        deviceLog.info('transactions.setAll', { count: records.length });
+        dispatch({ type: 'SET_ALL', payload: records });
+      },
     }),
     [state.transactions],
   );
