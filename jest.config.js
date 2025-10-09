@@ -5,7 +5,7 @@ module.exports = {
   coverageDirectory: 'coverage',
   coverageProvider: 'v8',
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|react-native-qrcode-svg|react-native-camera)/)',
+    'node_modules/(?!(react-native|@react-native|react-native-qrcode-svg)/)',
   ],
   testMatch: ['**/__tests__/**/*.test.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
 };
