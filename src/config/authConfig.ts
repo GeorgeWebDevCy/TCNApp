@@ -37,6 +37,13 @@ export const WORDPRESS_CONFIG = {
     register: '/wp-json/gn/v1/register',
     membershipQr: '/wp-json/gn/v1/membership/qr',
     validateQr: '/wp-json/gn/v1/membership/qr/validate',
+    admin: {
+      accounts: '/wp-json/tcn/v1/admin/accounts',
+      approveVendor: (vendorId: number | string) =>
+        `/wp-json/tcn/v1/admin/vendors/${vendorId}/approve`,
+      rejectVendor: (vendorId: number | string) =>
+        `/wp-json/tcn/v1/admin/vendors/${vendorId}/reject`,
+    },
   },
   links: {
     register: `${BASE_URL}/register`,

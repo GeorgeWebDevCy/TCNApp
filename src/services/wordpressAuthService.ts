@@ -17,6 +17,7 @@ import {
 } from './secureTokenStorage';
 import {
   AuthUser,
+  AccountStatus,
   LoginOptions,
   MemberQrCode,
   MemberValidationResult,
@@ -756,11 +757,64 @@ const normalizeAccountTypeValue = (
   return normalized as AuthUser['accountType'];
 };
 
+const normalizeAccountStatusValue = (
+  value: unknown,
+): AccountStatus | null => {
+  if (value == null) {
+    return null;
+  }
+
+  const raw =
+    typeof value === 'string'
+      ? value.trim()
+      : typeof value === 'number'
+      ? String(value)
+      : '';
+
+  if (!raw) {
+    return null;
+  }
+
+  const normalized = raw.toLowerCase();
+
+  if (normalized === 'active' || normalized === 'approved' || normalized === 'publish') {
+    return 'active';
+  }
+
+  if (
+    normalized === 'pending' ||
+    normalized === 'awaiting' ||
+    normalized === 'awaiting_approval' ||
+    normalized === 'pending-activation' ||
+    normalized === 'review'
+  ) {
+    return 'pending';
+  }
+
+  if (
+    normalized === 'rejected' ||
+    normalized === 'denied' ||
+    normalized === 'declined'
+  ) {
+    return 'rejected';
+  }
+
+  if (
+    normalized === 'suspended' ||
+    normalized === 'disabled' ||
+    normalized === 'blocked'
+  ) {
+    return 'suspended';
+  }
+
+  return normalized as AccountStatus;
+};
+
 const parseAccountMetadata = (
   payload: Record<string, unknown>,
 ): Pick<
   AuthUser,
-  'accountType' | 'vendorTier' | 'qrPayload' | 'qrToken'
+  'accountType' | 'accountStatus' | 'vendorTier' | 'vendorStatus' | 'qrPayload' | 'qrToken'
 > => {
   const meta =
     (payload.meta as Record<string, unknown> | undefined) ?? undefined;
@@ -807,6 +861,37 @@ const parseAccountMetadata = (
     getString(meta?.vendorTier) ??
     null;
 
+  const statusCandidates: unknown[] = [
+    payload.account_status,
+    payload.accountStatus,
+    payload.status,
+    meta?.account_status,
+    meta?.accountStatus,
+  ];
+  let accountStatus: AccountStatus | null = null;
+  for (const candidate of statusCandidates) {
+    const normalizedStatus = normalizeAccountStatusValue(candidate);
+    if (normalizedStatus) {
+      accountStatus = normalizedStatus;
+      break;
+    }
+  }
+
+  const vendorStatusCandidates: unknown[] = [
+    payload.vendor_status,
+    (payload.vendorStatus as unknown),
+    meta?.vendor_status,
+    meta?.vendorStatus,
+  ];
+  let vendorStatus: AccountStatus | null = null;
+  for (const candidate of vendorStatusCandidates) {
+    const normalizedStatus = normalizeAccountStatusValue(candidate);
+    if (normalizedStatus) {
+      vendorStatus = normalizedStatus;
+      break;
+    }
+  }
+
   const qrPayload =
     getString(payload.qr_payload) ??
     getString(payload.qrPayload) ??
@@ -823,7 +908,9 @@ const parseAccountMetadata = (
 
   return {
     accountType: accountType ?? null,
+    accountStatus: accountStatus ?? null,
     vendorTier: vendorTier ?? null,
+    vendorStatus: vendorStatus ?? null,
     qrPayload: qrPayload ?? null,
     qrToken: qrToken ?? null,
   };
@@ -2575,7 +2662,9 @@ export const loginWithPassword = async ({
         membership: null,
         woocommerceCredentials: defaultWooCredentials,
         accountType: null,
+        accountStatus: null,
         vendorTier: null,
+        vendorStatus: null,
         qrPayload: null,
         qrToken: null,
       };
@@ -2783,23 +2872,71 @@ export const registerAccount = async (
     last_name: lastName || undefined,
   };
 
+  const requestedAccountType =
+    (options.accountType ?? 'member').toLowerCase();
+  const normalizedAccountType =
+    requestedAccountType === 'vendor' ? 'vendor' : 'member';
+  const isVendor = normalizedAccountType === 'vendor';
+
   const payload: Record<string, unknown> = {
     username,
     email,
     password: options.password,
-    role: 'customer',
-    membership_tier: 'blue',
-    membership_plan: 'blue-membership',
-    create_membership_order: true,
-    membership_order_status: 'completed',
-    membership_status: 'active',
-    membership_purchase_date: registrationDate,
-    membership_subscription_date: registrationDate,
     suppress_emails: true,
     suppress_registration_email: true,
     suppress_order_email: true,
     send_user_notification: false,
-    woocommerce_customer: {
+  };
+
+  if (!payload.username || !payload.email || !payload.password) {
+    throw new Error('Unable to register a new account.');
+  }
+
+  if (firstName) {
+    payload.first_name = firstName;
+  }
+
+  if (lastName) {
+    payload.last_name = lastName;
+  }
+
+  if (isVendor) {
+    const vendorMeta = {
+      account_type: 'vendor',
+      account_status: 'pending',
+      vendor_status: 'pending',
+    };
+
+    payload.role = 'vendor';
+    payload.account_type = 'vendor';
+    payload.accountType = 'vendor';
+    payload.status = 'pending';
+    payload.account_status = 'pending';
+    payload.vendor_status = 'pending';
+    payload.meta = vendorMeta;
+    payload.woocommerce_customer = {
+      role: 'vendor',
+      email,
+      username,
+      first_name: firstName || undefined,
+      last_name: lastName || undefined,
+      billing,
+      shipping,
+      meta_data: [
+        { key: 'account_status', value: 'pending' },
+        { key: 'vendor_status', value: 'pending' },
+      ],
+    };
+  } else {
+    payload.role = 'customer';
+    payload.membership_tier = 'blue';
+    payload.membership_plan = 'blue-membership';
+    payload.create_membership_order = true;
+    payload.membership_order_status = 'completed';
+    payload.membership_status = 'active';
+    payload.membership_purchase_date = registrationDate;
+    payload.membership_subscription_date = registrationDate;
+    payload.woocommerce_customer = {
       role: 'customer',
       email,
       username,
@@ -2811,8 +2948,8 @@ export const registerAccount = async (
         { key: 'membership_tier', value: 'blue' },
         { key: 'membership_plan', value: 'blue-membership' },
       ],
-    },
-    woocommerce_order: {
+    };
+    payload.woocommerce_order = {
       status: 'completed',
       set_paid: true,
       payment_method: 'app_membership_auto',
@@ -2840,19 +2977,7 @@ export const registerAccount = async (
         { key: 'membership_purchase_date', value: registrationDate },
         { key: 'membership_subscription_date', value: registrationDate },
       ],
-    },
-  };
-
-  if (!payload.username || !payload.email || !payload.password) {
-    throw new Error('Unable to register a new account.');
-  }
-
-  if (firstName) {
-    payload.first_name = firstName;
-  }
-
-  if (lastName) {
-    payload.last_name = lastName;
+    };
   }
 
   const response = await fetchWithRouteFallback(
@@ -2876,6 +3001,10 @@ export const registerAccount = async (
       'Unable to register a new account.',
     );
     throw new Error(message);
+  }
+
+  if (isVendor) {
+    return 'Thank you! Your vendor application is pending review. We will notify you once an administrator activates your account.';
   }
 
   return 'Registration successful. Please log in to continue.';

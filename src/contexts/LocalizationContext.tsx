@@ -84,6 +84,10 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Passwords do not match.': 'errors.passwordMismatch',
   'Unable to change password.': 'errors.changePassword',
   'PIN entries do not match.': 'errors.pinMismatch',
+  'Your vendor account is pending approval.': 'errors.vendorPending',
+  'Your vendor application has been rejected.': 'errors.vendorRejected',
+  'Your vendor account has been suspended. Contact support for assistance.':
+    'errors.vendorSuspended',
 };
 
 export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({

@@ -8,6 +8,15 @@ export type AccountType =
   | 'guest'
   | (string & {});
 
+export type AccountStatus =
+  | 'active'
+  | 'pending'
+  | 'rejected'
+  | 'suspended'
+  | (string & {});
+
+export type RegisterAccountType = 'member' | 'vendor';
+
 export interface MembershipBenefit {
   id: string;
   title: string;
@@ -56,7 +65,9 @@ export interface AuthUser {
   membership?: MembershipInfo | null;
   woocommerceCredentials?: WooCommerceCredentialBundle | null;
   accountType?: AccountType | null;
+  accountStatus?: AccountStatus | null;
   vendorTier?: string | null;
+  vendorStatus?: AccountStatus | null;
   qrPayload?: string | null;
   qrToken?: string | null;
 }
@@ -91,6 +102,7 @@ export interface RegisterOptions {
   firstName?: string;
   lastName?: string;
   registrationDate?: string;
+  accountType?: RegisterAccountType;
 }
 
 export interface ResetPasswordOptions {

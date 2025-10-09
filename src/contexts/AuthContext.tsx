@@ -343,6 +343,40 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       const memberQrCode = await fetchMemberQrCode(session);
       const resolvedUser = sessionRef.current?.user ?? session.user;
 
+      const normalizedAccountType = resolvedUser?.accountType
+        ? resolvedUser.accountType.toLowerCase()
+        : null;
+
+      if (normalizedAccountType === 'vendor') {
+        const statusSource =
+          resolvedUser?.vendorStatus ?? resolvedUser?.accountStatus ?? null;
+        const normalizedStatus =
+          typeof statusSource === 'string'
+            ? statusSource.toLowerCase()
+            : 'active';
+
+        let blockingMessage: string | null = null;
+        if (normalizedStatus === 'pending') {
+          blockingMessage = 'Your vendor account is pending approval.';
+        } else if (normalizedStatus === 'rejected') {
+          blockingMessage = 'Your vendor application has been rejected.';
+        } else if (normalizedStatus === 'suspended') {
+          blockingMessage =
+            'Your vendor account has been suspended. Contact support for assistance.';
+        }
+
+        if (blockingMessage) {
+          deviceLog.warn('Vendor login blocked', {
+            status: normalizedStatus,
+            userId: resolvedUser?.id ?? null,
+          });
+          await clearSession();
+          await clearPasswordAuthenticated();
+          sessionRef.current = null;
+          throw new Error(blockingMessage);
+        }
+      }
+
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
@@ -914,6 +948,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 
   const registerAccount = useCallback(async (options: RegisterOptions) => {
     const registrationDate = new Date().toISOString();
+    const normalizedAccountType =
+      (options.accountType ?? 'member').toLowerCase();
+    const isVendor = normalizedAccountType === 'vendor';
 
     try {
       const message = await registerWordPressAccount({
@@ -922,19 +959,27 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       });
       deviceLog.success('Account registration succeeded', {
         username: options.username,
+        accountType: normalizedAccountType,
       });
-      deviceLog.info('WooCommerce customer created', {
-        username: options.username,
-        role: 'customer',
-        membershipPlan: 'blue-membership',
-      });
-      deviceLog.info('WooCommerce order created', {
-        username: options.username,
-        membershipPlan: 'blue-membership',
-        status: 'completed',
-        purchaseDate: registrationDate,
-        subscriptionDate: registrationDate,
-      });
+      if (isVendor) {
+        deviceLog.info('Vendor application submitted', {
+          username: options.username,
+          status: 'pending',
+        });
+      } else {
+        deviceLog.info('WooCommerce customer created', {
+          username: options.username,
+          role: 'customer',
+          membershipPlan: 'blue-membership',
+        });
+        deviceLog.info('WooCommerce order created', {
+          username: options.username,
+          membershipPlan: 'blue-membership',
+          status: 'completed',
+          purchaseDate: registrationDate,
+          subscriptionDate: registrationDate,
+        });
+      }
       return message;
     } catch (error) {
       deviceLog.error('Account registration failed', error);

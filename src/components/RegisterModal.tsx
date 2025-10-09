@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalization } from '../contexts/LocalizationContext';
-import { RegisterOptions } from '../types/auth';
+import { RegisterAccountType, RegisterOptions } from '../types/auth';
 import { COLORS } from '../config/theme';
 import { PasswordVisibilityToggle } from './PasswordVisibilityToggle';
 
@@ -35,6 +35,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
     useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [accountType, setAccountType] = useState<RegisterAccountType>('member');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -49,6 +50,7 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
       setConfirmPasswordVisible(false);
       setFirstName('');
       setLastName('');
+      setAccountType('member');
       setLoading(false);
       setError(null);
       setSuccessMessage(null);
@@ -85,8 +87,15 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
         password,
         firstName: trimmedFirstName || undefined,
         lastName: trimmedLastName || undefined,
+        accountType,
       });
-      setSuccessMessage(message ?? t('auth.registerModal.success'));
+      if (accountType === 'vendor') {
+        setSuccessMessage(
+          message ?? t('auth.registerModal.successVendor'),
+        );
+      } else {
+        setSuccessMessage(message ?? t('auth.registerModal.success'));
+      }
     } catch (err) {
       const fallback = 'Unable to register a new account.';
       const message = err instanceof Error ? err.message : fallback;
@@ -239,6 +248,57 @@ export const RegisterModal: React.FC<RegisterModalProps> = ({
               </View>
             </View>
 
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>
+                {t('auth.registerModal.accountTypeLabel')}
+              </Text>
+              <View style={styles.accountTypeRow}>
+                <Pressable
+                  style={[
+                    styles.accountTypeOption,
+                    accountType === 'member' && styles.accountTypeOptionActive,
+                    successMessage !== null && styles.accountTypeOptionDisabled,
+                  ]}
+                  disabled={loading || successMessage !== null}
+                  onPress={() => setAccountType('member')}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.accountTypeLabel,
+                      accountType === 'member' && styles.accountTypeLabelActive,
+                    ]}
+                  >
+                    {t('auth.registerModal.memberOption')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.accountTypeOption,
+                    accountType === 'vendor' && styles.accountTypeOptionActive,
+                    successMessage !== null && styles.accountTypeOptionDisabled,
+                  ]}
+                  disabled={loading || successMessage !== null}
+                  onPress={() => setAccountType('vendor')}
+                  accessibilityRole="button"
+                >
+                  <Text
+                    style={[
+                      styles.accountTypeLabel,
+                      accountType === 'vendor' && styles.accountTypeLabelActive,
+                    ]}
+                  >
+                    {t('auth.registerModal.vendorOption')}
+                  </Text>
+                </Pressable>
+              </View>
+              {accountType === 'vendor' ? (
+                <Text style={styles.helperText}>
+                  {t('auth.registerModal.vendorDescription')}
+                </Text>
+              ) : null}
+            </View>
+
             {translatedError ? (
               <Text style={styles.error}>{translatedError}</Text>
             ) : null}
@@ -337,6 +397,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textPrimary,
     backgroundColor: COLORS.surface,
+  },
+  helperText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+  },
+  accountTypeRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  accountTypeOption: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.surface,
+  },
+  accountTypeOptionActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: COLORS.primaryMuted,
+  },
+  accountTypeOptionDisabled: {
+    opacity: 0.6,
+  },
+  accountTypeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    color: COLORS.textSecondary,
+  },
+  accountTypeLabelActive: {
+    color: COLORS.primary,
   },
   passwordInputWrapper: {
     borderWidth: 1,
