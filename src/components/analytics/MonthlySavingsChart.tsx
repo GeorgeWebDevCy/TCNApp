@@ -1,5 +1,5 @@
-import React from 'react';
-import { VictoryAxis, VictoryBar, VictoryChart, VictoryTheme } from 'victory-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { AnalyticsCard, AnalyticsCardProps } from './AnalyticsCard';
 import { COLORS } from '../../config/theme';
 
@@ -20,6 +20,8 @@ export const MonthlySavingsChart: React.FC<MonthlySavingsChartProps> = ({
   isLoading,
   emptyMessage,
 }) => {
+  const maxValue = useMemo(() => data.reduce((max, point) => Math.max(max, point.value), 0), [data]);
+
   return (
     <AnalyticsCard
       title={title}
@@ -28,42 +30,58 @@ export const MonthlySavingsChart: React.FC<MonthlySavingsChartProps> = ({
       isEmpty={!data.length}
       emptyMessage={emptyMessage}
     >
-      <VictoryChart
-        height={220}
-        padding={{ top: 24, bottom: 48, left: 56, right: 24 }}
-        theme={VictoryTheme.material}
-        domainPadding={{ x: 24, y: 12 }}
-      >
-        <VictoryAxis
-          tickFormat={data.map(point => point.label)}
-          style={{
-            axis: { stroke: COLORS.mutedBorder },
-            tickLabels: {
-              fill: COLORS.textSecondary,
-              fontSize: 12,
-              angle: data.length > 4 ? -30 : 0,
-              padding: data.length > 4 ? 22 : 10,
-            },
-            grid: { stroke: 'transparent' },
-          }}
-        />
-        <VictoryAxis
-          dependentAxis
-          tickFormat={value => `${value}`}
-          style={{
-            axis: { stroke: COLORS.mutedBorder },
-            tickLabels: { fill: COLORS.textTertiary, fontSize: 12, padding: 6 },
-            grid: { stroke: COLORS.mutedBorder, strokeDasharray: '4 4' },
-          }}
-        />
-        <VictoryBar
-          data={data.map(point => ({ x: point.label, y: point.value }))}
-          style={{
-            data: { fill: COLORS.primary, width: 16, borderRadius: 6 },
-          }}
-          animate={{ duration: 400 }}
-        />
-      </VictoryChart>
+      <View style={styles.container}>
+        {data.map(point => {
+          const ratio = maxValue ? point.value / maxValue : 0;
+          const height = ratio === 0 ? 0 : Math.min(100, Math.max(ratio * 100, 12));
+          return (
+            <View key={point.label} style={styles.barItem}>
+              <Text style={styles.valueLabel}>{point.value}</Text>
+              <View style={styles.barShell}>
+                <View style={[styles.barFill, { height: `${height}%` }]} />
+              </View>
+              <Text style={styles.monthLabel} numberOfLines={1}>
+                {point.label}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
     </AnalyticsCard>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+    alignItems: 'flex-end',
+  },
+  barItem: {
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+  },
+  barShell: {
+    height: 140,
+    width: '100%',
+    borderRadius: 12,
+    backgroundColor: COLORS.mutedBackground,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  barFill: {
+    width: '100%',
+    backgroundColor: COLORS.primary,
+  },
+  valueLabel: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  monthLabel: {
+    fontSize: 12,
+    color: COLORS.textTertiary,
+  },
+});

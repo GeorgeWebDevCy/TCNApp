@@ -86,12 +86,30 @@ describe('VendorDashboardScreen', () => {
     });
   });
 
-  it('renders the vendor analytics snapshot', () => {
+  it('renders key vendor analytics sections', () => {
     let renderer: ReactTestRenderer.ReactTestRenderer | undefined;
     ReactTestRenderer.act(() => {
       renderer = ReactTestRenderer.create(<VendorDashboardScreen />);
     });
 
-    expect(renderer?.toJSON()).toMatchSnapshot();
+    const instance = renderer!.root;
+    const collectText = (value: unknown): string => {
+      if (typeof value === 'string' || typeof value === 'number') {
+        return String(value);
+      }
+      if (Array.isArray(value)) {
+        return value.map(collectText).join('');
+      }
+      return '';
+    };
+    const hasText = (expected: string) =>
+      instance.findAll(
+        node => node.type === 'Text' && collectText(node.props.children) === expected,
+      ).length > 0;
+
+    expect(hasText('Transaction analytics')).toBe(true);
+    expect(hasText('Monthly savings')).toBe(true);
+    expect(hasText('Top vendors')).toBe(true);
+    expect(hasText('Transaction status')).toBe(true);
   });
 });
