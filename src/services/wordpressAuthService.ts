@@ -740,6 +740,7 @@ const normalizeAccountTypeValue = (
 
   if (
     normalized === 'vendor' ||
+    normalized === 'tcn_vendor' ||
     normalized === 'store_vendor' ||
     normalized === 'seller'
   ) {

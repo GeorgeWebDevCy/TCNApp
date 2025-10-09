@@ -147,6 +147,21 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   const displayName = useMemo(() => getUserDisplayName(user) ?? '', [user]);
   const avatarInitials = useMemo(() => getUserInitials(user), [user]);
 
+  const roleLabel = useMemo(() => {
+    const normalized = (user?.accountType ?? '').toLowerCase();
+    const key = normalized
+      ? `profile.qr.accountTypes.${normalized}`
+      : 'profile.qr.accountTypes.member';
+    const defaultValue =
+      normalized && normalized !== 'member'
+        ? t('profile.qr.accountTypes.member')
+        : undefined;
+    return t(key, {
+      defaultValue,
+      replace: { type: user?.accountType ?? '' },
+    });
+  }, [user?.accountType, t]);
+
   const handleChangeAvatar = useCallback(async () => {
     try {
       const result = await launchImageLibrary({
@@ -477,6 +492,10 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
             {user?.email ? (
               <Text style={styles.avatarEmail}>{user.email}</Text>
             ) : null}
+            <View style={styles.avatarMetaRow}>
+              <Text style={styles.avatarMetaLabel}>{t('profile.qr.roleLabel')}</Text>
+              <Text style={styles.avatarMetaValue}>{roleLabel}</Text>
+            </View>
             <Text style={styles.avatarHint}>{t('profile.avatar.subtitle')}</Text>
             <View style={[styles.avatarActions, responsiveStyles.avatarActions]}>
               <Pressable
@@ -941,6 +960,23 @@ const styles = StyleSheet.create({
   avatarButtonText: {
     color: COLORS.textOnPrimary,
     fontWeight: '600',
+  },
+  avatarMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  avatarMetaLabel: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  avatarMetaValue: {
+    fontSize: 13,
+    color: COLORS.textPrimary,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   avatarSecondaryButtonText: {
     color: COLORS.textSecondary,
