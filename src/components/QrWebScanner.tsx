@@ -76,7 +76,7 @@ export const QrWebScanner: React.FC<QrWebScannerProps> = ({ onScan, style }) => 
           // Auto-grant camera access inside the WebView for scanning.
           // resources includes e.g., 'android.webkit.resource.VIDEO_CAPTURE'.
           try {
-            event.grant();
+            event.grant(event.resources);
           } catch {
             event.deny();
           }
