@@ -1,0 +1,8 @@
+diff --git a/node_modules/react-native-camera-kit/android/src/main/java/com/rncamerakit/CKCamera.kt b/node_modules/react-native-camera-kit/android/src/main/java/com/rncamerakit/CKCamera.kt
+index 1111111..2222222 100644
+--- a/node_modules/react-native-camera-kit/android/src/main/java/com/rncamerakit/CKCamera.kt
++++ b/node_modules/react-native-camera-kit/android/src/main/java/com/rncamerakit/CKCamera.kt
+@@
+-    fun capture(options: Map<String, Any>, promise: Promise) {
++    fun capture(options: Map<String, Any?>, promise: Promise) {
+ 
