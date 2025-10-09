@@ -99,6 +99,112 @@ Additional helpers:
 
 The legacy class name `GN_Password_Login_API` is aliased to the new service for backwards compatibility, so older bootstrap code continues working.
 
+## 🎟️ Discount Validation & Transaction Logging
+
+The Password Login API now exposes three REST routes that let mobile clients validate QR discount tokens, fetch a member’s eligible entitlements, and post completed redemption transactions. They live alongside the existing `/wp-json/gn/v1/*` namespace and inherit the same HTTPS enforcement, bearer token authentication, and CORS controls described above.
+
+| Route | Method | Auth | Purpose |
+| ----- | ------ | ---- | ------- |
+| `/gn/v1/discounts/lookup` | POST | `Authorization: Bearer {api_token}` issued by `/login`. Requires the vendor account to have the `tcn_discount_redemptions` capability. | Validate a scanned QR token and return member, plan, and discount eligibility details. |
+| `/gn/v1/discounts/transactions` | POST | `Authorization: Bearer {api_token}` with `tcn_discount_redemptions` capability. | Record a redeemed discount, persist the financial breakdown, and return an auditable transaction record. |
+| `/gn/v1/discounts/history` | GET | `Authorization: Bearer {api_token}`. Vendor tokens see their own outlet’s transactions; member tokens see their personal redemption history. | Paginate recent discount transactions with aggregation helpers for dashboards. |
+
+### Request/response highlights
+
+- **Lookup (`POST /discounts/lookup`)**
+  - **Body:** `{ "qr_token": "...", "vendor_id": 456 }`
+  - **Response:**
+    ```json
+    {
+      "success": true,
+      "member": { "id": 123, "name": "Ada Example", "plan_tier": "gold" },
+      "discount": {
+        "token": "...",
+        "label": "10% Café Beverage",
+        "type": "percentage",
+        "value": 0.10,
+        "max_uses": 1,
+        "expires_at": "2024-08-31T23:59:59+00:00"
+      },
+      "eligible": true,
+      "usage": { "uses_today": 0, "uses_total": 0 }
+    }
+    ```
+  - Invalid or expired tokens return `400 gn_invalid_discount_token` while exhausted entitlements return `409 gn_discount_limit_reached`.
+
+- **Transactions (`POST /discounts/transactions`)**
+  - **Body:**
+    ```json
+    {
+      "qr_token": "...",
+      "member_id": 123,
+      "vendor_id": 456,
+      "gross_amount": 250.0,
+      "discount_amount": 25.0,
+      "net_amount": 225.0,
+      "currency": "THB",
+      "metadata": { "cashier": "POS-3" }
+    }
+    ```
+  - **Response:**
+    ```json
+    {
+      "success": true,
+      "transaction": {
+        "id": 987,
+        "member_id": 123,
+        "vendor_id": 456,
+        "plan_tier": "gold",
+        "gross_amount": 250,
+        "discount_amount": 25,
+        "net_amount": 225,
+        "currency": "THB",
+        "created_at": "2024-07-12T04:15:22+00:00"
+      }
+    }
+    ```
+  - The endpoint enforces `gross_amount >= discount_amount >= 0` and automatically snapshots the member’s plan tier at the time of redemption.
+
+- **History (`GET /discounts/history`)**
+  - **Query params:** `page` (default 1), `per_page` (default 25, max 100), optional `member_id`, `vendor_id`, `date_start`, `date_end`, `plan_tier` filters for privileged dashboards.
+  - **Response:**
+    ```json
+    {
+      "success": true,
+      "totals": {
+        "count": 42,
+        "gross_sum": 10250,
+        "discount_sum": 1025,
+        "net_sum": 9225
+      },
+      "transactions": [ { ... latest redemption ... } ],
+      "pagination": { "page": 1, "per_page": 25, "total_pages": 2 }
+    }
+    ```
+
+### Storage & schema considerations
+
+- Introduce a custom table `{$wpdb->prefix}tcn_discount_transactions` with the following columns:
+  - `id` (bigint unsigned, auto-increment, primary key)
+  - `member_id` (bigint unsigned, indexed)
+  - `vendor_id` (bigint unsigned, indexed)
+  - `plan_tier` (varchar 32)
+  - `qr_token` (varchar 191, indexed for lookups)
+  - `gross_amount` (decimal 12,2)
+  - `discount_amount` (decimal 12,2)
+  - `net_amount` (decimal 12,2)
+  - `currency` (char 3)
+  - `metadata` (longtext, JSON-encoded)
+  - `created_at` (datetime, indexed)
+- Run schema creation/updates from the plugin activator using `dbDelta()`, logging migrations to the existing activity log for auditability.
+- Optionally add a materialised view or scheduled aggregation (`tcn_discount_stats`) if reporting queries prove slow; otherwise rely on SQL `SUM`/`COUNT` aggregations filtered by member/vendor.
+
+### Dashboard alignment & testing
+
+- Member and vendor dashboards should call `/discounts/history` with `member_id` or `vendor_id` filters to fetch rolling totals, then compute KPIs (gross, discount, net) client-side.
+- The API tester now includes presets for all three routes, preloading bearer token headers, lookup payloads, and sample transaction bodies so admins can validate the flow after deployments.
+- Coordinate with the downstream plugin repository to register the routes, capabilities, and table schema. Add integration tests (e.g., PHPUnit or REST API test cases) covering token validation, entitlement exhaustion, and transaction inserts to guard the mobile contract.
+
 ## 🛠 Developer Notes
 
 - See [`docs/TCN_PLATFORM_REFERENCE.md`](docs/TCN_PLATFORM_REFERENCE.md) for a function-by-function and endpoint-by-endpoint reference covering hooks, parameters, authentication, and example payloads designed for the built-in API tester.
