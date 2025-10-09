@@ -1,6 +1,7 @@
 import { MEMBERSHIP_CONFIG } from '../config/membershipConfig';
 import { StripePaymentSession } from '../config/stripeConfig';
 import { MembershipPlan } from '../types/auth';
+import deviceLog from '../utils/deviceLog';
 import {
   buildWordPressRequestInit,
   syncWordPressCookiesFromResponse,
@@ -138,59 +139,175 @@ const normalizePlans = (
   plans: WordPressMembershipPlan[],
 ): MembershipPlan[] => plans.map(normalizePlanPrice);
 
+const headersToRecord = (headers?: HeadersInit): Record<string, string> => {
+  if (!headers) {
+    return {};
+  }
+
+  if (typeof Headers !== 'undefined' && headers instanceof Headers) {
+    const entries: Record<string, string> = {};
+    headers.forEach((value, key) => {
+      entries[key] = value;
+    });
+    return entries;
+  }
+
+  if (Array.isArray(headers)) {
+    return headers.reduce<Record<string, string>>((acc, [key, value]) => {
+      acc[key] = value;
+      return acc;
+    }, {});
+  }
+
+  return { ...(headers as Record<string, string>) };
+};
+
+const sanitizeHeadersForLog = (headers?: HeadersInit): Record<string, string> => {
+  const normalized = headersToRecord(headers);
+  return Object.entries(normalized).reduce<Record<string, string>>(
+    (acc, [key, value]) => {
+      if (key.toLowerCase().includes('authorization')) {
+        acc[key] = '[REDACTED]';
+      } else {
+        acc[key] = value;
+      }
+      return acc;
+    },
+    {},
+  );
+};
+
+const buildErrorLogPayload = (
+  error: unknown,
+  context: Record<string, unknown> = {},
+): Record<string, unknown> => {
+  if (error instanceof Error) {
+    return {
+      ...context,
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+  }
+
+  return {
+    ...context,
+    message: typeof error === 'string' ? error : String(error),
+  };
+};
+
 export const fetchMembershipPlans = async (
   token?: string,
 ): Promise<MembershipPlan[]> => {
-  const requestInit = await buildWordPressRequestInit({
-    method: 'GET',
-    headers: buildHeaders(token),
+  const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.plans}`;
+  deviceLog.info('membership.plans.fetch.start', {
+    url: requestUrl,
+    hasToken: Boolean(token),
   });
-  const response = await fetch(
-    `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.plans}`,
-    requestInit,
-  );
-  await syncWordPressCookiesFromResponse(response);
 
-  const payload = await handleResponse<
-    MembershipPlansResponse | MembershipPlan[]
-  >(response);
+  try {
+    const requestInit = await buildWordPressRequestInit({
+      method: 'GET',
+      headers: buildHeaders(token),
+    });
 
-  if (Array.isArray(payload)) {
-    return normalizePlans(payload as WordPressMembershipPlan[]);
+    deviceLog.debug('membership.plans.fetch.request', {
+      url: requestUrl,
+      method: requestInit.method ?? 'GET',
+      headers: sanitizeHeadersForLog(requestInit.headers),
+    });
+
+    const response = await fetch(requestUrl, requestInit);
+
+    deviceLog.debug('membership.plans.fetch.responseMeta', {
+      url: response.url,
+      status: response.status,
+      ok: response.ok,
+    });
+
+    await syncWordPressCookiesFromResponse(response);
+
+    const payload = await handleResponse<
+      MembershipPlansResponse | MembershipPlan[]
+    >(response);
+
+    const plans = Array.isArray(payload)
+      ? normalizePlans(payload as WordPressMembershipPlan[])
+      : Array.isArray(payload.plans)
+        ? normalizePlans(payload.plans as WordPressMembershipPlan[])
+        : [];
+
+    deviceLog.success('membership.plans.fetch.success', {
+      planCount: plans.length,
+      highlightedPlan: plans.find(plan => plan.highlight)?.id ?? null,
+    });
+
+    return plans;
+  } catch (error) {
+    deviceLog.error('membership.plans.fetch.error', buildErrorLogPayload(error));
+    throw error;
   }
-
-  if (Array.isArray(payload.plans)) {
-    return normalizePlans(payload.plans as WordPressMembershipPlan[]);
-  }
-
-  return [];
 };
 
 export const createMembershipPaymentSession = async (
   plan: string,
   token?: string,
 ): Promise<PaymentSessionResponse> => {
-  const requestInit = await buildWordPressRequestInit({
-    method: 'POST',
-    headers: buildHeaders(token),
-    body: JSON.stringify({ plan }),
+  const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.createPaymentSession}`;
+  deviceLog.info('membership.paymentSession.create.start', {
+    plan,
+    url: requestUrl,
+    hasToken: Boolean(token),
   });
-  const response = await fetch(
-    `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.createPaymentSession}`,
-    requestInit,
-  );
-  await syncWordPressCookiesFromResponse(response);
 
-  const payload = await handleResponse<PaymentSessionResponse>(response);
+  try {
+    const requestInit = await buildWordPressRequestInit({
+      method: 'POST',
+      headers: buildHeaders(token),
+      body: JSON.stringify({ plan }),
+    });
 
-  if (
-    !payload.paymentIntentClientSecret ||
-    !payload.customerEphemeralKeySecret
-  ) {
-    throw new Error('Incomplete payment session details received.');
+    deviceLog.debug('membership.paymentSession.create.request', {
+      url: requestUrl,
+      method: requestInit.method ?? 'POST',
+      headers: sanitizeHeadersForLog(requestInit.headers),
+      hasBody: Boolean(requestInit.body),
+    });
+
+    const response = await fetch(requestUrl, requestInit);
+
+    deviceLog.debug('membership.paymentSession.create.responseMeta', {
+      url: response.url,
+      status: response.status,
+      ok: response.ok,
+    });
+
+    await syncWordPressCookiesFromResponse(response);
+
+    const payload = await handleResponse<PaymentSessionResponse>(response);
+
+    if (
+      !payload.paymentIntentClientSecret ||
+      !payload.customerEphemeralKeySecret
+    ) {
+      throw new Error('Incomplete payment session details received.');
+    }
+
+    deviceLog.success('membership.paymentSession.create.success', {
+      plan,
+      hasPublishableKey: Boolean(payload.publishableKey),
+      hasPaymentIntentSecret: Boolean(payload.paymentIntentClientSecret),
+      hasCustomerKey: Boolean(payload.customerEphemeralKeySecret),
+    });
+
+    return payload;
+  } catch (error) {
+    deviceLog.error(
+      'membership.paymentSession.create.error',
+      buildErrorLogPayload(error, { plan }),
+    );
+    throw error;
   }
-
-  return payload;
 };
 
 export const confirmMembershipUpgrade = async (
@@ -198,24 +315,65 @@ export const confirmMembershipUpgrade = async (
   token?: string,
   paymentIntentId?: string | null,
 ): Promise<ConfirmUpgradeResponse> => {
-  const requestInit = await buildWordPressRequestInit({
-    method: 'POST',
-    headers: buildHeaders(token),
-    body: JSON.stringify({
+  const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.confirm}`;
+  deviceLog.info('membership.upgrade.confirm.start', {
+    plan,
+    url: requestUrl,
+    hasToken: Boolean(token),
+    hasPaymentIntentId: Boolean(paymentIntentId),
+  });
+
+  try {
+    const requestBody = {
       plan,
       ...(paymentIntentId
         ? {
             payment_intent: paymentIntentId,
           }
         : {}),
-    }),
-  });
-  const response = await fetch(
-    `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.confirm}`,
-    requestInit,
-  );
-  await syncWordPressCookiesFromResponse(response);
+    };
 
-  const payload = await handleResponse<ConfirmUpgradeResponse>(response);
-  return payload;
+    const requestInit = await buildWordPressRequestInit({
+      method: 'POST',
+      headers: buildHeaders(token),
+      body: JSON.stringify(requestBody),
+    });
+
+    deviceLog.debug('membership.upgrade.confirm.request', {
+      url: requestUrl,
+      method: requestInit.method ?? 'POST',
+      headers: sanitizeHeadersForLog(requestInit.headers),
+      hasBody: Boolean(requestInit.body),
+      bodyKeys: Object.keys(requestBody),
+    });
+
+    const response = await fetch(requestUrl, requestInit);
+
+    deviceLog.debug('membership.upgrade.confirm.responseMeta', {
+      url: response.url,
+      status: response.status,
+      ok: response.ok,
+    });
+
+    await syncWordPressCookiesFromResponse(response);
+
+    const payload = await handleResponse<ConfirmUpgradeResponse>(response);
+
+    deviceLog.success('membership.upgrade.confirm.success', {
+      plan,
+      acknowledged: payload.success,
+      hasMessage: Boolean(payload.message),
+    });
+
+    return payload;
+  } catch (error) {
+    deviceLog.error(
+      'membership.upgrade.confirm.error',
+      buildErrorLogPayload(error, {
+        plan,
+        hasPaymentIntentId: Boolean(paymentIntentId),
+      }),
+    );
+    throw error;
+  }
 };
