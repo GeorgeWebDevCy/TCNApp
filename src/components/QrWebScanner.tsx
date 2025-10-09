@@ -1,4 +1,10 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { WebView, WebViewMessageEvent, PermissionRequestHandler } from 'react-native-webview';
 
@@ -20,6 +26,7 @@ const buildScannerHtml = (): string => {
 export const QrWebScanner: React.FC<QrWebScannerProps> = ({ onScan, style }) => {
   const [scannerKey] = useState(() => `qrw-${Date.now()}`);
   const webRef = useRef<WebView>(null);
+  const restartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const source = useMemo(() => ({ html: buildScannerHtml() }), []);
 
@@ -37,6 +44,14 @@ export const QrWebScanner: React.FC<QrWebScannerProps> = ({ onScan, style }) => 
             onScan(text);
             // Stop scanner to avoid duplicate events; page listens for this.
             webRef.current?.postMessage(JSON.stringify({ type: 'stop' }));
+            // Restart after a short delay so we are ready for the next scan.
+            if (restartTimeoutRef.current) {
+              clearTimeout(restartTimeoutRef.current);
+            }
+            restartTimeoutRef.current = setTimeout(() => {
+              webRef.current?.postMessage(JSON.stringify({ type: 'start' }));
+              restartTimeoutRef.current = null;
+            }, 1200);
           }
         }
       } catch {
@@ -45,6 +60,15 @@ export const QrWebScanner: React.FC<QrWebScannerProps> = ({ onScan, style }) => 
     },
     [onScan],
   );
+
+  useEffect(() => {
+    return () => {
+      if (restartTimeoutRef.current) {
+        clearTimeout(restartTimeoutRef.current);
+        restartTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const onPermissionRequest: PermissionRequestHandler | undefined =
     Platform.OS === 'android'
