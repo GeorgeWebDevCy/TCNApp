@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   Platform,
   StyleProp,
@@ -11,6 +11,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { MemberQrCode } from '../types/auth';
 import { COLORS } from '../config/theme';
+import deviceLog from '../utils/deviceLog';
 
 type MemberQrCardProps = {
   qrCode: MemberQrCode | null | undefined;
@@ -25,6 +26,18 @@ export const MemberQrCard: React.FC<MemberQrCardProps> = ({
 }) => {
   const { t } = useLocalization();
   const qrValue = qrCode?.payload ?? qrCode?.token ?? null;
+
+  useEffect(() => {
+    deviceLog.debug('memberQrCard.state', {
+      hasQrValue: Boolean(qrValue),
+      tokenSuffix:
+        qrCode?.token && qrCode.token.length > 4
+          ? qrCode.token.slice(-4)
+          : qrCode?.token ?? null,
+      issuedAt: qrCode?.issuedAt ?? null,
+      expiresAt: qrCode?.expiresAt ?? null,
+    });
+  }, [qrCode?.expiresAt, qrCode?.issuedAt, qrCode?.token, qrValue]);
 
   const roleLabel = useMemo(() => {
     const normalized = (accountType ?? '').toLowerCase();

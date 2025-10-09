@@ -25,6 +25,7 @@ import {
 } from '../types/transactions';
 import { COLORS } from '../config/theme';
 import QrScanner from '../components/QrScanner';
+import deviceLog from '../utils/deviceLog';
 
 type VendorScanScreenProps = {
   onShowAnalytics?: () => void;
@@ -54,25 +55,43 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
       const trimmed = token.trim();
       if (!trimmed) {
         setError(t('vendor.screen.errors.empty'));
+        deviceLog.info('vendor.validation.skipped', {
+          reason: 'empty_token',
+        });
         return;
       }
 
       setIsValidating(true);
       setError(null);
+      deviceLog.debug('vendor.validation.start', {
+        tokenLength: trimmed.length,
+        tokenSuffix: trimmed.length > 4 ? trimmed.slice(-4) : trimmed,
+      });
 
       try {
         const sessionToken = await getSessionToken();
+        deviceLog.debug('vendor.validation.sessionToken', {
+          hasToken: Boolean(sessionToken),
+        });
         const validation = await lookupMember(
           trimmed,
           sessionToken,
           vendorId ?? undefined,
         );
+        deviceLog.debug('vendor.validation.result', {
+          valid: validation.valid,
+          membershipTier: validation.membershipTier ?? null,
+          discount: validation.allowedDiscount ?? null,
+        });
         setResult(validation);
         if (!validation.valid) {
           setError(
             validation.message ?? t('vendor.screen.status.invalidMessage'),
           );
           setSubmissionError(validation.message ?? null);
+          deviceLog.info('vendor.validation.invalid', {
+            message: validation.message ?? null,
+          });
         }
       } catch (validationError) {
         const message =
@@ -82,17 +101,38 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         setError(message);
         setSubmissionError(message);
         setResult(null);
+        deviceLog.warn('vendor.validation.error', {
+          message,
+        });
       } finally {
         setIsValidating(false);
         setGrossAmount('');
+        deviceLog.debug('vendor.validation.complete', {
+          tokenSuffix: trimmed.length > 4 ? trimmed.slice(-4) : trimmed,
+        });
       }
     },
     [getSessionToken, t, vendorId],
   );
 
   const handleManualSubmit = useCallback(() => {
+    deviceLog.debug('vendor.manualValidation.triggered', {
+      tokenLength: manualToken.trim().length,
+    });
     void handleValidation(manualToken);
   }, [handleValidation, manualToken]);
+
+  const handleScan = useCallback(
+    (text: string) => {
+      deviceLog.debug('vendor.scanner.scanReceived', {
+        length: text.length,
+        suffix: text.length > 4 ? text.slice(-4) : text,
+      });
+      setManualToken(text);
+      void handleValidation(text);
+    },
+    [handleValidation],
+  );
 
   const statusLabel = useMemo(() => {
     if (!result) {
@@ -356,10 +396,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         <View style={styles.cameraContainer}>
           <QrScanner
             style={{ flex: 1 }}
-            onScan={(text: string) => {
-              setManualToken(text);
-              void handleValidation(text);
-            }}
+            onScan={handleScan}
           />
         </View>
 

@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import { Platform, StyleProp, StyleSheet, View, ViewStyle } from 'react-native';
 import { WebView, WebViewMessageEvent, PermissionRequestHandler } from 'react-native-webview';
+import deviceLog from '../utils/deviceLog';
 
 type QrWebScannerProps = {
   onScan: (text: string) => void;
@@ -41,6 +42,10 @@ export const QrWebScanner: React.FC<QrWebScannerProps> = ({ onScan, style }) => 
           const payload = (data.payload || {}) as { text?: string };
           const text = (payload.text || '').trim();
           if (text.length > 0) {
+            deviceLog.debug('qrWebScanner.scan', {
+              length: text.length,
+              suffix: text.length > 4 ? text.slice(-4) : text,
+            });
             onScan(text);
             // Stop scanner to avoid duplicate events; page listens for this.
             webRef.current?.postMessage(JSON.stringify({ type: 'stop' }));
@@ -53,20 +58,30 @@ export const QrWebScanner: React.FC<QrWebScannerProps> = ({ onScan, style }) => 
               restartTimeoutRef.current = null;
             }, 1200);
           }
+        } else if (data.type === 'error') {
+          const payload = (data.payload || {}) as { message?: string };
+          deviceLog.warn('qrWebScanner.error', {
+            message: payload.message ?? 'Unknown WebView scanner error.',
+          });
         }
-      } catch {
-        // ignore malformed messages
+      } catch (parseError) {
+        deviceLog.warn('qrWebScanner.message.parseError', {
+          message:
+            parseError instanceof Error ? parseError.message : String(parseError),
+        });
       }
     },
     [onScan],
   );
 
   useEffect(() => {
+    deviceLog.debug('qrWebScanner.mount', {});
     return () => {
       if (restartTimeoutRef.current) {
         clearTimeout(restartTimeoutRef.current);
         restartTimeoutRef.current = null;
       }
+      deviceLog.debug('qrWebScanner.unmount', {});
     };
   }, []);
 
