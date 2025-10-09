@@ -103,6 +103,7 @@ export interface RegisterOptions {
   lastName?: string;
   registrationDate?: string;
   accountType?: RegisterAccountType;
+  vendorTier?: string;
 }
 
 export interface ResetPasswordOptions {

@@ -18,7 +18,11 @@ import {
   recordTransaction,
 } from '../services/transactionService';
 import { calculateDiscountForAmount } from '../utils/discount';
-import { MemberLookupResult, TransactionRecord } from '../types/transactions';
+import {
+  DiscountDescriptor,
+  MemberLookupResult,
+  TransactionRecord,
+} from '../types/transactions';
 import { COLORS } from '../config/theme';
 
 type VendorScanScreenProps = {
@@ -57,7 +61,11 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
 
       try {
         const sessionToken = await getSessionToken();
-        const validation = await lookupMember(trimmed, sessionToken);
+        const validation = await lookupMember(
+          trimmed,
+          sessionToken,
+          vendorId ?? undefined,
+        );
         setResult(validation);
         if (!validation.valid) {
           setError(
@@ -78,7 +86,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         setGrossAmount('');
       }
     },
-    [getSessionToken, t],
+    [getSessionToken, t, vendorId],
   );
 
   const handleManualSubmit = useCallback(() => {
@@ -104,12 +112,58 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
   }, [result?.allowedDiscount]);
 
   const vendorTier = user?.vendorTier ?? null;
+  const vendorId = user?.id ?? null;
   const membershipTier = useMemo(() => {
     if (!result) {
       return null;
     }
     return result.membershipTier ?? result.membership?.tier ?? null;
   }, [result]);
+
+  const discountDescriptor = result?.discountDescriptor ?? null;
+
+  const calculateWithDescriptor = useCallback(
+    (amount: number, descriptor: DiscountDescriptor | null) => {
+      if (!descriptor) {
+        return calculateDiscountForAmount(amount, membershipTier, vendorTier);
+      }
+
+      const normalizedGross = Number.isFinite(amount) ? amount : 0;
+      if (descriptor.type === 'amount') {
+        const discountAmount = Number(descriptor.value.toFixed(2));
+        const discountPercentage = normalizedGross
+          ? Number(((discountAmount / normalizedGross) * 100).toFixed(2))
+          : 0;
+        const netAmount = Number(
+          (normalizedGross - discountAmount).toFixed(2),
+        );
+        return {
+          discountPercentage,
+          discountAmount,
+          netAmount,
+          grossAmount: Number(normalizedGross.toFixed(2)),
+        };
+      }
+
+      const percentage =
+        descriptor.value > 1
+          ? Number(descriptor.value.toFixed(2))
+          : Number((descriptor.value * 100).toFixed(2));
+      const discountAmount = Number(
+        ((normalizedGross * percentage) / 100).toFixed(2),
+      );
+      const netAmount = Number(
+        (normalizedGross - discountAmount).toFixed(2),
+      );
+      return {
+        discountPercentage: percentage,
+        discountAmount,
+        netAmount,
+        grossAmount: Number(normalizedGross.toFixed(2)),
+      };
+    },
+    [membershipTier, vendorTier],
+  );
 
   const grossAmountValue = useMemo(() => {
     const sanitized = grossAmount.replace(/[^0-9.]/g, '');
@@ -118,12 +172,8 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
   }, [grossAmount]);
 
   const localCalculation = useMemo(() => {
-    return calculateDiscountForAmount(
-      grossAmountValue,
-      membershipTier,
-      vendorTier,
-    );
-  }, [grossAmountValue, membershipTier, vendorTier]);
+    return calculateWithDescriptor(grossAmountValue, discountDescriptor);
+  }, [calculateWithDescriptor, discountDescriptor, grossAmountValue]);
 
   const recentTransactions = useMemo(
     () => transactions.slice(0, 5),
@@ -154,15 +204,15 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
       return;
     }
 
-    const optimisticCalculation = calculateDiscountForAmount(
+    const optimisticCalculation = calculateWithDescriptor(
       parsedAmount,
-      membershipTier,
-      vendorTier,
+      discountDescriptor,
     );
 
     const optimisticTransaction: TransactionRecord = {
       id: `local-${Date.now()}`,
       memberToken: result.token,
+      memberId: result.memberId ?? null,
       memberName: result.memberName ?? null,
       membership: result.membership ?? null,
       status: 'pending',
@@ -175,7 +225,9 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
       vendorTier: vendorTier ?? null,
       message: null,
       vendorName: user?.name ?? null,
+      vendorId,
       errorMessage: null,
+      discountDescriptor: discountDescriptor ?? undefined,
     };
 
     addTransaction(optimisticTransaction);
@@ -190,6 +242,10 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
           membershipTier: membershipTier ?? undefined,
           vendorTier: vendorTier ?? undefined,
           currency: 'THB',
+          memberToken: result.token,
+          memberId: result.memberId ?? undefined,
+          vendorId: vendorId ?? undefined,
+          discountDescriptor: discountDescriptor ?? undefined,
         },
         sessionToken,
       );
@@ -199,6 +255,9 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
           ? {
               ...previous,
               allowedDiscount: remoteCalculation.discountPercentage,
+              discountDescriptor:
+                remoteCalculation.discountDescriptor ??
+                previous.discountDescriptor,
             }
           : previous,
       );
@@ -206,6 +265,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
       const recorded = await recordTransaction(
         {
           memberToken: result.token,
+          memberId: result.memberId ?? undefined,
           memberName: result.memberName ?? null,
           membership: result.membership ?? null,
           membershipTier: membershipTier ?? undefined,
@@ -215,6 +275,11 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
           discountPercentage: remoteCalculation.discountPercentage,
           discountAmount: remoteCalculation.discountAmount,
           netAmount: remoteCalculation.netAmount,
+          vendorId: vendorId ?? undefined,
+          discountDescriptor:
+            remoteCalculation.discountDescriptor ??
+            discountDescriptor ??
+            undefined,
         },
         sessionToken,
       );
@@ -260,7 +325,10 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
     result,
     t,
     user?.name,
+    vendorId,
     vendorTier,
+    calculateWithDescriptor,
+    discountDescriptor,
   ]);
 
   return (
