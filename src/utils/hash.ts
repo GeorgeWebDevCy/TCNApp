@@ -1,3 +1,4 @@
+import 'react-native-get-random-values';
 import SHA256 from 'crypto-js/sha256';
 import encHex from 'crypto-js/enc-hex';
 
@@ -18,39 +19,6 @@ const getSecureRandomBytes = (size: number): Uint8Array => {
     const buffer = new Uint8Array(size);
     globalThis.crypto.getRandomValues(buffer);
     return buffer;
-  }
-
-  let nodeCrypto:
-    | {
-        randomBytes?: (size: number) => unknown;
-      }
-    | null = null;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires, global-require
-    nodeCrypto = require('crypto');
-  } catch (error) {
-    nodeCrypto = null;
-  }
-
-  if (nodeCrypto?.randomBytes) {
-    const bytes = nodeCrypto.randomBytes(size);
-
-    if (bytes instanceof Uint8Array) {
-      return bytes;
-    }
-
-    if (ArrayBuffer.isView(bytes)) {
-      const view = bytes as ArrayBufferView;
-      return new Uint8Array(view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength));
-    }
-
-    if (bytes instanceof ArrayBuffer) {
-      return new Uint8Array(bytes);
-    }
-
-    if (Array.isArray(bytes)) {
-      return Uint8Array.from(bytes);
-    }
   }
 
   throw new Error('Secure random number generator is not available.');
