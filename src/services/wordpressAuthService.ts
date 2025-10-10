@@ -135,6 +135,12 @@ const normalizeApiToken = (value?: string | null): string | undefined => {
     return undefined;
   }
 
+  const bearerPrefix = /^bearer\s+/i;
+  if (bearerPrefix.test(trimmed)) {
+    const withoutPrefix = trimmed.replace(bearerPrefix, '').trim();
+    return withoutPrefix.length > 0 ? withoutPrefix : undefined;
+  }
+
   if (isLikelyUrl(trimmed)) {
     const extracted = extractTokenFromUrl(trimmed);
     if (extracted) {
@@ -2451,6 +2457,18 @@ export const ensureValidSession =
     });
     return session;
   };
+
+export const ensureValidSessionToken = async (
+  providedToken?: string | null,
+): Promise<string | null> => {
+  const normalizedProvided = normalizeApiToken(providedToken);
+  if (normalizedProvided) {
+    return normalizedProvided;
+  }
+
+  const session = await ensureValidSession();
+  return session?.token ?? null;
+};
 
 interface JwtTokenResponse {
   token?: string;
