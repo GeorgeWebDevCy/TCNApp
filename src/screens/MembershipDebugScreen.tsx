@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthContext } from '../contexts/AuthContext';
 import { COLORS } from '../config/theme';
@@ -18,6 +19,7 @@ import {
 } from '../services/membershipService';
 import type { MembershipPlan } from '../types/auth';
 import deviceLog from '../utils/deviceLog';
+import { AUTH_STORAGE_KEYS } from '../config/authConfig';
 
 type SessionSummary = {
   requiresPayment: boolean;
@@ -61,7 +63,7 @@ const summarizeSecret = (value?: string | null) => ({
 export const MembershipDebugScreen: React.FC<{ onBack?: () => void }> = ({
   onBack,
 }) => {
-  const { getSessionToken, state } = useAuthContext();
+  const { getSessionToken, refreshSession, state } = useAuthContext();
   const [loading, setLoading] = useState(false);
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +71,15 @@ export const MembershipDebugScreen: React.FC<{ onBack?: () => void }> = ({
   const [sessionSummary, setSessionSummary] = useState<SessionSummary | null>(
     null,
   );
+  const [authStatus, setAuthStatus] = useState<{
+    isAuthenticated: boolean;
+    hasToken: boolean;
+    tokenLength: number | null;
+    tokenSuffix: string | null;
+    hasCookie: boolean;
+    cookieLength: number | null;
+    cookieSuffix: string | null;
+  } | null>(null);
 
   const selectedPlan = useMemo(
     () => plans.find(p => p.id === selectedPlanId) ?? null,
@@ -108,6 +119,36 @@ export const MembershipDebugScreen: React.FC<{ onBack?: () => void }> = ({
       setLoading(false);
     }
   }, [getSessionToken]);
+
+  const handlePreflightAuth = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await refreshSession();
+      const token = await getSessionToken();
+      const cookie = await AsyncStorage.getItem(
+        AUTH_STORAGE_KEYS.wordpressCookies,
+      );
+
+      const status = {
+        isAuthenticated: state.isAuthenticated,
+        hasToken: Boolean(token),
+        tokenLength: typeof token === 'string' ? token.length : null,
+        tokenSuffix: typeof token === 'string' ? suffix(token) : null,
+        hasCookie: Boolean(cookie && cookie.trim().length > 0),
+        cookieLength: typeof cookie === 'string' ? cookie.length : null,
+        cookieSuffix: typeof cookie === 'string' ? suffix(cookie) : null,
+      };
+      setAuthStatus(status);
+      deviceLog.info('debug.membership.preflight', status as any);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setError(message);
+      deviceLog.error('debug.membership.preflight.error', { message });
+    } finally {
+      setLoading(false);
+    }
+  }, [getSessionToken, refreshSession, state.isAuthenticated]);
 
   const handleCreateSession = useCallback(async () => {
     if (!selectedPlan) return;
@@ -176,6 +217,31 @@ export const MembershipDebugScreen: React.FC<{ onBack?: () => void }> = ({
           <Text style={styles.kv}><Text style={styles.k}>Merchant:</Text> {envInfo.merchantDisplayName}</Text>
           <Text style={styles.kv}><Text style={styles.k}>URL Scheme:</Text> {envInfo.urlScheme}</Text>
           <Text style={styles.kv}><Text style={styles.k}>User tier:</Text> {envInfo.membershipTier ?? 'n/a'}</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Auth Status</Text>
+          <Pressable
+            style={[styles.button, styles.secondary]}
+            onPress={() => void handlePreflightAuth()}
+            accessibilityRole="button"
+          >
+            {loading ? (
+              <ActivityIndicator color={COLORS.infoText} />
+            ) : (
+              <Text style={styles.secondaryText}>Refresh Session</Text>
+            )}
+          </Pressable>
+
+          {authStatus ? (
+            <View style={styles.sessionBlock}>
+              <Text style={styles.kv}><Text style={styles.k}>Authenticated:</Text> {String(authStatus.isAuthenticated)}</Text>
+              <Text style={styles.kv}><Text style={styles.k}>Token:</Text> {authStatus.hasToken ? `yes (${authStatus.tokenLength}) …${authStatus.tokenSuffix}` : 'no'}</Text>
+              <Text style={styles.kv}><Text style={styles.k}>Cookie:</Text> {authStatus.hasCookie ? `yes (${authStatus.cookieLength}) …${authStatus.cookieSuffix}` : 'no'}</Text>
+            </View>
+          ) : (
+            <Text style={styles.dim}>No preflight run yet</Text>
+          )}
         </View>
 
         <View style={styles.card}>

@@ -121,6 +121,16 @@ const persistCookieHeader = async (header: string | null): Promise<void> => {
   }
 };
 
+const getStoredCookieHeader = async (): Promise<string | null> => {
+  if (typeof cachedCookieHeader !== 'undefined') {
+    return cachedCookieHeader;
+  }
+  const stored = await AsyncStorage.getItem(AUTH_STORAGE_KEYS.wordpressCookies);
+  const trimmed = stored?.trim();
+  cachedCookieHeader = trimmed && trimmed.length > 0 ? trimmed : null;
+  return cachedCookieHeader;
+};
+
 const extractSetCookieHeader = (headers: unknown): string | null => {
   if (!headers) {
     return null;
@@ -185,6 +195,14 @@ export const buildWordPressRequestInit = async (
   const headers = normalizeHeaders(init?.headers);
 
   await ensureAuthorizationHeader(headers);
+  try {
+    const cookieHeader = await getStoredCookieHeader();
+    if (cookieHeader && !hasHeader(headers, 'Cookie')) {
+      headers['Cookie'] = cookieHeader;
+    }
+  } catch (error) {
+    // Best-effort: if cookies cannot be read, continue with auth headers only.
+  }
 
   return {
     ...(init ?? {}),
