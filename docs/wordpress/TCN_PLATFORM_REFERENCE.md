@@ -316,6 +316,12 @@ Membership routes expose the member profile, genealogy tree, commission ledger, 
 | `/gn/v1/memberships/stripe-intent` | POST | Bearer token or logged-in cookie | Create a Stripe Payment Intent when a membership carries a fee. |
 | `/gn/v1/memberships/confirm` | POST | Bearer token or logged-in cookie | Promote the user to a new level and record commissions after verifying payment details. |
 
+#### Client implementation status
+
+- The React Native app refuses to call any membership route until `ensureValidSessionToken()` resolves a bearer token, which mirrors the plugin's expectation that every upgrade request is authenticated.【F:src/services/membershipService.ts†L104-L125】
+- Each request is constructed through `buildWordPressRequestInit()` so `Authorization` and `X-Authorization` headers are consistently attached and WordPress cookies are synchronised, eliminating the need for additional mobile workarounds.【F:src/services/membershipService.ts†L118-L141】【F:src/services/wordpressCookieService.ts†L74-L101】
+- Because the client already enforces these behaviours, membership upgrade failures typically stem from server configuration (Stripe keys, plan slugs, HTTPS/CORS) rather than missing mobile code. Resolve those checks before planning app-level changes.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L290-L314】
+
 #### `GET /wp-json/tcn-mlm/v1/member`
 
 Returns:

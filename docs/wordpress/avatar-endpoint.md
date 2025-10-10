@@ -61,6 +61,12 @@ between WordPress and the mobile app.
 - Hydrate the profile card from the `avatar_urls` field returned by `/wp-json/gn/v1/me`. When the API omits this map the client falls back to showing the member's initials.
 - Implement a companion `DELETE /wp-json/gn/v1/profile/avatar` handler that clears the stored avatar metadata and returns the refreshed profile payload so the app can revert to WordPress' default avatar when members remove their photo.
 
+### Existing mobile implementation
+
+- The React Native client already posts avatar uploads with a bearer token, REST nonce (when present), and a fallback `token` form field so WordPress receives the credentials even when proxies strip headers. The service also retries once with a refreshed token if the first call returns `401`/`403`.【F:src/services/wordpressAuthService.ts†L1835-L1950】【F:src/services/wordpressAuthService.ts†L1984-L2056】
+- When no cached token is found the client attempts a background re-login with securely stored credentials before failing the request, which keeps the mobile flow aligned with the plugin's authentication expectations.【F:src/services/wordpressAuthService.ts†L1867-L1909】
+- Because the app already performs these checks and retries, operational issues with avatar uploads are almost always traced back to server configuration (authentication, HTTPS, allowed origins) rather than missing mobile code. Focus on the troubleshooting checklist below before planning client changes.【F:docs/wordpress/avatar-endpoint.md†L66-L106】
+
 ## Troubleshooting checklist
 
 When uploads fail, walk through the following checks before debugging the mobile client:
