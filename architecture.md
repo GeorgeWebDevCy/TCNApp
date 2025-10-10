@@ -59,6 +59,8 @@ TCN Platform combines the WooCommerce membership/MLM stack with the GN Password 
 3. Successful requests issue a seven-day token hand-off that redirects through `/wp-login.php?action=gn_token_login` when the browser finally completes the flow.
 4. Registration, forgot/reset, and change password flows share the same HTTPS and response-hardening rules, avoiding user enumeration.
 5. Verification helpers (`issue_reset_verification_code`, filters for custom verification) keep the endpoint flexible for SMS/email code workflows.
+6. Mobile clients must persist the `api_token` returned by `/wp-json/gn/v1/login`, attach it to every REST request using `Authorization: Bearer {token}`, and recycle it until a 401/403 response indicates expiry. Tokens last seven days by default, so prompt for credentials when the stored expiry is near or the server rejects the token.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L30-L47】【F:docs/wordpress/avatar-endpoint.md†L55-L76】
+7. When developing on non-HTTPS environments or across different origins, configure the Password Login API settings to allow HTTP (for debug sites) and whitelist the mobile app’s origin so avatar uploads, membership upgrades, and QR calls pass CORS validation.【F:docs/wordpress/avatar-endpoint.md†L68-L76】【F:docs/wordpress/tcn-platform-plugin.md†L250-L309】
 
 ## Genealogy Visualization
 - REST endpoint returns a nested tree structure limited to the authenticated user's downline.

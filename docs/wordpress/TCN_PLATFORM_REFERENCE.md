@@ -372,6 +372,15 @@ Returns `{ summary: {...}, ledger: [...] }` where `summary` mirrors the totals d
 * **Validation:** Confirms the plan exists, Stripe is configured when needed, the payment intent status is in `succeeded|processing|requires_capture`, the amount and currency match, and the metadata `plan` matches the request. Any mismatch returns a `409` error. Missing auth returns `401`.
 * **Success response:** `{ success: true, level: plan }` after assigning the sponsor, updating `_tcn_membership_level`, and recording commissions.【F:includes/Membership/MembershipModule.php†L480-L552】
 
+##### Troubleshooting failed upgrades
+
+1. **Stripe keys** – Enter the test or live Stripe publishable/secret keys under **TCN Platform → General**. When the secret key is blank the API responds with `stripe_not_configured` and refuses to create PaymentIntents.【F:docs/wordpress/tcn-platform-plugin.md†L250-L309】【F:includes/Membership/MembershipModule.php†L434-L478】
+2. **PaymentIntent flow** – Paid plans require a PaymentIntent from `/wp-json/gn/v1/memberships/stripe-intent` before calling `/confirm`. Confirm the client collects the `client_secret`, processes the payment via Stripe’s SDK, and only calls `/confirm` once the intent status is `succeeded`, `processing`, or `requires_capture` as enforced by the plugin.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L357-L373】
+3. **Request payload** – Pass both `plan` and `payment_intent` (for paid tiers) in the confirmation body. Free plans can omit `payment_intent`; the plugin immediately promotes the user when `requires_payment` is false.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L349-L373】
+4. **Authentication** – All membership routes expect the Password Login API bearer token. Make sure each request includes `Authorization: Bearer {api_token}`; missing or expired tokens lead to `401 rest_forbidden`/`tcn_rest_unauthorized` responses and no upgrade occurs.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L292-L317】【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L366-L373】
+
+The built-in **API Tester** under TCN Platform mirrors these calls so administrators can verify Stripe connectivity and payloads without leaving WordPress.【F:docs/wordpress/tcn-platform-plugin.md†L250-L309】
+
 ### 2.5 WooCommerce Bridges (`/wp-json/gn/v1/customers`, `/wp-json/gn/v1/orders`)
 
 These endpoints bridge mobile clients to WooCommerce without exposing the entire WooCommerce REST API. Authentication succeeds when the requester can `manage_woocommerce` or presents a valid consumer key/secret pair (via Basic auth header or `consumer_key`/`consumer_secret` parameters). Keys must have `write` or `read_write` permissions; the user associated with the key is temporarily set as the current user for capability checks.【F:includes/Rest/WooCommerceEndpoints.php†L19-L131】【F:includes/Rest/WooCommerceEndpoints.php†L136-L214】
