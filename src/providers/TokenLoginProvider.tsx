@@ -59,18 +59,23 @@ const useHydrationQueue = () => {
     }
   }, [activeTask]);
 
+  const getPendingCount = useCallback(() => {
+    return queueRef.current.length;
+  }, []);
+
   return {
     activeTask,
     enqueue,
     processNext,
     clearActiveTask,
+    getPendingCount,
   };
 };
 
 export const TokenLoginProvider: React.FC<React.PropsWithChildren> = ({
   children,
 }) => {
-  const { activeTask, enqueue, processNext, clearActiveTask } =
+  const { activeTask, enqueue, processNext, clearActiveTask, getPendingCount } =
     useHydrationQueue();
   const hasCompletedRef = useRef(false);
 
@@ -93,14 +98,14 @@ export const TokenLoginProvider: React.FC<React.PropsWithChildren> = ({
 
         deviceLog.debug('tokenLogin.queue.enqueue', {
           url,
-          pending: queueRef.current.length + (activeTask ? 1 : 0),
+          pending: getPendingCount() + (activeTask ? 1 : 0),
         });
 
         enqueue(task);
         processNext();
       });
     },
-    [activeTask, enqueue, processNext],
+    [activeTask, enqueue, getPendingCount, processNext],
   );
 
   const handleComplete = useCallback(

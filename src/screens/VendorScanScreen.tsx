@@ -49,6 +49,8 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [grossAmount, setGrossAmount] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const vendorTier = user?.vendorTier ?? null;
+  const vendorId = user?.id ?? null;
 
   const handleValidation = useCallback(
     async (token: string) => {
@@ -152,8 +154,6 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
     return `${formatted}%`;
   }, [result?.allowedDiscount]);
 
-  const vendorTier = user?.vendorTier ?? null;
-  const vendorId = user?.id ?? null;
   const membershipTier = useMemo(() => {
     if (!result) {
       return null;

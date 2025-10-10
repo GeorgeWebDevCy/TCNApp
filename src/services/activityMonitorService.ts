@@ -114,7 +114,14 @@ const sanitizeValue = (value: unknown, seen: WeakSet<object>): unknown => {
   }
 
   if (Array.isArray(value)) {
-    return value.map(item => sanitizeValue(item, seen));
+    if (seen.has(value as object)) {
+      return '[Circular]';
+    }
+
+    seen.add(value as object);
+    const sanitized = value.map(item => sanitizeValue(item, seen));
+    seen.delete(value as object);
+    return sanitized;
   }
 
   if (typeof value === 'object') {

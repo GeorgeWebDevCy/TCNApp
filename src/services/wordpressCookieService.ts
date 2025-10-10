@@ -121,6 +121,64 @@ const persistCookieHeader = async (header: string | null): Promise<void> => {
   }
 };
 
+const extractSetCookieHeader = (headers: unknown): string | null => {
+  if (!headers) {
+    return null;
+  }
+
+  const maybeHeaders = headers as {
+    get?: (name: string) => string | null | undefined;
+    getAll?: (name: string) => string[] | undefined;
+  };
+
+  if (typeof maybeHeaders.get === 'function') {
+    const direct =
+      maybeHeaders.get('set-cookie') ?? maybeHeaders.get('Set-Cookie');
+    if (direct && direct.trim().length > 0) {
+      return direct;
+    }
+  }
+
+  if (typeof maybeHeaders.getAll === 'function') {
+    const entries =
+      maybeHeaders.getAll('set-cookie') ?? maybeHeaders.getAll('Set-Cookie');
+    if (Array.isArray(entries) && entries.length > 0) {
+      return entries.filter(Boolean).join(',');
+    }
+  }
+
+  const mapCandidate = (headers as { map?: Record<string, unknown> }).map;
+  if (mapCandidate && typeof mapCandidate === 'object') {
+    for (const [key, value] of Object.entries(mapCandidate)) {
+      if (key.toLowerCase() === 'set-cookie') {
+        if (Array.isArray(value)) {
+          return value.filter(Boolean).join(',');
+        }
+        if (typeof value === 'string' && value.trim().length > 0) {
+          return value;
+        }
+      }
+    }
+  }
+
+  if (typeof headers === 'object') {
+    for (const [key, value] of Object.entries(
+      headers as Record<string, unknown>,
+    )) {
+      if (key.toLowerCase() === 'set-cookie') {
+        if (Array.isArray(value)) {
+          return value.filter(Boolean).join(',');
+        }
+        if (typeof value === 'string' && value.trim().length > 0) {
+          return value;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
 export const buildWordPressRequestInit = async (
   init?: RequestInit,
 ): Promise<RequestInit> => {
@@ -136,10 +194,17 @@ export const buildWordPressRequestInit = async (
 };
 
 export const syncWordPressCookiesFromResponse = async (
-  _response: Response,
+  response: Response,
 ): Promise<void> => {
-  if (typeof cachedCookieHeader === 'undefined' || cachedCookieHeader !== null) {
-    await persistCookieHeader(null);
+  if (!response) {
+    return;
+  }
+
+  const headers = (response as { headers?: unknown }).headers;
+  const setCookieHeader = extractSetCookieHeader(headers);
+
+  if (setCookieHeader) {
+    await persistCookieHeader(setCookieHeader);
   }
 };
 
