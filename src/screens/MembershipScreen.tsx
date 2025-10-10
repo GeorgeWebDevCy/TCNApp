@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
+import type { InitPaymentSheetParams } from '@stripe/stripe-react-native';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
 import { STRIPE_CONFIG } from '../config/stripeConfig';
@@ -356,18 +357,64 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         customerKey: summarizeSecret(customerEphemeralKeySecretValue),
       });
 
+      // Guard against client/server Stripe account mismatches. If the backend
+      // returns a publishable key, it must match the one configured in the app
+      // or the PaymentSheet will fail to initialise with the provided client
+      // secret.
+      if (
+        'publishableKey' in paymentSession &&
+        typeof (paymentSession as any).publishableKey === 'string'
+      ) {
+        const serverKey = (paymentSession as any)
+          .publishableKey as string | null;
+        if (
+          serverKey &&
+          STRIPE_CONFIG.publishableKey &&
+          serverKey.trim() !== STRIPE_CONFIG.publishableKey.trim()
+        ) {
+          deviceLog.warn('membership.checkout.publishableKey.mismatch', {
+            planId: selectedPlan.id,
+            serverKeySuffix:
+              serverKey.length > 8 ? serverKey.slice(-8) : serverKey,
+            clientKeySuffix:
+              STRIPE_CONFIG.publishableKey.length > 8
+                ? STRIPE_CONFIG.publishableKey.slice(-8)
+                : STRIPE_CONFIG.publishableKey,
+          });
+        }
+      }
+
       if (paymentSession.requiresPayment) {
         deviceLog.debug('membership.checkout.paymentSheet.init.start', {
           planId: selectedPlan.id,
         });
-        const initResult = await initPaymentSheet({
+        // Build init params carefully to avoid passing null values. The Stripe
+        // SDK expects undefined for omitted fields; passing null can cause
+        // native type errors and block the upgrade flow.
+        const initParams: InitPaymentSheetParams = {
           paymentIntentClientSecret: paymentSession.paymentIntentClientSecret,
-          customerEphemeralKeySecret:
-            paymentSession.customerEphemeralKeySecret,
-          customerId: paymentSession.customerId,
           merchantDisplayName: STRIPE_CONFIG.merchantDisplayName,
           allowsDelayedPaymentMethods: false,
-        });
+        };
+
+        if (
+          typeof (paymentSession as any).customerId === 'string' &&
+          (paymentSession as any).customerId
+        ) {
+          initParams.customerId = (paymentSession as any).customerId as string;
+        }
+
+        if (
+          typeof (paymentSession as any).customerEphemeralKeySecret ===
+            'string' &&
+          (paymentSession as any).customerEphemeralKeySecret
+        ) {
+          initParams.customerEphemeralKeySecret = (
+            paymentSession as any
+          ).customerEphemeralKeySecret as string;
+        }
+
+        const initResult = await initPaymentSheet(initParams);
 
         deviceLog.debug('membership.checkout.paymentSheet.init.complete', {
           planId: selectedPlan.id,

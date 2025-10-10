@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   Alert,
   Image,
@@ -60,6 +60,7 @@ type HomeScreenProps = {
   onUpgradeMembership?: () => void;
   onViewAnalytics?: () => void;
   onOpenAdminConsole?: () => void;
+  onOpenMembershipDebug?: () => void;
 };
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -67,6 +68,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onUpgradeMembership,
   onViewAnalytics,
   onOpenAdminConsole,
+  onOpenMembershipDebug,
 }) => {
   const { state, logout } = useAuthContext();
   const user = state.user;
@@ -432,6 +434,25 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     onManageProfile?.();
   }, [logEvent, onManageProfile]);
 
+  // Hidden gesture: 5 taps on the brand logo within 1.5 seconds opens
+  // the Membership Debug screen in production.
+  const secretTapCountRef = useRef(0);
+  const lastTapRef = useRef(0);
+  const handleBrandLogoTap = useCallback(() => {
+    const now = Date.now();
+    const delta = now - lastTapRef.current;
+    if (delta > 1500) {
+      secretTapCountRef.current = 0;
+    }
+    secretTapCountRef.current += 1;
+    lastTapRef.current = now;
+    if (secretTapCountRef.current >= 5) {
+      secretTapCountRef.current = 0;
+      deviceLog.info('easteregg.membershipDebug.opened');
+      onOpenMembershipDebug?.();
+    }
+  }, [onOpenMembershipDebug]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView
@@ -442,7 +463,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <LanguageSwitcher />
         </View>
         <View style={[styles.brandHeader, responsiveStyles.brandHeader]}>
-          <BrandLogo orientation={layout.isTablet ? 'horizontal' : 'vertical'} />
+          <Pressable
+            onPress={handleBrandLogoTap}
+            accessibilityRole="imagebutton"
+            accessibilityLabel="Brand"
+          >
+            <BrandLogo orientation={layout.isTablet ? 'horizontal' : 'vertical'} />
+          </Pressable>
         </View>
         <View style={[styles.profileHeader, responsiveStyles.profileHeader]}>
           {user?.avatarUrl ? (

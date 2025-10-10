@@ -29,6 +29,7 @@ import { MemberDashboardScreen } from './src/screens/MemberDashboardScreen';
 import { VendorDashboardScreen } from './src/screens/VendorDashboardScreen';
 import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
+import { MembershipDebugScreen } from './src/screens/MembershipDebugScreen';
 import { COLORS } from './src/config/theme';
 
 // AppContent is intentionally separated from the surrounding provider tree so we can
@@ -49,6 +50,7 @@ const AppContent: React.FC = () => {
     | 'vendorScan'
     | 'vendorAnalytics'
     | 'adminDashboard'
+    | 'membershipDebug'
   >('home');
 
   const normalizedAccountType = (user?.accountType ?? '').toLowerCase();
@@ -121,57 +123,46 @@ const AppContent: React.FC = () => {
     return <LoginScreen />;
   }
 
+  let content: JSX.Element;
   if (isAdmin && activeScreen === 'adminDashboard') {
-    return (
+    content = (
       <AdminDashboardScreen
         onOpenMemberExperience={() => setActiveScreen('home')}
       />
     );
-  }
-
-  if (isVendor) {
+  } else if (isVendor) {
     if (activeScreen === 'vendorAnalytics') {
-      return (
-        <VendorDashboardScreen
-          onBack={() => setActiveScreen('vendorScan')}
+      content = (
+        <VendorDashboardScreen onBack={() => setActiveScreen('vendorScan')} />
+      );
+    } else {
+      content = (
+        <VendorScanScreen
+          onShowAnalytics={() => setActiveScreen('vendorAnalytics')}
         />
       );
     }
-
-    return (
-      <VendorScanScreen
-        onShowAnalytics={() => setActiveScreen('vendorAnalytics')}
+  } else if (activeScreen === 'profile') {
+    content = <UserProfileScreen onBack={() => setActiveScreen('home')} />;
+  } else if (activeScreen === 'membership') {
+    content = <MembershipScreen onBack={() => setActiveScreen('home')} />;
+  } else if (activeScreen === 'memberAnalytics') {
+    content = <MemberDashboardScreen onBack={() => setActiveScreen('home')} />;
+  } else if (activeScreen === 'membershipDebug') {
+    content = <MembershipDebugScreen onBack={() => setActiveScreen('home')} />;
+  } else {
+    content = (
+      <HomeScreen
+        onManageProfile={() => setActiveScreen('profile')}
+        onUpgradeMembership={() => setActiveScreen('membership')}
+        onViewAnalytics={() => setActiveScreen('memberAnalytics')}
+        onOpenAdminConsole={() => setActiveScreen('adminDashboard')}
+        onOpenMembershipDebug={() => setActiveScreen('membershipDebug')}
       />
     );
   }
 
-  if (activeScreen === 'profile') {
-    // The profile screen exposes a callback to return to the home view. Rather than
-    // introducing a navigation library in this lightweight shell we manage the routing
-    // manually.
-    return <UserProfileScreen onBack={() => setActiveScreen('home')} />;
-  }
-
-  if (activeScreen === 'membership') {
-    // Same pattern as the profile screen—show the membership upsell/management view
-    // and allow the component to return the user to the home view.
-    return <MembershipScreen onBack={() => setActiveScreen('home')} />;
-  }
-
-  if (activeScreen === 'memberAnalytics') {
-    return <MemberDashboardScreen onBack={() => setActiveScreen('home')} />;
-  }
-
-  return (
-    // The home screen is the default route once authenticated. We pass callbacks that
-    // simply mutate the local activeScreen state, emulating a navigation push.
-    <HomeScreen
-      onManageProfile={() => setActiveScreen('profile')}
-      onUpgradeMembership={() => setActiveScreen('membership')}
-      onViewAnalytics={() => setActiveScreen('memberAnalytics')}
-      onOpenAdminConsole={() => setActiveScreen('adminDashboard')}
-    />
-  );
+  return <View style={{ flex: 1 }}>{content}</View>;
 };
 
 function App(): JSX.Element {
