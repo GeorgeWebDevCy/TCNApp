@@ -13,7 +13,10 @@ import {
   TransactionRecord,
 } from '../types/transactions';
 import { calculateDiscountForAmount } from '../utils/discount';
-import { validateMemberQrCode } from './wordpressAuthService';
+import {
+  ensureValidSessionToken,
+  validateMemberQrCode,
+} from './wordpressAuthService';
 
 const TRANSACTION_ENDPOINTS = {
   lookupMember: '/wp-json/gn/v1/discounts/lookup',
@@ -418,6 +421,11 @@ export const lookupMember = async (
   authToken?: string | null,
   vendorId?: number | null,
 ): Promise<MemberLookupResult> => {
+  const resolvedAuthToken = await ensureValidSessionToken(authToken);
+  if (!resolvedAuthToken) {
+    throw new Error('Authentication token is unavailable.');
+  }
+
   try {
     const body: Record<string, unknown> = {
       qr_token: token,
@@ -431,7 +439,7 @@ export const lookupMember = async (
       TRANSACTION_ENDPOINTS.lookupMember,
       {
         method: 'POST',
-        headers: buildHeaders(authToken ?? undefined),
+        headers: buildHeaders(resolvedAuthToken),
         body: JSON.stringify(body),
       },
     );
@@ -445,7 +453,7 @@ export const lookupMember = async (
     deviceLog.warn('transaction.lookupMember.error', { message });
 
     try {
-      const fallback = await validateMemberQrCode(token, authToken);
+      const fallback = await validateMemberQrCode(token, resolvedAuthToken);
       deviceLog.debug('transaction.lookupMember.fallback', fallback);
       return fallback as MemberLookupResult;
     } catch (fallbackError) {
@@ -480,6 +488,11 @@ export const calculateDiscount = async (
   let message: string | null = null;
 
   if (!descriptor && params.memberToken) {
+    const resolvedAuthToken = await ensureValidSessionToken(authToken);
+    if (!resolvedAuthToken) {
+      throw new Error('Authentication token is unavailable.');
+    }
+
     try {
       const body: Record<string, unknown> = {
         qr_token: params.memberToken,
@@ -497,7 +510,7 @@ export const calculateDiscount = async (
         TRANSACTION_ENDPOINTS.lookupMember,
         {
           method: 'POST',
-          headers: buildHeaders(authToken ?? undefined),
+          headers: buildHeaders(resolvedAuthToken),
           body: JSON.stringify(body),
         },
       );
@@ -550,6 +563,11 @@ export const recordTransaction = async (
   request: RecordTransactionRequest,
   authToken?: string | null,
 ): Promise<TransactionRecord> => {
+  const resolvedAuthToken = await ensureValidSessionToken(authToken);
+  if (!resolvedAuthToken) {
+    throw new Error('Authentication token is unavailable.');
+  }
+
   const optimisticDiscount = calculateDiscountForAmount(
     request.grossAmount,
     request.membershipTier ?? null,
@@ -583,7 +601,7 @@ export const recordTransaction = async (
       TRANSACTION_ENDPOINTS.recordTransaction,
       {
         method: 'POST',
-        headers: buildHeaders(authToken ?? undefined),
+        headers: buildHeaders(resolvedAuthToken),
         body: JSON.stringify({
           qr_token: request.memberToken,
           member_id: request.memberId ?? undefined,
@@ -624,11 +642,16 @@ export const fetchMemberTransactions = async (
   authToken?: string | null,
 ): Promise<TransactionRecord[]> => {
   try {
+    const resolvedAuthToken = await ensureValidSessionToken(authToken);
+    if (!resolvedAuthToken) {
+      throw new Error('Authentication token is unavailable.');
+    }
+
     const payload = await performRequest<unknown>(
       `${TRANSACTION_ENDPOINTS.history}?scope=member`,
       {
         method: 'GET',
-        headers: buildHeaders(authToken ?? undefined),
+        headers: buildHeaders(resolvedAuthToken),
       },
     );
 
@@ -649,11 +672,16 @@ export const fetchVendorTransactions = async (
   authToken?: string | null,
 ): Promise<TransactionRecord[]> => {
   try {
+    const resolvedAuthToken = await ensureValidSessionToken(authToken);
+    if (!resolvedAuthToken) {
+      throw new Error('Authentication token is unavailable.');
+    }
+
     const payload = await performRequest<unknown>(
       `${TRANSACTION_ENDPOINTS.history}?scope=vendor`,
       {
         method: 'GET',
-        headers: buildHeaders(authToken ?? undefined),
+        headers: buildHeaders(resolvedAuthToken),
       },
     );
 

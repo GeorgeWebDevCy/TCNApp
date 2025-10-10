@@ -3,7 +3,7 @@ import {
   buildWordPressRequestInit,
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
-import { restoreSession } from './wordpressAuthService';
+import { ensureValidSessionToken, restoreSession } from './wordpressAuthService';
 
 export type ActivityMonitorLogLevel =
   | 'debug'
@@ -161,6 +161,12 @@ const processQueue = async (): Promise<void> => {
     }
 
     try {
+      const token = await ensureValidSessionToken();
+      if (!token) {
+        queue.unshift(entry);
+        break;
+      }
+
       const payload = await buildPayload(entry);
       const requestInit = await buildWordPressRequestInit({
         method: 'POST',

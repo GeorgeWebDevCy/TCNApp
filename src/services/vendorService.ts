@@ -4,6 +4,7 @@ import {
   buildWordPressRequestInit,
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
+import { ensureValidSessionToken } from './wordpressAuthService';
 import { VendorTierDefinition, VendorTierDiscounts } from '../types/vendor';
 
 const VENDOR_ENDPOINTS = {
@@ -123,15 +124,18 @@ export const fetchVendorTiers = async (
   authToken?: string | null,
 ): Promise<VendorTierDefinition[]> => {
   try {
+    const resolvedToken = await ensureValidSessionToken(authToken);
+    if (!resolvedToken) {
+      throw new Error('Authentication token is unavailable.');
+    }
+
     const init = await buildWordPressRequestInit({
       method: 'GET',
       headers: {
         Accept: 'application/json',
         Authorization:
-          authToken && authToken.trim().length > 0
-            ? authToken.startsWith('Bearer ')
-              ? authToken
-              : `Bearer ${authToken.trim()}`
+          resolvedToken && resolvedToken.trim().length > 0
+            ? `Bearer ${resolvedToken.trim()}`
             : undefined,
       },
     });

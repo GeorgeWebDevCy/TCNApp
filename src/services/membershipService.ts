@@ -7,6 +7,7 @@ import {
   buildWordPressRequestInit,
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
+import { ensureValidSessionToken } from './wordpressAuthService';
 
 export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
@@ -231,16 +232,21 @@ const buildErrorLogPayload = (
 export const fetchMembershipPlans = async (
   token?: string,
 ): Promise<MembershipPlan[]> => {
+  const resolvedToken = await ensureValidSessionToken(token);
+  if (!resolvedToken) {
+    throw new Error('Authentication token is unavailable.');
+  }
+
   const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.plans}`;
   deviceLog.info('membership.plans.fetch.start', {
     url: requestUrl,
-    hasToken: Boolean(token),
+    hasToken: Boolean(resolvedToken),
   });
 
   try {
     const requestInit = await buildWordPressRequestInit({
       method: 'GET',
-      headers: buildHeaders(token),
+      headers: buildHeaders(resolvedToken),
     });
 
     deviceLog.debug('membership.plans.fetch.request', {
@@ -307,17 +313,22 @@ export const createMembershipPaymentSession = async (
   plan: string,
   token?: string,
 ): Promise<PaymentSessionResponse> => {
+  const resolvedToken = await ensureValidSessionToken(token);
+  if (!resolvedToken) {
+    throw new Error('Authentication token is unavailable.');
+  }
+
   const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.createPaymentSession}`;
   deviceLog.info('membership.paymentSession.create.start', {
     plan,
     url: requestUrl,
-    hasToken: Boolean(token),
+    hasToken: Boolean(resolvedToken),
   });
 
   try {
     const requestInit = await buildWordPressRequestInit({
       method: 'POST',
-      headers: buildHeaders(token),
+      headers: buildHeaders(resolvedToken),
       body: JSON.stringify({ plan }),
     });
 
@@ -460,11 +471,16 @@ export const confirmMembershipUpgrade = async (
   token?: string,
   paymentIntentId?: string | null,
 ): Promise<ConfirmUpgradeResponse> => {
+  const resolvedToken = await ensureValidSessionToken(token);
+  if (!resolvedToken) {
+    throw new Error('Authentication token is unavailable.');
+  }
+
   const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.confirm}`;
   deviceLog.info('membership.upgrade.confirm.start', {
     plan,
     url: requestUrl,
-    hasToken: Boolean(token),
+    hasToken: Boolean(resolvedToken),
     hasPaymentIntentId: Boolean(paymentIntentId),
   });
 
@@ -480,7 +496,7 @@ export const confirmMembershipUpgrade = async (
 
     const requestInit = await buildWordPressRequestInit({
       method: 'POST',
-      headers: buildHeaders(token),
+      headers: buildHeaders(resolvedToken),
       body: JSON.stringify(requestBody),
     });
 
