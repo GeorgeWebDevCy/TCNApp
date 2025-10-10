@@ -316,6 +316,12 @@ Membership routes expose the member profile, genealogy tree, commission ledger, 
 | `/gn/v1/memberships/stripe-intent` | POST | Bearer token or logged-in cookie | Create a Stripe Payment Intent when a membership carries a fee. |
 | `/gn/v1/memberships/confirm` | POST | Bearer token or logged-in cookie | Promote the user to a new level and record commissions after verifying payment details. |
 
+#### Client implementation status
+
+- The React Native app refuses to call any membership route until `ensureValidSessionToken()` resolves a bearer token, which mirrors the plugin's expectation that every upgrade request is authenticated.【F:src/services/membershipService.ts†L104-L125】
+- Each request is constructed through `buildWordPressRequestInit()` so `Authorization` and `X-Authorization` headers are consistently attached and WordPress cookies are synchronised, eliminating the need for additional mobile workarounds.【F:src/services/membershipService.ts†L118-L141】【F:src/services/wordpressCookieService.ts†L74-L101】
+- Because the client already enforces these behaviours, membership upgrade failures typically stem from server configuration (Stripe keys, plan slugs, HTTPS/CORS) rather than missing mobile code. Resolve those checks before planning app-level changes.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L290-L314】
+
 #### `GET /wp-json/tcn-mlm/v1/member`
 
 Returns:
@@ -371,6 +377,15 @@ Returns `{ summary: {...}, ledger: [...] }` where `summary` mirrors the totals d
   * `payment_intent` *(string, required when the plan has a fee)*.
 * **Validation:** Confirms the plan exists, Stripe is configured when needed, the payment intent status is in `succeeded|processing|requires_capture`, the amount and currency match, and the metadata `plan` matches the request. Any mismatch returns a `409` error. Missing auth returns `401`.
 * **Success response:** `{ success: true, level: plan }` after assigning the sponsor, updating `_tcn_membership_level`, and recording commissions.【F:includes/Membership/MembershipModule.php†L480-L552】
+
+##### Troubleshooting failed upgrades
+
+1. **Stripe keys** – Enter the test or live Stripe publishable/secret keys under **TCN Platform → General**. When the secret key is blank the API responds with `stripe_not_configured` and refuses to create PaymentIntents.【F:docs/wordpress/tcn-platform-plugin.md†L250-L309】【F:includes/Membership/MembershipModule.php†L434-L478】
+2. **PaymentIntent flow** – Paid plans require a PaymentIntent from `/wp-json/gn/v1/memberships/stripe-intent` before calling `/confirm`. Confirm the client collects the `client_secret`, processes the payment via Stripe’s SDK, and only calls `/confirm` once the intent status is `succeeded`, `processing`, or `requires_capture` as enforced by the plugin.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L357-L373】
+3. **Request payload** – Pass both `plan` and `payment_intent` (for paid tiers) in the confirmation body. Free plans can omit `payment_intent`; the plugin immediately promotes the user when `requires_payment` is false.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L349-L373】
+4. **Authentication** – All membership routes expect the Password Login API bearer token. Make sure each request includes `Authorization: Bearer {api_token}`; missing or expired tokens lead to `401 rest_forbidden`/`tcn_rest_unauthorized` responses and no upgrade occurs.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L292-L317】【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L366-L373】
+
+The built-in **API Tester** under TCN Platform mirrors these calls so administrators can verify Stripe connectivity and payloads without leaving WordPress.【F:docs/wordpress/tcn-platform-plugin.md†L250-L309】
 
 ### 2.5 WooCommerce Bridges (`/wp-json/gn/v1/customers`, `/wp-json/gn/v1/orders`)
 

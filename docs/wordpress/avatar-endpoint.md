@@ -56,7 +56,25 @@ between WordPress and the mobile app.
 
 ## Client integration notes
 
-- Fetch the bearer token from the `POST /wp-json/gn/v1/login` response when establishing a session without cookies, store it client-side, and attach it to avatar uploads while it remains valid (tokens expire after roughly 15 minutes, so refresh it as needed).
+- Fetch the bearer token from the `POST /wp-json/gn/v1/login` response when establishing a session without cookies, store it client-side, and attach it to avatar uploads while it remains valid. Password Login API tokens last seven days by default, so refresh them when you receive a `401`/`403` response or when the expiry timestamp approaches.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L30-L47】
 - Construct the React Native `fetch`/`axios` request with an `Authorization` header of exactly `Bearer ${token}` to satisfy the plugin's `TokenAuthenticator` regex.
 - Hydrate the profile card from the `avatar_urls` field returned by `/wp-json/gn/v1/me`. When the API omits this map the client falls back to showing the member's initials.
 - Implement a companion `DELETE /wp-json/gn/v1/profile/avatar` handler that clears the stored avatar metadata and returns the refreshed profile payload so the app can revert to WordPress' default avatar when members remove their photo.
+
+### Existing mobile implementation
+
+- The React Native client already posts avatar uploads with a bearer token, REST nonce (when present), and a fallback `token` form field so WordPress receives the credentials even when proxies strip headers. The service also retries once with a refreshed token if the first call returns `401`/`403`.【F:src/services/wordpressAuthService.ts†L1835-L1950】【F:src/services/wordpressAuthService.ts†L1984-L2056】
+- When no cached token is found the client attempts a background re-login with securely stored credentials before failing the request, which keeps the mobile flow aligned with the plugin's authentication expectations.【F:src/services/wordpressAuthService.ts†L1867-L1909】
+- Because the app already performs these checks and retries, operational issues with avatar uploads are almost always traced back to server configuration (authentication, HTTPS, allowed origins) rather than missing mobile code. Focus on the troubleshooting checklist below before planning client changes.【F:docs/wordpress/avatar-endpoint.md†L66-L106】
+
+## Troubleshooting checklist
+
+When uploads fail, walk through the following checks before debugging the mobile client:
+
+1. **Bearer token present** – Call `POST /wp-json/gn/v1/login` first and copy the `api_token` from the response. Every avatar upload must set `Authorization: Bearer {api_token}` (or include `token={api_token}` as a query parameter). Requests without a recognised token fail the permission callback with `401 tcn_rest_unauthorized` before the upload handler executes.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L292-L304】
+2. **Accepted field names** – The handler accepts either a multipart form field called `avatar` or a JSON payload containing `avatar_url`, `avatar_base64`, `avatar_mime`, and `avatar_filename`. Different field names (e.g. `profileImage`) are ignored and trigger a `tcn_avatar_missing` validation error.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L294-L304】
+3. **HTTPS or “Allow Dev HTTP”** – By default the plugin rejects non-HTTPS requests. Enable the “Allow HTTP on WP_DEBUG sites” toggle in **TCN Platform → Password Login API** when testing on a development host, or make sure your WordPress install is served over HTTPS in production.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L26-L34】
+4. **CORS origin** – If the mobile app runs from a different domain, add that origin to the “Allowed CORS origin” field in the Password Login API settings so preflight checks succeed and the request reaches WordPress.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L26-L34】
+5. **User capability** – Members without `upload_files` can still update their own avatar, but only when the `user_id` in the request matches the authenticated account. Mismatched IDs cause a `403 tcn_rest_forbidden` response.【F:docs/wordpress/TCN_PLATFORM_REFERENCE.md†L292-L304】
+
+Validating these server-side requirements usually resolves avatar upload problems without any mobile changes.
