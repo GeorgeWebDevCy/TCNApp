@@ -205,6 +205,23 @@ step_login() {
   fi
 
   echo "Authenticated as user_id=${USER_ID:-unknown} account_type=${ACCOUNT_TYPE:-unknown}" >&2
+
+  if [[ -n "$USER_ID" ]]; then
+    case "$ACCOUNT_TYPE" in
+      vendor*)
+        if [[ -z "$VENDOR_ID" ]]; then
+          VENDOR_ID="$USER_ID"
+          echo "Defaulting vendor_id to $VENDOR_ID from login context" >&2
+        fi
+        ;;
+      member*|customer*)
+        if [[ -z "$MEMBER_ID" ]]; then
+          MEMBER_ID="$USER_ID"
+          echo "Defaulting member_id to $MEMBER_ID from login context" >&2
+        fi
+        ;;
+    esac
+  fi
 }
 
 step_profile() {
