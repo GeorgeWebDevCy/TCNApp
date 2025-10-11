@@ -231,6 +231,54 @@ describe('wordpressAuthService', () => {
     );
   });
 
+  it('prefers the JWT bearer token when the login response also includes an API token', async () => {
+    const jwtToken =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MjB9.abc123signature';
+    const apiToken = 'opaque-api-token-value-1234567890';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          token: jwtToken,
+          api_token: apiToken,
+          user_email: 'member@example.com',
+          user_display_name: 'Member Example',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+          avatar_urls: {},
+        }),
+      )
+      .mockResolvedValueOnce(createJsonResponse(200, { success: true }));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
+
+    await registerAccount({
+      username: 'newmember',
+      email: 'newmember@example.com',
+      password: 'aSecurePassword123',
+      accountType: 'member',
+    });
+
+    const registerRequestInit = fetchMock.mock.calls[2]?.[1] as RequestInit;
+    expect(registerRequestInit?.headers).toEqual(
+      expect.objectContaining({
+        Authorization: `Bearer ${jwtToken}`,
+        'X-Authorization': `Bearer ${jwtToken}`,
+      }),
+    );
+  });
+
   it('removes the avatar and refreshes the cached profile when deletion succeeds', async () => {
     const loginFetch = jest
       .fn()

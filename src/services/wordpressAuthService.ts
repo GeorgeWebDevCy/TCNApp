@@ -2549,7 +2549,13 @@ export const loginWithPassword = async ({
   const rawApiTokenValue =
     getString(json.api_token) ?? getString((json as any).apiToken);
   const rawTokenFieldValue = getString(json.token);
-  const rawTokenValue = rawApiTokenValue ?? rawTokenFieldValue;
+  const normalizedJwtToken = normalizeApiToken(rawTokenFieldValue);
+  const normalizedApiToken = normalizeApiToken(rawApiTokenValue);
+  const rawTokenValue =
+    normalizedJwtToken ??
+    normalizedApiToken ??
+    rawTokenFieldValue ??
+    rawApiTokenValue;
   const rawTokenType =
     rawTokenFieldValue != null
       ? typeof json.token
@@ -2566,6 +2572,7 @@ export const loginWithPassword = async ({
   try {
     deviceLog.debug('wordpressAuth.loginWithPassword.payloadKeys', {
       hasApiToken: Boolean(rawApiTokenValue),
+      hasJwtToken: Boolean(normalizedJwtToken),
       hasTokenField: Boolean(rawTokenFieldValue),
       hasTokenLoginUrl: Boolean(rawTokenLoginUrl),
       hasUser: Boolean(json.user),
@@ -2592,20 +2599,22 @@ export const loginWithPassword = async ({
     throw new Error(message);
   }
 
-  // Prefer the explicit api_token as the bearer token.
-  // Only treat the legacy `token` field as a possible URL handoff.
+  // Prefer a JWT bearer token when available. Fall back to the opaque API token
+  // for backwards compatibility with hosts that still rely on it. Treat the
+  // legacy `token` field as a potential login URL only when it does not resolve
+  // to a usable bearer token.
   let token: string | undefined;
+  let tokenSource: 'jwt' | 'api' | null = null;
   let tokenLoginUrl = rawTokenLoginUrl ?? undefined;
 
-  if (rawApiTokenValue) {
-    token = rawApiTokenValue; // opaque API token (not a URL/JWT is fine)
-  } else if (rawTokenFieldValue) {
-    const normalized = normalizeApiToken(rawTokenFieldValue);
-    if (normalized) {
-      token = normalized;
-    } else if (isLikelyUrl(rawTokenFieldValue)) {
-      tokenLoginUrl = tokenLoginUrl ?? rawTokenFieldValue;
-    }
+  if (normalizedJwtToken) {
+    token = normalizedJwtToken;
+    tokenSource = 'jwt';
+  } else if (normalizedApiToken) {
+    token = normalizedApiToken; // opaque API token (not a URL/JWT is fine)
+    tokenSource = 'api';
+  } else if (rawTokenFieldValue && isLikelyUrl(rawTokenFieldValue)) {
+    tokenLoginUrl = tokenLoginUrl ?? rawTokenFieldValue;
   }
   const restNonce =
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
@@ -2700,6 +2709,7 @@ export const loginWithPassword = async ({
   deviceLog.debug('wordpressAuth.loginWithPassword.session', {
     status: response.status,
     hasApiToken: Boolean(token),
+    tokenSource,
     maskedToken: maskTokenForLogging(token),
     hasRefreshToken: Boolean(refreshToken),
     hasUser: Boolean(user),
@@ -2729,6 +2739,9 @@ export const loginWithPassword = async ({
   deviceLog.success('wordpressAuth.loginWithPassword.success', {
     email,
     userId: user?.id ?? null,
+    tokenSource,
+    hasToken: Boolean(token),
+    hasRefreshToken: Boolean(refreshToken),
   });
   return session;
 };
