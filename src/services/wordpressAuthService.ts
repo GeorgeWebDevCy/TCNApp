@@ -2362,12 +2362,67 @@ export const ensureValidSession =
     const normalizedToken = normalizeApiToken(session.token);
 
     if (!normalizedToken) {
-      deviceLog.warn('wordpressAuth.ensureValidSession.missingApiToken', {
-        session: describeSessionForLogging(session),
+    deviceLog.warn('wordpressAuth.ensureValidSession.missingApiToken', {
+      session: describeSessionForLogging(session),
+    });
+
+    try {
+      const [savedEmail, savedPassword] = await Promise.all([
+        getSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
+        getSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
+      ]);
+
+      if (savedEmail && savedPassword) {
+        deviceLog.info('wordpressAuth.ensureValidSession.reauth.attempt', {
+          hasSavedCredentials: true,
+        });
+
+        try {
+          const reauthSession = await loginWithPassword({
+            email: savedEmail,
+            password: savedPassword,
+            remember: true,
+          });
+          const reauthToken = normalizeApiToken(reauthSession.token);
+
+          if (reauthToken) {
+            deviceLog.success('wordpressAuth.ensureValidSession.reauth.succeeded', {
+              maskedToken: maskTokenForLogging(reauthToken),
+            });
+            return {
+              ...reauthSession,
+              token: reauthToken,
+              tokenLoginUrl: undefined,
+            };
+          }
+
+          deviceLog.warn('wordpressAuth.ensureValidSession.reauth.missingToken');
+        } catch (reauthError) {
+          deviceLog.warn('wordpressAuth.ensureValidSession.reauth.failed', {
+            message:
+              reauthError instanceof Error
+                ? reauthError.message
+                : String(reauthError),
+          });
+        }
+      } else {
+        deviceLog.info('wordpressAuth.ensureValidSession.reauth.unavailable', {
+          hasSavedEmail: Boolean(savedEmail),
+          hasSavedPassword: Boolean(savedPassword),
+        });
+      }
+    } catch (credentialError) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.reauth.credentialsError', {
+        message:
+          credentialError instanceof Error
+            ? credentialError.message
+            : String(credentialError),
       });
-      await clearSession();
-      return null;
     }
+
+    await clearSession();
+    return null;
+  }
 
     const tokenResult = await fetchSessionUser(normalizedToken);
     deviceLog.debug(
