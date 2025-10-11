@@ -2513,6 +2513,77 @@ export const ensureValidSession =
     return session;
   };
 
+export const reauthenticateWithStoredCredentials = async (): Promise<
+  PersistedSession | null
+> => {
+  try {
+    const [savedEmail, savedPassword] = await Promise.all([
+      getSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
+      getSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
+    ]);
+
+    deviceLog.info('wordpressAuth.reauthenticateWithStoredCredentials.start', {
+      hasSavedEmail: Boolean(savedEmail),
+      hasSavedPassword: Boolean(savedPassword),
+    });
+
+    if (!savedEmail || !savedPassword) {
+      deviceLog.warn(
+        'wordpressAuth.reauthenticateWithStoredCredentials.missingCredentials',
+        {
+          hasSavedEmail: Boolean(savedEmail),
+          hasSavedPassword: Boolean(savedPassword),
+        },
+      );
+      return null;
+    }
+
+    try {
+      const session = await loginWithPassword({
+        email: savedEmail,
+        password: savedPassword,
+        remember: true,
+      });
+
+      const normalizedToken = normalizeApiToken(session.token);
+      if (!normalizedToken) {
+        deviceLog.warn(
+          'wordpressAuth.reauthenticateWithStoredCredentials.missingToken',
+        );
+        return null;
+      }
+
+      const normalizedSession: PersistedSession = {
+        ...session,
+        token: normalizedToken,
+        tokenLoginUrl: undefined,
+      };
+
+      deviceLog.success(
+        'wordpressAuth.reauthenticateWithStoredCredentials.success',
+        {
+          userId: normalizedSession.user?.id ?? null,
+        },
+      );
+
+      return normalizedSession;
+    } catch (error) {
+      deviceLog.warn(
+        'wordpressAuth.reauthenticateWithStoredCredentials.failure',
+        {
+          message: error instanceof Error ? error.message : String(error),
+        },
+      );
+      return null;
+    }
+  } catch (error) {
+    deviceLog.warn('wordpressAuth.reauthenticateWithStoredCredentials.error', {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+};
+
 export const ensureValidSessionToken = async (
   providedToken?: string | null,
 ): Promise<string | null> => {

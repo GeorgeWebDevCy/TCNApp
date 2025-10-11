@@ -31,6 +31,7 @@ import {
   setSessionLock,
   persistSessionSnapshot,
   ensureCookieSession,
+  reauthenticateWithStoredCredentials,
   uploadProfileAvatar as uploadWordPressProfileAvatar,
   deleteProfileAvatar as deleteWordPressProfileAvatar,
   ensureMemberQrCode,
@@ -915,7 +916,26 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   ]);
 
   const getSessionToken = useCallback(async () => {
-    const session = await ensureValidSession();
+    let session = await ensureValidSession();
+
+    if (!session?.token) {
+      deviceLog.warn('auth.getSessionToken.missingToken', {
+        hasSession: Boolean(session),
+        locked: session?.locked ?? null,
+        hasUser: Boolean(session?.user ?? null),
+      });
+
+      const reauthenticated = await reauthenticateWithStoredCredentials();
+      if (reauthenticated?.token) {
+        deviceLog.info('auth.getSessionToken.reauthenticated', {
+          userId: reauthenticated.user?.id ?? null,
+        });
+        session = reauthenticated;
+      } else if (!session) {
+        sessionRef.current = null;
+        return null;
+      }
+    }
 
     if (!session) {
       sessionRef.current = null;
@@ -951,8 +971,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       }
     }
 
-    return session.token ?? null;
-  }, [hydrateTokenLogin, logCookieHydration]);
+    if (!session.token) {
+      deviceLog.warn('auth.getSessionToken.unresolved');
+      return null;
+    }
+
+    return session.token;
+  }, [
+    hydrateTokenLogin,
+    logCookieHydration,
+    reauthenticateWithStoredCredentials,
+  ]);
 
   const registerAccount = useCallback(async (options: RegisterOptions) => {
     const registrationDate = new Date().toISOString();
