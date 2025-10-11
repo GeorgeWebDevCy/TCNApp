@@ -16,6 +16,7 @@ import {
   deleteProfileAvatar,
   ensureMemberQrCode,
   validateMemberQrCode,
+  ensureValidSession,
 } from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -498,6 +499,97 @@ describe('wordpressAuthService', () => {
         [AUTH_STORAGE_KEYS.token, apiToken],
         [AUTH_STORAGE_KEYS.tokenLoginUrl, tokenLoginUrl],
       ]),
+    );
+  });
+
+  it('re-authenticates using stored credentials when a restored session has no token', async () => {
+    const storedUser = {
+      id: 99,
+      email: 'member@example.com',
+      name: 'Member Example',
+      firstName: 'Member',
+      lastName: 'Example',
+      membership: null,
+      membershipBenefits: [],
+      woocommerceCredentials: null,
+      accountType: null,
+      accountStatus: null,
+      vendorTier: null,
+      vendorStatus: null,
+      qrPayload: null,
+      qrToken: null,
+    };
+
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(storedUser),
+    );
+    await EncryptedStorage.setItem(
+      AUTH_STORAGE_KEYS.credentialEmail,
+      'member@example.com',
+    );
+    await EncryptedStorage.setItem(
+      AUTH_STORAGE_KEYS.credentialPassword,
+      'passw0rd',
+    );
+
+    const apiToken = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl';
+
+    const loginResponseBody = {
+      token: apiToken,
+      user_email: 'member@example.com',
+      user_display_name: 'Member Example',
+    };
+
+    const profileResponseBody = {
+      id: 99,
+      email: 'member@example.com',
+      name: 'Member Example',
+      avatar_urls: {},
+    };
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody))
+      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await ensureValidSession();
+
+    expect(session).not.toBeNull();
+    expect(session?.token).toBe(apiToken);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.passwordLogin}`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'member@example.com',
+          password: 'passw0rd',
+          remember: true,
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${apiToken}`,
+        }),
+      }),
+    );
+
+    expect(await EncryptedStorage.getItem(AUTH_STORAGE_KEYS.token)).toBe(
+      apiToken,
+    );
+
+    expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
+      expect.arrayContaining([[AUTH_STORAGE_KEYS.token, apiToken]]),
     );
   });
 
