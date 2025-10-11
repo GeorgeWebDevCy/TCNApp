@@ -225,7 +225,15 @@ const normalizePlan = (plan: WordPressMembershipPlan): MembershipPlan => {
           : `plan-${Date.now()}`;
 
   const metadata = coerceMetadata(plan.metadata);
-  if (!metadata.wordpressPlanId && rawId) {
+  const metadataHasId = ['wordpressPlanId', 'planId', 'id'].some(key => {
+    const value = metadata[key];
+    if (typeof value === 'string') {
+      return value.trim().length > 0;
+    }
+    return typeof value === 'number';
+  });
+
+  if (!metadataHasId && rawId) {
     metadata.wordpressPlanId = rawId;
   }
 
