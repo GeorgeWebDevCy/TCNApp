@@ -65,10 +65,14 @@ api() {
   local body=${3:-}
 
   local url="${BASE_URL%/}${path}"
-  local args=( -sS -w "\n__HTTP_STATUS:%{http_code}\n" -X "$method" "$url" )
+  local args=( -sS -w "\n__HTTP_STATUS:%{http_code}\n" --url "$url" )
+
+  if [[ -n "$method" ]]; then
+    args+=( --request "$method" )
+  fi
 
   if [[ -n "$body" ]]; then
-    args+=( -H 'Content-Type: application/json' -d "$body" )
+    args+=( -H "Content-Type: application/json" -d "$body" )
   fi
 
   if [[ ${VERBOSE} -eq 1 ]]; then
@@ -86,11 +90,15 @@ auth_api() {
   local body=${4:-}
 
   local url="${BASE_URL%/}${path}"
-  local args=( -sS -w "\n__HTTP_STATUS:%{http_code}\n" -X "$method" "$url" \
+  local args=( -sS -w "\n__HTTP_STATUS:%{http_code}\n" --url "$url" \
     -H "Authorization: Bearer $token" )
 
+  if [[ -n "$method" ]]; then
+    args+=( --request "$method" )
+  fi
+
   if [[ -n "$body" ]]; then
-    args+=( -H 'Content-Type: application/json' -d "$body" )
+    args+=( -H "Content-Type: application/json" -d "$body" )
   fi
 
   if [[ ${VERBOSE} -eq 1 ]]; then
