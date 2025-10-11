@@ -102,9 +102,15 @@ calc_net_amount
 api() {
   local method=$1
   local path=$2
-  local body=${3:-}
+  local body=""
+  shift 2
+
+  if [[ $# -gt 0 && $1 != -* ]]; then
+    body=$1
+    shift
+  fi
+
   local extra_headers=()
-  shift 3 || true
   if [[ $# -gt 0 ]]; then
     extra_headers=("$@")
   fi
