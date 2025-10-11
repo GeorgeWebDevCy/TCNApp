@@ -28,6 +28,7 @@ import { VendorScanScreen } from './src/screens/VendorScanScreen';
 import { MemberDashboardScreen } from './src/screens/MemberDashboardScreen';
 import { VendorDashboardScreen } from './src/screens/VendorDashboardScreen';
 import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
+import { PostLoginDiagnosticsScreen } from './src/screens/PostLoginDiagnosticsScreen';
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
 import { MembershipDebugScreen } from './src/screens/MembershipDebugScreen';
 import { COLORS } from './src/config/theme';
@@ -52,6 +53,7 @@ const AppContent: React.FC = () => {
     | 'adminDashboard'
     | 'membershipDebug'
   >('home');
+  const [hasCompletedDiagnostics, setHasCompletedDiagnostics] = useState(false);
 
   const normalizedAccountType = (user?.accountType ?? '').toLowerCase();
   const isVendor = normalizedAccountType === 'vendor';
@@ -65,6 +67,7 @@ const AppContent: React.FC = () => {
     // should be shown instead.
     if (!isAuthenticated) {
       setActiveScreen('home');
+      setHasCompletedDiagnostics(false);
     }
   }, [isAuthenticated]);
 
@@ -121,6 +124,15 @@ const AppContent: React.FC = () => {
     // No authenticated session found, so we show the login experience. The AuthProvider
     // will update the context once the user signs in.
     return <LoginScreen />;
+  }
+
+  if (!hasCompletedDiagnostics) {
+    return (
+      <PostLoginDiagnosticsScreen
+        onComplete={() => setHasCompletedDiagnostics(true)}
+        onSkip={() => setHasCompletedDiagnostics(true)}
+      />
+    );
   }
 
   let content: JSX.Element;
