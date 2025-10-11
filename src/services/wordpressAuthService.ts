@@ -30,6 +30,7 @@ import {
 export interface PersistedSession {
   token?: string;
   refreshToken?: string;
+  tokenExpiresAt?: string | null;
   tokenLoginUrl?: string | null;
   restNonce?: string | null;
   user: AuthUser | null;
@@ -159,6 +160,7 @@ const describeSessionForLogging = (
   maskedToken: string | null;
   hasRefreshToken: boolean;
   maskedRefreshToken: string | null;
+  tokenExpiresAt: string | null;
   tokenLoginUrl: ReturnType<typeof describeUrlForLogging>;
   locked: boolean;
   hasUser: boolean;
@@ -172,6 +174,7 @@ const describeSessionForLogging = (
     maskedToken: maskTokenForLogging(session.token),
     hasRefreshToken: Boolean(session.refreshToken),
     maskedRefreshToken: maskTokenForLogging(session.refreshToken),
+    tokenExpiresAt: session.tokenExpiresAt ?? null,
     tokenLoginUrl: describeUrlForLogging(session.tokenLoginUrl ?? null),
     locked: session.locked,
     hasUser: Boolean(session.user),
@@ -420,37 +423,61 @@ const extractSuccessFlag = (
 // Attempt to refresh a JWT-style token using the compatible JWT endpoint.
 const refreshJwtTokenIfPossible = async (
   token?: string | null,
-): Promise<string | null> => {
+): Promise<TokenRefreshResult | null> => {
   const normalized = normalizeApiToken(token ?? undefined);
   if (!normalized) {
     return null;
   }
 
-  try {
-    const response = await fetchWithRouteFallback(
-      WORDPRESS_CONFIG.endpoints.refreshToken,
-      {
+  const endpoints = [
+    WORDPRESS_CONFIG.endpoints.refreshToken,
+    WORDPRESS_CONFIG.endpoints.legacyRefreshToken,
+  ].filter(
+    (value, index, array): value is string =>
+      typeof value === 'string' &&
+      value.length > 0 &&
+      array.indexOf(value) === index,
+  );
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetchWithRouteFallback(endpoint, {
         method: 'POST',
         headers: {
           Accept: 'application/json',
           Authorization: `Bearer ${normalized}`,
         },
-      },
-    );
+      });
 
-    const json = (await parseJsonResponse<JwtTokenResponse>(
-      response,
-    )) as JwtTokenResponse | null;
+      const status = response.status;
+      const json = await parseJsonResponse<JwtTokenResponse>(response);
 
-    if (!response.ok || !json || typeof json !== 'object') {
-      return null;
+      if (status === 404) {
+        continue;
+      }
+
+      if (!response.ok || !json || typeof json !== 'object') {
+        return null;
+      }
+
+      const jsonRecord = json as Record<string, unknown>;
+      const rawToken =
+        getString(json.token) ??
+        getString(json.api_token) ??
+        getString(jsonRecord['apiToken']);
+      const nextToken = normalizeApiToken(rawToken ?? undefined);
+      if (!nextToken) {
+        return null;
+      }
+
+      const expiresAt = extractTokenExpiry(jsonRecord);
+      return { token: nextToken, expiresAt };
+    } catch (error) {
+      continue;
     }
-
-    const newToken = getString(json.token);
-    return newToken ?? null;
-  } catch (error) {
-    return null;
   }
+
+  return null;
 };
 
 const fetchWithRouteFallback = async (
@@ -532,6 +559,72 @@ const getString = (value: unknown): string | null => {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value.trim();
   }
+  return null;
+};
+
+const parseExpiresInSeconds = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+};
+
+const normalizeIsoTimestamp = (value: string | null): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return new Date(parsed).toISOString();
+};
+
+const extractTokenExpiry = (
+  payload: Record<string, unknown> | null | undefined,
+): string | null => {
+  if (!payload || typeof payload !== 'object') {
+    return null;
+  }
+
+  const explicitExpiry =
+    getString((payload as Record<string, unknown>).expires_at) ??
+    getString((payload as Record<string, unknown>).expiresAt) ??
+    getString((payload as Record<string, unknown>).token_expires_at) ??
+    getString((payload as Record<string, unknown>).tokenExpiresAt);
+
+  const normalizedExplicit = normalizeIsoTimestamp(explicitExpiry);
+  if (normalizedExplicit) {
+    return normalizedExplicit;
+  }
+
+  const expiresInSources: unknown[] = [
+    (payload as Record<string, unknown>).expires_in,
+    (payload as Record<string, unknown>).expiresIn,
+    (payload as Record<string, unknown>).token_expires_in,
+    (payload as Record<string, unknown>).tokenExpiresIn,
+  ];
+
+  for (const candidate of expiresInSources) {
+    const seconds = parseExpiresInSeconds(candidate);
+    if (seconds) {
+      const milliseconds = seconds * 1000;
+      if (Number.isFinite(milliseconds)) {
+        return new Date(Date.now() + milliseconds).toISOString();
+      }
+    }
+  }
+
   return null;
 };
 
@@ -1129,6 +1222,11 @@ type SessionValidationResult = {
   status: number;
 };
 
+interface TokenRefreshResult {
+  token: string;
+  expiresAt: string | null;
+}
+
 const fetchSessionUser = async (
   token: string,
 ): Promise<SessionValidationResult> => {
@@ -1558,6 +1656,7 @@ export const hasPasswordAuthenticated = async (): Promise<boolean> => {
 const storeSession = async ({
   token,
   refreshToken,
+  tokenExpiresAt,
   tokenLoginUrl,
   restNonce,
   user,
@@ -1580,6 +1679,12 @@ const storeSession = async ({
     await setSecureValue(AUTH_STORAGE_KEYS.refreshToken, refreshToken);
   } else {
     await removeSecureValue(AUTH_STORAGE_KEYS.refreshToken);
+  }
+
+  if (tokenExpiresAt) {
+    entries.push([AUTH_STORAGE_KEYS.tokenExpiresAt, tokenExpiresAt]);
+  } else {
+    removals.push(AUTH_STORAGE_KEYS.tokenExpiresAt);
   }
 
   if (user) {
@@ -1635,6 +1740,7 @@ export const persistSessionSnapshot = async (
   await storeSession({
     token: session.token,
     refreshToken: session.refreshToken,
+    tokenExpiresAt: session.tokenExpiresAt ?? null,
     tokenLoginUrl: undefined,
     restNonce: session.restNonce ?? undefined,
     user: session.user,
@@ -1655,6 +1761,7 @@ export const clearSession = async () => {
   await AsyncStorage.multiRemove([
     AUTH_STORAGE_KEYS.token,
     AUTH_STORAGE_KEYS.refreshToken,
+    AUTH_STORAGE_KEYS.tokenExpiresAt,
     AUTH_STORAGE_KEYS.userProfile,
     AUTH_STORAGE_KEYS.sessionLock,
     AUTH_STORAGE_KEYS.passwordAuthenticated,
@@ -1678,6 +1785,7 @@ export const restoreSession = async (
       AUTH_STORAGE_KEYS.userProfile,
       AUTH_STORAGE_KEYS.sessionLock,
       AUTH_STORAGE_KEYS.tokenLoginUrl,
+      AUTH_STORAGE_KEYS.tokenExpiresAt,
       AUTH_STORAGE_KEYS.wpRestNonce,
     ]),
     // Plain-text fallback copy persisted alongside encrypted storage
@@ -1688,6 +1796,7 @@ export const restoreSession = async (
   const userJson = storedValues[AUTH_STORAGE_KEYS.userProfile];
   const lockValue = storedValues[AUTH_STORAGE_KEYS.sessionLock];
   const storedTokenLoginUrl = storedValues[AUTH_STORAGE_KEYS.tokenLoginUrl];
+  const storedTokenExpiresAt = storedValues[AUTH_STORAGE_KEYS.tokenExpiresAt];
   const storedRestNonce = storedValues[AUTH_STORAGE_KEYS.wpRestNonce];
 
   if (storedTokenLoginUrl && storedTokenLoginUrl.length > 0) {
@@ -1732,6 +1841,10 @@ export const restoreSession = async (
     token,
     refreshToken,
     tokenLoginUrl: undefined,
+    tokenExpiresAt:
+      storedTokenExpiresAt && storedTokenExpiresAt.length > 0
+        ? normalizeIsoTimestamp(storedTokenExpiresAt)
+        : undefined,
     restNonce:
       storedRestNonce && storedRestNonce.length > 0
         ? storedRestNonce
@@ -1873,6 +1986,7 @@ export const uploadProfileAvatar = async (
       const patched: PersistedSession = {
         token,
         refreshToken: session?.refreshToken,
+        tokenExpiresAt: session?.tokenExpiresAt ?? null,
         tokenLoginUrl: undefined,
         restNonce: session?.restNonce ?? undefined,
         user: session?.user ?? null,
@@ -2000,16 +2114,17 @@ export const uploadProfileAvatar = async (
       const refreshed = await refreshJwtTokenIfPossible(token ?? undefined);
       if (refreshed) {
         deviceLog.success('wordpressAuth.uploadProfileAvatar.refreshToken.succeeded', {
-          maskedToken: maskTokenForLogging(refreshed),
+          maskedToken: maskTokenForLogging(refreshed.token),
         });
         await storeSession({
-          token: refreshed,
+          token: refreshed.token,
           refreshToken: session?.refreshToken,
+          tokenExpiresAt: refreshed.expiresAt ?? session?.tokenExpiresAt ?? null,
           tokenLoginUrl: undefined,
           restNonce: session?.restNonce ?? undefined,
           user: session?.user ?? null,
         });
-        token = refreshed;
+        token = refreshed.token;
         // Rebuild headers/body/query with new token
         const retryInit: RequestInit = {
           method: 'POST',
@@ -2187,6 +2302,7 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
       const patched: PersistedSession = {
         token,
         refreshToken: session?.refreshToken,
+        tokenExpiresAt: session?.tokenExpiresAt ?? null,
         tokenLoginUrl: undefined,
         restNonce: session?.restNonce ?? undefined,
         user: session?.user ?? null,
@@ -2235,11 +2351,12 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
 
     const refreshed = await refreshJwtTokenIfPossible(token ?? session?.token);
     if (refreshed) {
-      token = refreshed;
+      token = refreshed.token;
       try {
         const patched: PersistedSession = {
-          token: refreshed,
+          token: refreshed.token,
           refreshToken: session?.refreshToken,
+          tokenExpiresAt: refreshed.expiresAt ?? session?.tokenExpiresAt ?? null,
           tokenLoginUrl: undefined,
           restNonce: session?.restNonce ?? undefined,
           user: session?.user ?? null,
@@ -2254,8 +2371,8 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
         headers: {
           Accept: 'application/json',
           ...(restNonce ? { 'X-WP-Nonce': restNonce } : {}),
-          Authorization: `Bearer ${refreshed}`,
-          'X-Authorization': `Bearer ${refreshed}`,
+          Authorization: `Bearer ${refreshed.token}`,
+          'X-Authorization': `Bearer ${refreshed.token}`,
         },
       };
       const preparedRetry = await buildWordPressRequestInit(retryInit);
@@ -2321,6 +2438,7 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
     const nextSession: PersistedSession = {
       token: token ?? session.token,
       refreshToken: session.refreshToken,
+      tokenExpiresAt: session.tokenExpiresAt ?? null,
       tokenLoginUrl: undefined,
       restNonce: session.restNonce ?? undefined,
       user,
@@ -2463,18 +2581,19 @@ export const ensureValidSession =
         deviceLog.success(
           'wordpressAuth.ensureValidSession.refreshToken.succeeded',
           {
-            maskedToken: maskTokenForLogging(refreshed),
+            maskedToken: maskTokenForLogging(refreshed.token),
           },
         );
         await storeSession({
-          token: refreshed,
+          token: refreshed.token,
           refreshToken: session.refreshToken,
+          tokenExpiresAt: refreshed.expiresAt ?? session.tokenExpiresAt ?? null,
           tokenLoginUrl: undefined,
           restNonce: session.restNonce ?? undefined,
           user: session.user,
         });
         deviceLog.info('wordpressAuth.ensureValidSession.retry.start');
-        const retry = await fetchSessionUser(refreshed);
+        const retry = await fetchSessionUser(refreshed.token);
         deviceLog.debug('wordpressAuth.ensureValidSession.retryTokenResult', retry);
         if (retry.user) {
           await AsyncStorage.setItem(
@@ -2486,7 +2605,8 @@ export const ensureValidSession =
           });
           return {
             ...session,
-            token: refreshed,
+            token: refreshed.token,
+            tokenExpiresAt: refreshed.expiresAt ?? session.tokenExpiresAt ?? null,
             tokenLoginUrl: undefined,
             user: retry.user,
           };
@@ -2607,6 +2727,10 @@ interface JwtTokenResponse {
   user_nicename?: string;
   user_display_name?: string;
   expires_in?: number;
+  token_expires_in?: number;
+  tokenExpiresIn?: number;
+  token_expires_at?: string;
+  tokenExpiresAt?: string;
   message?: string;
   code?: string;
   data?: { status?: number };
@@ -2752,6 +2876,7 @@ export const loginWithPassword = async ({
   }
   const restNonce =
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
+  const tokenExpiresAt = extractTokenExpiry(json as Record<string, unknown>);
 
   if (!token && tokenLoginUrl) {
     deviceLog.info('wordpressAuth.loginWithPassword.tokenLoginOnly', {
@@ -2834,6 +2959,7 @@ export const loginWithPassword = async ({
   const session: PersistedSession = {
     token,
     refreshToken,
+    tokenExpiresAt,
     user,
     tokenLoginUrl,
     restNonce,

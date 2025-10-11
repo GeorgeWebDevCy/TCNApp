@@ -27,7 +27,8 @@ export const WORDPRESS_CONFIG = {
   endpoints: {
     // Use GN/TCN connector login endpoint which returns api_token and token_login_url
     passwordLogin: '/wp-json/gn/v1/login',
-    refreshToken: '/wp-json/jwt-auth/v1/token/refresh',
+    refreshToken: '/wp-json/gn/v1/token/refresh',
+    legacyRefreshToken: '/wp-json/jwt-auth/v1/token/refresh',
     validateToken: '/wp-json/jwt-auth/v1/token/validate',
     profile: '/wp-json/gn/v1/me',
     profileAvatar: '/wp-json/gn/v1/profile/avatar',
@@ -63,6 +64,7 @@ export const PIN_CONFIG = {
 export const AUTH_STORAGE_KEYS = {
   token: '@tcnapp/wp-token',
   refreshToken: '@tcnapp/wp-refresh-token',
+  tokenExpiresAt: '@tcnapp/wp-token-expiration',
   userProfile: '@tcnapp/user-profile',
   sessionLock: '@tcnapp/session-locked',
   passwordAuthenticated: '@tcnapp/password-authenticated',

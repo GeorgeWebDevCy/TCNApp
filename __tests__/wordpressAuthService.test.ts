@@ -593,6 +593,84 @@ describe('wordpressAuthService', () => {
     );
   });
 
+  it('refreshes the stored API token and expiration when validation returns 401', async () => {
+    const storedUser = {
+      id: 101,
+      email: 'refresh@example.com',
+      name: 'Refresh Example',
+      firstName: 'Refresh',
+      lastName: 'Example',
+      membership: null,
+      membershipBenefits: [],
+      woocommerceCredentials: null,
+      accountType: null,
+      accountStatus: null,
+      vendorTier: null,
+      vendorStatus: null,
+      qrPayload: null,
+      qrToken: null,
+    };
+
+    const expiredToken = 'expiredToken1234567890';
+    const refreshedToken = 'refreshedToken0987654321';
+
+    await EncryptedStorage.setItem(AUTH_STORAGE_KEYS.token, expiredToken);
+    await AsyncStorage.setItem(AUTH_STORAGE_KEYS.token, expiredToken);
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(storedUser),
+    );
+
+    const profileUnauthorized = createJsonResponse(401, {
+      code: 'jwt_auth_invalid_token',
+    });
+    const refreshResponse = createJsonResponse(200, {
+      token: refreshedToken,
+      expires_in: 3600,
+    });
+    const profileResponse = createJsonResponse(200, {
+      id: storedUser.id,
+      email: storedUser.email,
+      name: storedUser.name,
+      avatar_urls: {},
+    });
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(profileUnauthorized)
+      .mockResolvedValueOnce(refreshResponse)
+      .mockResolvedValueOnce(profileResponse);
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await ensureValidSession();
+
+    expect(session?.token).toBe(refreshedToken);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.refreshToken}`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${expiredToken}`,
+        }),
+      }),
+    );
+
+    expect(await EncryptedStorage.getItem(AUTH_STORAGE_KEYS.token)).toBe(
+      refreshedToken,
+    );
+
+    const storedExpiry = await AsyncStorage.getItem(
+      AUTH_STORAGE_KEYS.tokenExpiresAt,
+    );
+    expect(storedExpiry).not.toBeNull();
+    const parsedExpiry = Date.parse(storedExpiry as string);
+    expect(Number.isNaN(parsedExpiry)).toBe(false);
+    expect(parsedExpiry).toBeGreaterThan(Date.now());
+  });
+
   it('sends membership metadata when registering a new account so the blue plan is auto-purchased', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2024-02-01T10:00:00.000Z'));
