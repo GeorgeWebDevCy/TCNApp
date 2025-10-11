@@ -232,6 +232,10 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
     setIsRunning(true);
 
     const baseUrl = WORDPRESS_CONFIG.baseUrl;
+    deviceLog.info('postLoginDiagnostics.runChecks.start', {
+      baseUrl,
+      userId: state.user?.id ?? null,
+    });
 
     try {
       const response = await fetchWithTimeout(`${baseUrl}/wp-json`, {
@@ -280,8 +284,12 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
 
     let token: string | null = null;
     try {
+      deviceLog.info('postLoginDiagnostics.token.request', {
+        userId: state.user?.id ?? null,
+      });
       token = await getSessionToken();
       if (!token) {
+        deviceLog.warn('postLoginDiagnostics.token.noneReceived');
         handleFailure('token', t('auth.postLoginDiagnostics.token.missing'));
         return;
       }
