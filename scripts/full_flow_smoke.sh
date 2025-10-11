@@ -155,6 +155,17 @@ extract_body() {
   sed '/^__HTTP_STATUS:/d'
 }
 
+log_response() {
+  local step=$1
+  local response=$2
+
+  if [[ -n "$response" ]]; then
+    printf '\nResponse (%s):\n%s\n' "$step" "$response" >&2
+  else
+    printf '\nResponse (%s): <empty body>\n' "$step" >&2
+  fi
+}
+
 assert_success() {
   local status=$1
   local step=$2
@@ -184,6 +195,7 @@ step_login() {
   fi
 
   assert_success "$status" "login" || { printf "%s\n" "$response"; exit 2; }
+  log_response "login" "$response"
 
   if [[ $JQ_AVAILABLE -eq 1 ]]; then
     TOKEN=$(printf "%s" "$response" | jq -r '(.api_token // .apiToken // .token // empty)')
@@ -234,6 +246,7 @@ step_profile() {
   response=$(printf "%s" "$raw" | extract_body)
 
   assert_success "$status" "profile" || { printf "%s\n" "$response"; exit 4; }
+  log_response "profile" "$response"
 
   if [[ -z "$MEMBER_ID" ]]; then
     if [[ $JQ_AVAILABLE -eq 1 ]]; then
@@ -256,6 +269,7 @@ step_vendor_tiers() {
   response=$(printf "%s" "$raw" | extract_body)
 
   assert_success "$status" "vendors/tiers" || { printf "%s\n" "$response"; exit 5; }
+  log_response "vendors/tiers" "$response"
   if [[ ${VERBOSE} -eq 1 ]]; then
     echo "Vendor tiers: $response" >&2
   fi
@@ -270,6 +284,7 @@ step_membership_plans() {
   local response
   response=$(printf "%s" "$raw" | extract_body)
   assert_success "$status" "memberships/plans" || { printf "%s\n" "$response"; exit 6; }
+  log_response "memberships/plans" "$response"
   if [[ ${VERBOSE} -eq 1 ]]; then
     echo "Membership plans: $response" >&2
   fi
@@ -286,6 +301,7 @@ step_activity_log() {
   local response
   response=$(printf "%s" "$raw" | extract_body)
   assert_success "$status" "activity log" || { printf "%s\n" "$response"; exit 7; }
+  log_response "activity log" "$response"
 }
 
 step_discount_lookup() {
@@ -304,6 +320,7 @@ step_discount_lookup() {
   local response
   response=$(printf "%s" "$raw" | extract_body)
   assert_success "$status" "discount lookup" || { printf "%s\n" "$response"; exit 8; }
+  log_response "discount lookup" "$response"
 
   if [[ -z "$MEMBER_ID" ]]; then
     if [[ $JQ_AVAILABLE -eq 1 ]]; then
@@ -347,6 +364,7 @@ step_discount_transaction() {
   local response
   response=$(printf "%s" "$raw" | extract_body)
   assert_success "$status" "discount transaction" || { printf "%s\n" "$response"; exit 9; }
+  log_response "discount transaction" "$response"
 }
 
 step_discount_history() {
@@ -364,6 +382,7 @@ step_discount_history() {
   local response
   response=$(printf "%s" "$raw" | extract_body)
   assert_success "$status" "discount history" || { printf "%s\n" "$response"; exit 10; }
+  log_response "discount history" "$response"
   if [[ ${VERBOSE} -eq 1 ]]; then
     echo "Discount history: $response" >&2
   fi
