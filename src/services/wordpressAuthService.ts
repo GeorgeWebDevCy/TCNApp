@@ -2616,6 +2616,14 @@ export const loginWithPassword = async ({
   } else if (rawTokenFieldValue && isLikelyUrl(rawTokenFieldValue)) {
     tokenLoginUrl = tokenLoginUrl ?? rawTokenFieldValue;
   }
+
+  if (!token && tokenLoginUrl) {
+    const extractedFromLoginUrl = normalizeApiToken(tokenLoginUrl);
+    if (extractedFromLoginUrl) {
+      token = extractedFromLoginUrl;
+      tokenSource = tokenSource ?? 'api';
+    }
+  }
   const restNonce =
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
 
