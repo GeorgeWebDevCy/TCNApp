@@ -126,6 +126,17 @@ const extractTokenFromUrl = (value: string): string | undefined => {
   return undefined;
 };
 
+const isLikelyJwtToken = (value?: string | null): boolean => {
+  if (!value || typeof value !== 'string') {
+    return false;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  // Heuristic: JWTs are three base64url segments separated by dots
+  const parts = trimmed.split('.');
+  return parts.length === 3 && parts[0].length > 0 && parts[1].length > 0;
+};
+
 const normalizeApiToken = (value?: string | null): string | undefined => {
   if (!value || typeof value !== 'string') {
     return undefined;
@@ -2884,13 +2895,14 @@ export const loginWithPassword = async ({
   const rawApiTokenValue =
     getString(json.api_token) ?? getString((json as any).apiToken);
   const rawTokenFieldValue = getString(json.token);
-  const normalizedJwtToken = normalizeApiToken(rawTokenFieldValue);
   const normalizedApiToken = normalizeApiToken(rawApiTokenValue);
+  const normalizedTokenField = normalizeApiToken(rawTokenFieldValue);
+  const tokenFieldIsJwt = isLikelyJwtToken(normalizedTokenField);
   const rawTokenValue =
-    normalizedJwtToken ??
     normalizedApiToken ??
-    rawTokenFieldValue ??
-    rawApiTokenValue;
+    (tokenFieldIsJwt ? normalizedTokenField : undefined) ??
+    rawApiTokenValue ??
+    (tokenFieldIsJwt ? rawTokenFieldValue : undefined);
   const rawTokenType =
     rawTokenFieldValue != null
       ? typeof json.token
@@ -2907,8 +2919,8 @@ export const loginWithPassword = async ({
   try {
     deviceLog.debug('wordpressAuth.loginWithPassword.payloadKeys', {
       hasApiToken: Boolean(rawApiTokenValue),
-      hasJwtToken: Boolean(normalizedJwtToken),
       hasTokenField: Boolean(rawTokenFieldValue),
+      tokenFieldIsJwt,
       hasTokenLoginUrl: Boolean(rawTokenLoginUrl),
       hasUser: Boolean(json.user),
       tokenPreview:
@@ -2934,30 +2946,21 @@ export const loginWithPassword = async ({
     throw new Error(message);
   }
 
-  // Prefer a JWT bearer token when available. Fall back to the opaque API token
-  // for backwards compatibility with hosts that still rely on it. Treat the
-  // legacy `token` field as a potential login URL only when it does not resolve
-  // to a usable bearer token.
+  // Prefer the API token when available. If absent, accept a JWT in the
+  // `token` field only when it appears to be a real JWT. Treat any other
+  // `token` value as a login-handoff token (not usable for Authorization).
   let token: string | undefined;
   let tokenSource: 'jwt' | 'api' | null = null;
   let tokenLoginUrl = rawTokenLoginUrl ?? undefined;
 
-  if (normalizedJwtToken) {
-    token = normalizedJwtToken;
-    tokenSource = 'jwt';
-  } else if (normalizedApiToken) {
-    token = normalizedApiToken; // opaque API token (not a URL/JWT is fine)
+  if (normalizedApiToken) {
+    token = normalizedApiToken;
     tokenSource = 'api';
+  } else if (tokenFieldIsJwt && normalizedTokenField) {
+    token = normalizedTokenField;
+    tokenSource = 'jwt';
   } else if (rawTokenFieldValue && isLikelyUrl(rawTokenFieldValue)) {
     tokenLoginUrl = tokenLoginUrl ?? rawTokenFieldValue;
-  }
-
-  if (!token && tokenLoginUrl) {
-    const extractedFromLoginUrl = normalizeApiToken(tokenLoginUrl);
-    if (extractedFromLoginUrl) {
-      token = extractedFromLoginUrl;
-      tokenSource = tokenSource ?? 'api';
-    }
   }
   const restNonce =
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
