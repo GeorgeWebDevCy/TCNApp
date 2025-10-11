@@ -41,6 +41,55 @@ const createInitialStatuses = (): DiagnosticState => ({
   endpoint: { status: 'pending', details: null },
 });
 
+const formatDebugValue = (value: unknown): string => {
+  if (value == null || value === '') {
+    return String(value);
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (error) {
+      return String(value);
+    }
+  }
+
+  return String(value);
+};
+
+const formatContextDetails = (
+  context: Array<[string, unknown]> | undefined,
+): string => {
+  if (!context || context.length === 0) {
+    return '';
+  }
+
+  const lines = context.map(([label, rawValue]) => {
+    const formatted = formatDebugValue(rawValue);
+    const [firstLine, ...remainingLines] = formatted.split('\n');
+    if (remainingLines.length === 0) {
+      return `• ${label}: ${firstLine}`;
+    }
+
+    const indented = remainingLines.map(line => `  ${line}`).join('\n');
+    return `• ${label}: ${firstLine}\n${indented}`;
+  });
+
+  return `\n\nDetails:\n${lines.join('\n')}`;
+};
+
 const decodeBase64Url = (value: string): string => {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
   const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
@@ -167,6 +216,13 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
 }) => {
   const { getSessionToken, state } = useAuthContext();
   const { t } = useLocalization();
+  const {
+    authMethod,
+    hasPasswordAuthenticated,
+    isAuthenticated,
+    isLocked,
+    user,
+  } = state;
   const [statuses, setStatuses] = useState<DiagnosticState>(() => createInitialStatuses());
   const [isRunning, setIsRunning] = useState(false);
   const [overallError, setOverallError] = useState<string | null>(null);
@@ -207,16 +263,19 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
   );
 
   const handleFailure = useCallback(
-    (key: DiagnosticKey, message: string) => {
+    (key: DiagnosticKey, message: string, context?: Array<[string, unknown]>) => {
+      const contextDetails = formatContextDetails(context);
+      const combinedMessage = `${message}${contextDetails}`;
       deviceLog.warn('postLoginDiagnostics.check.failed', {
         key,
         message,
+        context,
       });
-      updateStatus(key, { status: 'error', details: message });
+      updateStatus(key, { status: 'error', details: combinedMessage });
       blockRemaining(key);
       setOverallError(
         t('auth.postLoginDiagnostics.errorSubtitle', {
-          replace: { message },
+          replace: { message: combinedMessage },
         }),
       );
       setAllPassed(false);
@@ -234,11 +293,13 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
     const baseUrl = WORDPRESS_CONFIG.baseUrl;
     deviceLog.info('postLoginDiagnostics.runChecks.start', {
       baseUrl,
-      userId: state.user?.id ?? null,
+      userId: user?.id ?? null,
     });
 
+    const discoveryUrl = `${baseUrl}/wp-json`;
+
     try {
-      const response = await fetchWithTimeout(`${baseUrl}/wp-json`, {
+      const response = await fetchWithTimeout(discoveryUrl, {
         method: 'GET',
         headers: {
           Accept: 'application/json',
@@ -246,11 +307,18 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       });
 
       if (!response.ok) {
+        const responseHeaders = Array.from(response.headers.entries());
         handleFailure(
           'server',
           t('auth.postLoginDiagnostics.server.failure', {
             replace: { message: `HTTP ${response.status}` },
           }),
+          [
+            ['Request URL', discoveryUrl],
+            ['Response status', response.status],
+            ['Status text', response.statusText],
+            ['Headers', responseHeaders],
+          ],
         );
         return;
       }
@@ -269,14 +337,35 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       });
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
-        handleFailure('server', t('auth.postLoginDiagnostics.server.timeout'));
+        handleFailure(
+          'server',
+          t('auth.postLoginDiagnostics.server.timeout'),
+          [
+            ['Request URL', discoveryUrl],
+            ['Timeout (ms)', 10000],
+          ],
+        );
       } else {
         const message = error instanceof Error ? error.message : String(error);
+        const context: Array<[string, unknown]> = [
+          ['Request URL', discoveryUrl],
+          ['Error name', error instanceof Error ? error.name : typeof error],
+          ['Error message', message],
+        ];
+        if (error instanceof Error) {
+          if ('cause' in error && error.cause) {
+            context.push(['Error cause', error.cause]);
+          }
+          if (error.stack) {
+            context.push(['Error stack', error.stack]);
+          }
+        }
         handleFailure(
           'server',
           t('auth.postLoginDiagnostics.server.failure', {
             replace: { message },
           }),
+          context,
         );
       }
       return;
@@ -285,12 +374,23 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
     let token: string | null = null;
     try {
       deviceLog.info('postLoginDiagnostics.token.request', {
-        userId: state.user?.id ?? null,
+        userId: user?.id ?? null,
       });
       token = await getSessionToken();
       if (!token) {
         deviceLog.warn('postLoginDiagnostics.token.noneReceived');
-        handleFailure('token', t('auth.postLoginDiagnostics.token.missing'));
+        handleFailure(
+          'token',
+          t('auth.postLoginDiagnostics.token.missing'),
+          [
+            ['User ID', user?.id ?? null],
+            ['User email', user?.email ?? null],
+            ['Is authenticated', isAuthenticated],
+            ['Is locked', isLocked],
+            ['Auth method', authMethod ?? 'unknown'],
+            ['Has password authenticated', hasPasswordAuthenticated],
+          ],
+        );
         return;
       }
 
@@ -304,19 +404,44 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         },
       );
       deviceLog.info('postLoginDiagnostics.token.success', {
-        userId: state.user?.id ?? null,
+        userId: user?.id ?? null,
       });
     } catch (error) {
+      const context: Array<[string, unknown]> = [
+        ['User ID', user?.id ?? null],
+        ['User email', user?.email ?? null],
+        ['Is authenticated', isAuthenticated],
+        ['Is locked', isLocked],
+        ['Auth method', authMethod ?? 'unknown'],
+        ['Has password authenticated', hasPasswordAuthenticated],
+        ['Error name', error instanceof Error ? error.name : typeof error],
+      ];
+      if (error instanceof Error) {
+        if ('cause' in error && error.cause) {
+          context.push(['Error cause', error.cause]);
+        }
+        if (error.stack) {
+          context.push(['Error stack', error.stack]);
+        }
+      }
       handleFailure(
         'token',
         error instanceof Error ? error.message : String(error),
+        context,
       );
       return;
     }
 
     const payload = token ? decodeJwtPayload(token) : null;
     if (!payload) {
-      handleFailure('lifetime', t('auth.postLoginDiagnostics.lifetime.decodeError'));
+      handleFailure(
+        'lifetime',
+        t('auth.postLoginDiagnostics.lifetime.decodeError'),
+        [
+          ['Token preview', maskToken(token ?? '')],
+          ['Token length', token?.length ?? 0],
+        ],
+      );
       return;
     }
 
@@ -331,7 +456,15 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         : null;
 
     if (!Number.isFinite(exp)) {
-      handleFailure('lifetime', t('auth.postLoginDiagnostics.lifetime.decodeError'));
+      handleFailure(
+        'lifetime',
+        t('auth.postLoginDiagnostics.lifetime.decodeError'),
+        [
+          ['Token preview', maskToken(token ?? '')],
+          ['exp raw value', expRaw ?? null],
+          ['iat raw value', iatRaw ?? null],
+        ],
+      );
       return;
     }
 
@@ -346,6 +479,12 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
             relative: formatRelativeDuration(secondsUntilExpiry),
           },
         }),
+        [
+          ['Token preview', maskToken(token ?? '')],
+          ['Expires (epoch seconds)', exp],
+          ['Current time (epoch seconds)', nowSeconds],
+          ['Seconds until expiry', secondsUntilExpiry],
+        ],
       );
       return;
     }
@@ -371,6 +510,13 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
             actualDays: (comparisonLifetime / 86400).toFixed(2),
           },
         }),
+        [
+          ['Token preview', maskToken(token ?? '')],
+          ['Expected lifetime (seconds)', EXPECTED_TOKEN_LIFETIME_SECONDS],
+          ['Actual lifetime (seconds)', comparisonLifetime],
+          ['Issued at (epoch seconds)', issuedAt ?? 'unknown'],
+          ['Expires (epoch seconds)', exp],
+        ],
       );
       return;
     }
@@ -407,11 +553,18 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
 
       const response = await fetchWithTimeout(profileUrl, requestInit);
       if (!response.ok) {
+        const responseHeaders = Array.from(response.headers.entries());
         handleFailure(
           'endpoint',
           t('auth.postLoginDiagnostics.endpoint.unauthorized', {
             replace: { status: response.status },
           }),
+          [
+            ['Request URL', profileUrl],
+            ['Response status', response.status],
+            ['Status text', response.statusText],
+            ['Headers', responseHeaders],
+          ],
         );
         return;
       }
@@ -430,11 +583,25 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      const context: Array<[string, unknown]> = [
+        ['Request URL', profileUrl],
+        ['Error name', error instanceof Error ? error.name : typeof error],
+        ['Error message', message],
+      ];
+      if (error instanceof Error) {
+        if ('cause' in error && error.cause) {
+          context.push(['Error cause', error.cause]);
+        }
+        if (error.stack) {
+          context.push(['Error stack', error.stack]);
+        }
+      }
       handleFailure(
         'endpoint',
         t('auth.postLoginDiagnostics.endpoint.failure', {
           replace: { message },
         }),
+        context,
       );
       return;
     }
@@ -443,11 +610,16 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
     setAllPassed(true);
     deviceLog.success('postLoginDiagnostics.complete');
   }, [
+    authMethod,
     getSessionToken,
     handleFailure,
-    state.user?.id,
+    hasPasswordAuthenticated,
+    isAuthenticated,
+    isLocked,
     t,
     updateStatus,
+    user?.email,
+    user?.id,
   ]);
 
   useEffect(() => {
