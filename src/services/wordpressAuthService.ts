@@ -103,6 +103,7 @@ const extractTokenFromUrl = (value: string): string | undefined => {
       'auth_token',
       'bearer',
       'api_token',
+      'login_token',
     ];
 
     for (const key of candidateKeys) {

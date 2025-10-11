@@ -174,6 +174,38 @@ describe('wordpressAuthService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('extracts the reusable API token from the token_login_url when WordPress uses the login_token parameter', async () => {
+    const apiToken = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl';
+    const tokenLoginUrl = `https://example.com/wp-login.php?action=gn_token_login&login_token=${apiToken}`;
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          success: true,
+          token_login_url: tokenLoginUrl,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
+
+    expect(session.token).toBe(apiToken);
+    expect(session.tokenLoginUrl).toBe(tokenLoginUrl);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('persists the avatar URL returned by the WordPress profile endpoint', async () => {
     const loginResponseBody = {
       token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
