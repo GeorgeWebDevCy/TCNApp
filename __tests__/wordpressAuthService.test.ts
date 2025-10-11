@@ -671,6 +671,214 @@ describe('wordpressAuthService', () => {
     expect(parsedExpiry).toBeGreaterThan(Date.now());
   });
 
+  it('preemptively refreshes expired bearer tokens during bootstrap', async () => {
+    const storedUser = {
+      id: 202,
+      email: 'expired@example.com',
+      name: 'Expired Example',
+      firstName: 'Expired',
+      lastName: 'Example',
+      membership: null,
+      membershipBenefits: [],
+      woocommerceCredentials: null,
+      accountType: null,
+      accountStatus: null,
+      vendorTier: null,
+      vendorStatus: null,
+      qrPayload: null,
+      qrToken: null,
+    };
+
+    const expiredToken = 'expiredToken.bootstrap.123456';
+    const refreshedToken = 'refreshedToken.bootstrap.654321';
+    const pastExpiry = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+    await EncryptedStorage.setItem(AUTH_STORAGE_KEYS.token, expiredToken);
+    await AsyncStorage.setItem(AUTH_STORAGE_KEYS.token, expiredToken);
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(storedUser),
+    );
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.tokenExpiresAt,
+      pastExpiry,
+    );
+
+    const refreshResponse = createJsonResponse(200, {
+      token: refreshedToken,
+      expires_in: 3600,
+    });
+    const profileResponse = createJsonResponse(200, {
+      id: storedUser.id,
+      email: storedUser.email,
+      name: storedUser.name,
+      avatar_urls: {},
+    });
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(refreshResponse)
+      .mockResolvedValueOnce(profileResponse);
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await ensureValidSession();
+
+    expect(session?.token).toBe(refreshedToken);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.refreshToken}`,
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${expiredToken}`,
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${refreshedToken}`,
+        }),
+      }),
+    );
+
+    expect(await EncryptedStorage.getItem(AUTH_STORAGE_KEYS.token)).toBe(
+      refreshedToken,
+    );
+
+    const storedExpiry = await AsyncStorage.getItem(
+      AUTH_STORAGE_KEYS.tokenExpiresAt,
+    );
+    expect(storedExpiry).not.toBeNull();
+    const parsedExpiry = Date.parse(storedExpiry as string);
+    expect(Number.isNaN(parsedExpiry)).toBe(false);
+    expect(parsedExpiry).toBeGreaterThan(Date.now());
+  });
+
+  it('retries credential-based login when refresh fails during bootstrap', async () => {
+    const storedUser = {
+      id: 303,
+      email: 'fallback@example.com',
+      name: 'Fallback Example',
+      firstName: 'Fallback',
+      lastName: 'Example',
+      membership: null,
+      membershipBenefits: [],
+      woocommerceCredentials: null,
+      accountType: null,
+      accountStatus: null,
+      vendorTier: null,
+      vendorStatus: null,
+      qrPayload: null,
+      qrToken: null,
+    };
+
+    const expiredToken = 'expiredToken.bootstrap.abcdef';
+    const refreshedToken = 'fallbackToken.bootstrap.fedcba';
+    const futureExpiry = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+    await EncryptedStorage.setItem(AUTH_STORAGE_KEYS.token, expiredToken);
+    await AsyncStorage.setItem(AUTH_STORAGE_KEYS.token, expiredToken);
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(storedUser),
+    );
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.tokenExpiresAt,
+      futureExpiry,
+    );
+    await EncryptedStorage.setItem(
+      AUTH_STORAGE_KEYS.credentialEmail,
+      'fallback@example.com',
+    );
+    await EncryptedStorage.setItem(
+      AUTH_STORAGE_KEYS.credentialPassword,
+      'pa55word!',
+    );
+
+    const profileUnauthorized = createJsonResponse(401, {
+      code: 'jwt_auth_invalid_token',
+    });
+    const refreshFailure = createJsonResponse(500, {
+      code: 'jwt_auth_bad_token',
+    });
+    const loginResponseBody = {
+      token: refreshedToken,
+      user_email: 'fallback@example.com',
+      user_display_name: 'Fallback Example',
+    };
+    const profileResponseBody = {
+      id: storedUser.id,
+      email: storedUser.email,
+      name: storedUser.name,
+      avatar_urls: {},
+    };
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(profileUnauthorized)
+      .mockResolvedValueOnce(refreshFailure)
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody))
+      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await ensureValidSession();
+
+    expect(session?.token).toBe(refreshedToken);
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${expiredToken}`,
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.refreshToken}`,
+      expect.objectContaining({ method: 'POST' }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.passwordLogin}`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          username: 'fallback@example.com',
+          password: 'pa55word!',
+          remember: true,
+        }),
+      }),
+    );
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${refreshedToken}`,
+        }),
+      }),
+    );
+
+    expect(await EncryptedStorage.getItem(AUTH_STORAGE_KEYS.token)).toBe(
+      refreshedToken,
+    );
+  });
+
   it('sends membership metadata when registering a new account so the blue plan is auto-purchased', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2024-02-01T10:00:00.000Z'));

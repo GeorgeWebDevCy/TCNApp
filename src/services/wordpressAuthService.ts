@@ -628,6 +628,21 @@ const extractTokenExpiry = (
   return null;
 };
 
+const TOKEN_EXPIRY_BUFFER_MS = 60 * 1000;
+
+const hasTokenExpired = (expiresAt?: string | null): boolean => {
+  if (!expiresAt || expiresAt.trim().length === 0) {
+    return false;
+  }
+
+  const parsed = Date.parse(expiresAt);
+  if (Number.isNaN(parsed)) {
+    return false;
+  }
+
+  return parsed <= Date.now() + TOKEN_EXPIRY_BUFFER_MS;
+};
+
 const encodeBase64 = (value: string): string | null => {
   try {
     if (typeof globalThis !== 'undefined') {
@@ -2461,7 +2476,7 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
 
 export const ensureValidSession =
   async (): Promise<PersistedSession | null> => {
-    const session = await restoreSession();
+    let session = await restoreSession();
     deviceLog.info('wordpressAuth.ensureValidSession.start', {
       session: describeSessionForLogging(session),
     });
@@ -2477,70 +2492,130 @@ export const ensureValidSession =
       return session;
     }
 
-    const normalizedToken = normalizeApiToken(session.token);
+    const attemptReauthenticationWithStoredCredentials = async () => {
+      try {
+        const [savedEmail, savedPassword] = await Promise.all([
+          getSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
+          getSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
+        ]);
 
-    if (!normalizedToken) {
-    deviceLog.warn('wordpressAuth.ensureValidSession.missingApiToken', {
-      session: describeSessionForLogging(session),
-    });
-
-    try {
-      const [savedEmail, savedPassword] = await Promise.all([
-        getSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
-        getSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
-      ]);
-
-      if (savedEmail && savedPassword) {
-        deviceLog.info('wordpressAuth.ensureValidSession.reauth.attempt', {
-          hasSavedCredentials: true,
-        });
-
-        try {
-          const reauthSession = await loginWithPassword({
-            email: savedEmail,
-            password: savedPassword,
-            remember: true,
+        if (savedEmail && savedPassword) {
+          deviceLog.info('wordpressAuth.ensureValidSession.reauth.attempt', {
+            hasSavedCredentials: true,
           });
-          const reauthToken = normalizeApiToken(reauthSession.token);
 
-          if (reauthToken) {
-            deviceLog.success('wordpressAuth.ensureValidSession.reauth.succeeded', {
-              maskedToken: maskTokenForLogging(reauthToken),
+          try {
+            const reauthSession = await loginWithPassword({
+              email: savedEmail,
+              password: savedPassword,
+              remember: true,
             });
-            return {
-              ...reauthSession,
-              token: reauthToken,
-              tokenLoginUrl: undefined,
-            };
-          }
+            const reauthToken = normalizeApiToken(reauthSession.token);
 
-          deviceLog.warn('wordpressAuth.ensureValidSession.reauth.missingToken');
-        } catch (reauthError) {
-          deviceLog.warn('wordpressAuth.ensureValidSession.reauth.failed', {
-            message:
-              reauthError instanceof Error
-                ? reauthError.message
-                : String(reauthError),
+            if (reauthToken) {
+              deviceLog.success(
+                'wordpressAuth.ensureValidSession.reauth.succeeded',
+                {
+                  maskedToken: maskTokenForLogging(reauthToken),
+                },
+              );
+              return {
+                ...reauthSession,
+                token: reauthToken,
+                tokenLoginUrl: undefined,
+              } as PersistedSession;
+            }
+
+            deviceLog.warn('wordpressAuth.ensureValidSession.reauth.missingToken');
+          } catch (reauthError) {
+            deviceLog.warn('wordpressAuth.ensureValidSession.reauth.failed', {
+              message:
+                reauthError instanceof Error
+                  ? reauthError.message
+                  : String(reauthError),
+            });
+          }
+        } else {
+          deviceLog.info('wordpressAuth.ensureValidSession.reauth.unavailable', {
+            hasSavedEmail: Boolean(savedEmail),
+            hasSavedPassword: Boolean(savedPassword),
           });
         }
-      } else {
-        deviceLog.info('wordpressAuth.ensureValidSession.reauth.unavailable', {
-          hasSavedEmail: Boolean(savedEmail),
-          hasSavedPassword: Boolean(savedPassword),
-        });
+      } catch (credentialError) {
+        deviceLog.warn(
+          'wordpressAuth.ensureValidSession.reauth.credentialsError',
+          {
+            message:
+              credentialError instanceof Error
+                ? credentialError.message
+                : String(credentialError),
+          },
+        );
       }
-    } catch (credentialError) {
-      deviceLog.warn('wordpressAuth.ensureValidSession.reauth.credentialsError', {
-        message:
-          credentialError instanceof Error
-            ? credentialError.message
-            : String(credentialError),
+
+      return null;
+    };
+
+    let normalizedToken = normalizeApiToken(session.token);
+    const tokenExpired = normalizedToken
+      ? hasTokenExpired(session.tokenExpiresAt ?? null)
+      : false;
+
+    if (!normalizedToken) {
+      deviceLog.warn('wordpressAuth.ensureValidSession.missingApiToken', {
+        session: describeSessionForLogging(session),
       });
+
+      const reauthenticated = await attemptReauthenticationWithStoredCredentials();
+      if (reauthenticated) {
+        return reauthenticated;
+      }
+
+      await clearSession();
+      return null;
     }
 
-    await clearSession();
-    return null;
-  }
+    if (tokenExpired) {
+      deviceLog.info('wordpressAuth.ensureValidSession.tokenExpired', {
+        expiresAt: session.tokenExpiresAt ?? null,
+      });
+      const refreshed = await refreshJwtTokenIfPossible(normalizedToken);
+      if (refreshed) {
+        deviceLog.success(
+          'wordpressAuth.ensureValidSession.tokenExpired.refreshed',
+          {
+            maskedToken: maskTokenForLogging(refreshed.token),
+          },
+        );
+        normalizedToken = refreshed.token;
+        session = {
+          ...session,
+          token: refreshed.token,
+          tokenExpiresAt:
+            refreshed.expiresAt ?? session.tokenExpiresAt ?? null,
+          tokenLoginUrl: undefined,
+        };
+        await storeSession({
+          token: session.token,
+          refreshToken: session.refreshToken,
+          tokenExpiresAt: session.tokenExpiresAt ?? null,
+          tokenLoginUrl: undefined,
+          restNonce: session.restNonce ?? undefined,
+          user: session.user,
+        });
+      } else {
+        deviceLog.warn(
+          'wordpressAuth.ensureValidSession.tokenExpired.refreshUnavailable',
+        );
+        const reauthenticated =
+          await attemptReauthenticationWithStoredCredentials();
+        if (reauthenticated) {
+          return reauthenticated;
+        }
+        await clearSession();
+        return null;
+      }
+    }
 
     const tokenResult = await fetchSessionUser(normalizedToken);
     deviceLog.debug(
@@ -2584,10 +2659,18 @@ export const ensureValidSession =
             maskedToken: maskTokenForLogging(refreshed.token),
           },
         );
-        await storeSession({
+        session = {
+          ...session,
           token: refreshed.token,
+          tokenExpiresAt:
+            refreshed.expiresAt ?? session.tokenExpiresAt ?? null,
+          tokenLoginUrl: undefined,
+        };
+        normalizedToken = refreshed.token;
+        await storeSession({
+          token: session.token,
           refreshToken: session.refreshToken,
-          tokenExpiresAt: refreshed.expiresAt ?? session.tokenExpiresAt ?? null,
+          tokenExpiresAt: session.tokenExpiresAt ?? null,
           tokenLoginUrl: undefined,
           restNonce: session.restNonce ?? undefined,
           user: session.user,
@@ -2605,9 +2688,6 @@ export const ensureValidSession =
           });
           return {
             ...session,
-            token: refreshed.token,
-            tokenExpiresAt: refreshed.expiresAt ?? session.tokenExpiresAt ?? null,
-            tokenLoginUrl: undefined,
             user: retry.user,
           };
         } else {
@@ -2617,6 +2697,11 @@ export const ensureValidSession =
         }
       } else {
         deviceLog.warn('wordpressAuth.ensureValidSession.refreshToken.unavailable');
+        const reauthenticated =
+          await attemptReauthenticationWithStoredCredentials();
+        if (reauthenticated) {
+          return reauthenticated;
+        }
       }
       await clearSession();
       return null;
