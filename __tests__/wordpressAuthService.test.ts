@@ -149,6 +149,31 @@ describe('wordpressAuthService', () => {
     );
   });
 
+  it('throws when WordPress omits the reusable API token from the login response', async () => {
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          success: true,
+          token_login_url:
+            'https://example.com/wp-login.php?action=gn_token_login&token=one-time',
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      loginWithPassword({
+        email: 'member@example.com',
+        password: 'passw0rd',
+      }),
+    ).rejects.toThrow(
+      'Unable to retrieve the WordPress API token. Please ensure the Password Login API service is active.',
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('persists the avatar URL returned by the WordPress profile endpoint', async () => {
     const loginResponseBody = {
       token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
