@@ -21,6 +21,9 @@ export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
       'Discover participating vendors and network news.',
       'Receive general promotions inside the app.',
     ],
+    metadata: {
+      wordpressPlanId: 'blue',
+    },
   },
   {
     id: 'gold-membership',
@@ -34,6 +37,9 @@ export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
       'Eligible for Membership Network Program progression.',
     ],
     highlight: true,
+    metadata: {
+      wordpressPlanId: 'gold',
+    },
   },
   {
     id: 'platinum-membership',
@@ -46,6 +52,9 @@ export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
       'Higher-tier discounts with premium vendors.',
       'Priority invitations to member events and drops.',
     ],
+    metadata: {
+      wordpressPlanId: 'platinum',
+    },
   },
   {
     id: 'black-membership',
@@ -58,14 +67,29 @@ export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
       'Maximum partner discounts and VIP perks.',
       'Exclusive campaigns and concierge support.',
     ],
+    metadata: {
+      wordpressPlanId: 'black',
+    },
   },
 ];
 
-type WordPressMembershipPlan = MembershipPlan & {
-  amount_minor?: number;
-  amountMinor?: number;
-  fee?: number;
-  formatted_fee?: string;
+type WordPressMembershipPlan = {
+  id?: string | null;
+  slug?: string | null;
+  name?: string | null;
+  price?: number | null;
+  amount_minor?: number | null;
+  amountMinor?: number | null;
+  currency?: string | null;
+  interval?: string | null;
+  description?: string | null;
+  features?: unknown;
+  benefits?: unknown;
+  highlight?: boolean | null;
+  metadata?: unknown;
+  product_id?: number | null;
+  fee?: number | null;
+  formatted_fee?: string | null;
   [key: string]: unknown;
 };
 
@@ -126,7 +150,55 @@ const handleResponse = async <T>(response: Response): Promise<T> => {
   return (payload as T) ?? ({} as T);
 };
 
-const normalizePlanPrice = (plan: WordPressMembershipPlan): MembershipPlan => {
+const toSlug = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/gu, '')
+    .replace(/\s+/gu, '-')
+    .replace(/-+/gu, '-');
+
+const coerceStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map(entry => (typeof entry === 'string' ? entry.trim() : ''))
+    .filter((entry): entry is string => entry.length > 0);
+};
+
+const coerceMetadata = (value: unknown): Record<string, unknown> => {
+  if (!value) {
+    return {};
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce<Record<string, unknown>>((acc, entry) => {
+      if (
+        entry &&
+        typeof entry === 'object' &&
+        'key' in entry &&
+        typeof (entry as Record<string, unknown>).key === 'string'
+      ) {
+        const key = ((entry as Record<string, unknown>).key as string).trim();
+        const entryValue = (entry as Record<string, unknown>).value;
+        if (key.length > 0) {
+          acc[key] = entryValue ?? null;
+        }
+      }
+      return acc;
+    }, {});
+  }
+
+  if (typeof value === 'object') {
+    return { ...(value as Record<string, unknown>) };
+  }
+
+  return {};
+};
+
+const normalizePlan = (plan: WordPressMembershipPlan): MembershipPlan => {
   const amountMinor =
     typeof plan.amount_minor === 'number'
       ? plan.amount_minor
@@ -143,15 +215,93 @@ const normalizePlanPrice = (plan: WordPressMembershipPlan): MembershipPlan => {
         ? Math.round(rawPrice * 100)
         : rawPrice;
 
-  return {
-    ...plan,
+  const rawId =
+    typeof plan.id === 'string' && plan.id.trim().length > 0
+      ? plan.id.trim()
+      : typeof plan.slug === 'string' && plan.slug.trim().length > 0
+        ? plan.slug.trim()
+        : typeof plan.name === 'string' && plan.name.trim().length > 0
+          ? toSlug(plan.name)
+          : `plan-${Date.now()}`;
+
+  const metadata = coerceMetadata(plan.metadata);
+  if (!metadata.wordpressPlanId && rawId) {
+    metadata.wordpressPlanId = rawId;
+  }
+
+  if (typeof plan.product_id === 'number' && !metadata.wordpressProductId) {
+    metadata.wordpressProductId = plan.product_id;
+  }
+
+  const features = coerceStringArray(plan.features ?? plan.benefits);
+
+  const normalized: MembershipPlan = {
+    id: rawId,
+    name:
+      typeof plan.name === 'string' && plan.name.trim().length > 0
+        ? plan.name.trim()
+        : rawId,
     price: normalizedPrice,
+    currency:
+      typeof plan.currency === 'string' && plan.currency.trim().length > 0
+        ? plan.currency.trim().toUpperCase()
+        : 'THB',
   };
+
+  if (typeof plan.interval === 'string' && plan.interval.trim().length > 0) {
+    const interval = plan.interval.trim().toLowerCase();
+    if (['day', 'week', 'month', 'year'].includes(interval)) {
+      normalized.interval = interval as MembershipPlan['interval'];
+    }
+  }
+
+  if (typeof plan.description === 'string' && plan.description.trim().length > 0) {
+    normalized.description = plan.description.trim();
+  }
+
+  if (features.length > 0) {
+    normalized.features = features;
+  }
+
+  const highlightValue =
+    typeof plan.highlight === 'boolean'
+      ? plan.highlight
+      : typeof metadata.highlight === 'boolean'
+        ? (metadata.highlight as boolean)
+        : undefined;
+
+  if (typeof highlightValue === 'boolean') {
+    normalized.highlight = highlightValue;
+  }
+
+  if (Object.keys(metadata).length > 0) {
+    normalized.metadata = metadata;
+  }
+
+  return normalized;
 };
 
 const normalizePlans = (
   plans: WordPressMembershipPlan[],
-): MembershipPlan[] => plans.map(normalizePlanPrice);
+): MembershipPlan[] => plans.map(normalizePlan);
+
+const extractPlanRequestId = (plan: MembershipPlan): string => {
+  const metadataIdCandidates = [
+    plan.metadata && (plan.metadata as Record<string, unknown>).wordpressPlanId,
+    plan.metadata && (plan.metadata as Record<string, unknown>).planId,
+    plan.metadata && (plan.metadata as Record<string, unknown>).id,
+  ];
+
+  const requestId = metadataIdCandidates.find(
+    (candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0,
+  );
+
+  return requestId ? requestId.trim() : plan.id;
+};
+
+export const getMembershipPlanRequestId = (
+  plan: Pick<MembershipPlan, 'id' | 'metadata'>,
+): string => extractPlanRequestId(plan as MembershipPlan);
 
 const headersToRecord = (headers?: HeadersInit): Record<string, string> => {
   if (!headers) {

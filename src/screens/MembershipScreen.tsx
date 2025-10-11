@@ -23,6 +23,7 @@ import {
   createMembershipPaymentSession,
   fetchMembershipPlans,
   DEFAULT_MEMBERSHIP_PLANS,
+  getMembershipPlanRequestId,
 } from '../services/membershipService';
 import { MembershipPlan } from '../types/auth';
 import { COLORS } from '../config/theme';
@@ -303,19 +304,25 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
 
     try {
       setProcessing(true);
-      logEvent('checkout.start', { planId: selectedPlan.id });
+      const requestPlanId = getMembershipPlanRequestId(selectedPlan);
+      logEvent('checkout.start', {
+        planId: selectedPlan.id,
+        requestPlanId,
+      });
       deviceLog.debug('membership.checkout.start', {
         planId: selectedPlan.id,
+        requestPlanId,
         price: selectedPlan.price,
         currency: selectedPlan.currency,
       });
       const token = await getSessionToken();
       deviceLog.debug('membership.checkout.sessionToken', {
         planId: selectedPlan.id,
+        requestPlanId,
         hasToken: Boolean(token),
       });
       const paymentSession = await createMembershipPaymentSession(
-        selectedPlan.id,
+        requestPlanId,
         token ?? undefined,
       );
 
@@ -387,6 +394,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       if (paymentSession.requiresPayment) {
         deviceLog.debug('membership.checkout.paymentSheet.init.start', {
           planId: selectedPlan.id,
+          requestPlanId,
         });
         // Build init params carefully to avoid passing null values. The Stripe
         // SDK expects undefined for omitted fields; passing null can cause
@@ -418,6 +426,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
 
         deviceLog.debug('membership.checkout.paymentSheet.init.complete', {
           planId: selectedPlan.id,
+          requestPlanId,
           success: !initResult.error,
           errorMessage: initResult.error?.message ?? null,
         });
@@ -428,10 +437,12 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
 
         deviceLog.debug('membership.checkout.paymentSheet.present.start', {
           planId: selectedPlan.id,
+          requestPlanId,
         });
         const presentResult = await presentPaymentSheet();
         deviceLog.debug('membership.checkout.paymentSheet.present.complete', {
           planId: selectedPlan.id,
+          requestPlanId,
           success: !presentResult.error,
           errorMessage: presentResult.error?.message ?? null,
         });
@@ -441,22 +452,25 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       } else {
         deviceLog.debug('membership.checkout.paymentSession.freeUpgrade', {
           planId: selectedPlan.id,
+          requestPlanId,
         });
       }
 
       try {
         deviceLog.debug('membership.checkout.confirmUpgrade.start', {
           planId: selectedPlan.id,
+          requestPlanId,
           hasPaymentIntentId: Boolean(paymentSession.paymentIntentId),
         });
         await confirmMembershipUpgrade(
-          selectedPlan.id,
+          requestPlanId,
           token ?? undefined,
           paymentSession.paymentIntentId ?? null,
         );
       } catch (confirmError) {
         deviceLog.warn('membership.checkout.confirmUpgrade.error', {
           planId: selectedPlan.id,
+          requestPlanId,
           message:
             confirmError instanceof Error
               ? confirmError.message
@@ -473,8 +487,12 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       await refreshSession();
       deviceLog.debug('membership.checkout.sessionRefreshed', {
         planId: selectedPlan.id,
+        requestPlanId,
       });
-      logEvent('checkout.success', { planId: selectedPlan.id });
+      logEvent('checkout.success', {
+        planId: selectedPlan.id,
+        requestPlanId,
+      });
       Alert.alert(
         t('membership.screen.successTitle'),
         t('membership.screen.successMessage'),
