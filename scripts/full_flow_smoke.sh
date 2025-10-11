@@ -5,7 +5,7 @@ set -euo pipefail
 BASE_URL=${BASE_URL:-"https://dominicb72.sg-host.com"}
 USERNAME=""
 PASSWORD=""
-VERBOSE=0
+VERBOSE=1
 VENDOR_ID=""
 MEMBER_ID=""
 QR_TOKEN=""
