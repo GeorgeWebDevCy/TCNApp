@@ -1,3 +1,8 @@
+jest.mock(
+  '@react-native-async-storage/async-storage',
+  () => require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+
 const globalProcess = globalThis.process ?? { env: {} };
 
 globalProcess.env = globalProcess.env ?? {};

@@ -1,6 +1,7 @@
 module.exports = {
   preset: 'react-native',
   setupFiles: ['./jest.setup.js'],
+  setupFilesAfterEnv: ['./jest.setupAfterEnv.js'],
   collectCoverage: true,
   coverageDirectory: 'coverage',
   coverageProvider: 'v8',

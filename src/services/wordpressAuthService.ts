@@ -51,6 +51,8 @@ const maskTokenForLogging = (token?: string | null): string | null => {
   return `***${lastFour} (length=${trimmed.length})`;
 };
 
+const MIN_API_TOKEN_LENGTH = 16;
+
 const describeUrlForLogging = (
   value?: string | null,
 ): {
@@ -2898,22 +2900,55 @@ export const loginWithPassword = async ({
   const normalizedApiToken = normalizeApiToken(rawApiTokenValue);
   const normalizedTokenField = normalizeApiToken(rawTokenFieldValue);
   const tokenFieldIsJwt = isLikelyJwtToken(normalizedTokenField);
-  const rawTokenValue =
-    normalizedApiToken ??
-    (tokenFieldIsJwt ? normalizedTokenField : undefined) ??
-    rawApiTokenValue ??
-    (tokenFieldIsJwt ? rawTokenFieldValue : undefined);
+  const tokenFieldLooksLikeUrl =
+    rawTokenFieldValue != null ? isLikelyUrl(rawTokenFieldValue) : false;
   const rawTokenType =
     rawTokenFieldValue != null
       ? typeof json.token
       : rawApiTokenValue != null
       ? typeof json.api_token
       : 'undefined';
-  const hasResponseToken = Boolean(rawTokenValue);
   const rawTokenLoginUrl =
     getString(json.token_login_url) ??
     getString(json.tokenLoginUrl) ??
     getString((json as any).redirect);
+
+  let token: string | undefined;
+  let tokenSource: 'jwt' | 'api' | null = null;
+  let tokenLoginUrl = rawTokenLoginUrl ?? undefined;
+
+  // Prefer real JWTs when present. Otherwise fall back to reusable API tokens,
+  // accepting values from either the `api_token` field or the legacy `token`
+  // field when it does not look like a login-handoff URL.
+  if (tokenFieldIsJwt && normalizedTokenField) {
+    token = normalizedTokenField;
+    tokenSource = 'jwt';
+  } else if (normalizedApiToken) {
+    token = normalizedApiToken;
+    tokenSource = 'api';
+  } else if (normalizedTokenField && !tokenFieldLooksLikeUrl) {
+    token = normalizedTokenField;
+    tokenSource = 'api';
+  } else if (!tokenLoginUrl && tokenFieldLooksLikeUrl && rawTokenFieldValue) {
+    tokenLoginUrl = rawTokenFieldValue;
+  }
+
+  if (!token && tokenLoginUrl) {
+    const extractedToken = normalizeApiToken(tokenLoginUrl);
+    if (extractedToken && extractedToken.length >= MIN_API_TOKEN_LENGTH) {
+      token = extractedToken;
+      tokenSource = tokenSource ?? 'api';
+    }
+  }
+
+  const rawTokenValueForLogging =
+    rawApiTokenValue ?? rawTokenFieldValue ?? null;
+  const tokenPreviewValue =
+    token ??
+    normalizedApiToken ??
+    normalizedTokenField ??
+    rawTokenValueForLogging ??
+    undefined;
 
   // Debug which keys the server actually returned (no secrets exposed)
   try {
@@ -2921,47 +2956,32 @@ export const loginWithPassword = async ({
       hasApiToken: Boolean(rawApiTokenValue),
       hasTokenField: Boolean(rawTokenFieldValue),
       tokenFieldIsJwt,
-      hasTokenLoginUrl: Boolean(rawTokenLoginUrl),
+      hasTokenLoginUrl: Boolean(tokenLoginUrl),
       hasUser: Boolean(json.user),
       tokenPreview:
-        rawTokenValue && rawTokenValue.length >= 8
-          ? `***${rawTokenValue.slice(-4)}(len=${rawTokenValue.length})`
+        tokenPreviewValue && tokenPreviewValue.length >= 8
+          ? `***${tokenPreviewValue.slice(-4)}(len=${tokenPreviewValue.length})`
           : null,
     });
   } catch {}
 
-  if (!response.ok || (!hasResponseToken && !rawTokenLoginUrl)) {
-    const message =
-      typeof json?.message === 'string' && json.message.trim().length > 0
-        ? sanitizeErrorMessage(json.message)
-        : 'Unable to log in with WordPress credentials.';
+  const loginErrorMessage =
+    typeof json?.message === 'string' && json.message.trim().length > 0
+      ? sanitizeErrorMessage(json.message)
+      : 'Unable to log in with WordPress credentials.';
+
+  if (!response.ok || (!token && !tokenLoginUrl)) {
     deviceLog.warn('wordpressAuth.loginWithPassword.failed', {
       status: response.status,
       ok: response.ok,
       code: json.code ?? null,
       dataStatus: json.data?.status ?? null,
-      message,
-      hasTokenLoginUrl: Boolean(rawTokenLoginUrl),
+      message: loginErrorMessage,
+      hasTokenLoginUrl: Boolean(tokenLoginUrl),
     });
-    throw new Error(message);
+    throw new Error(loginErrorMessage);
   }
 
-  // Prefer the API token when available. If absent, accept a JWT in the
-  // `token` field only when it appears to be a real JWT. Treat any other
-  // `token` value as a login-handoff token (not usable for Authorization).
-  let token: string | undefined;
-  let tokenSource: 'jwt' | 'api' | null = null;
-  let tokenLoginUrl = rawTokenLoginUrl ?? undefined;
-
-  if (normalizedApiToken) {
-    token = normalizedApiToken;
-    tokenSource = 'api';
-  } else if (tokenFieldIsJwt && normalizedTokenField) {
-    token = normalizedTokenField;
-    tokenSource = 'jwt';
-  } else if (rawTokenFieldValue && isLikelyUrl(rawTokenFieldValue)) {
-    tokenLoginUrl = tokenLoginUrl ?? rawTokenFieldValue;
-  }
   const restNonce =
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
   const tokenExpiresAt = extractTokenExpiry(json as Record<string, unknown>);
@@ -2977,10 +2997,14 @@ export const loginWithPassword = async ({
       });
     } else {
       deviceLog.error('wordpressAuth.loginWithPassword.invalidToken', {
-        token: maskTokenForLogging(rawTokenValue ?? null),
+        token: maskTokenForLogging(rawTokenValueForLogging),
         rawTokenType,
-        rawTokenLength: rawTokenValue ? rawTokenValue.length : null,
-        rawTokenIsUrl: rawTokenValue ? isLikelyUrl(rawTokenValue) : null,
+        rawTokenLength: rawTokenValueForLogging
+          ? rawTokenValueForLogging.length
+          : null,
+        rawTokenIsUrl: rawTokenValueForLogging
+          ? isLikelyUrl(rawTokenValueForLogging)
+          : null,
         hasApiTokenField: Boolean(rawApiTokenValue),
         hasTokenLoginUrl: Boolean(tokenLoginUrl),
         responseStatus: response.status,
