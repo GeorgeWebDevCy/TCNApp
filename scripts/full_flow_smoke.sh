@@ -110,10 +110,19 @@ api() {
   fi
 
   local url="${BASE_URL%/}${path}"
-  local args=( -sS -w "\n__HTTP_STATUS:%{http_code}\n" -X "$method" "$url" )
+  local args=( -sS -w "\n__HTTP_STATUS:%{http_code}\n" --url "$url" )
+
+  # Explicitly set the HTTP method only when required.  Relying on "-X" caused
+  # some curl versions to treat the method name as a hostname ("GET") when the
+  # option parsing became confused, which surfaced as "Could not resolve host:
+  # GET" errors.  Using the long form "--request" keeps the association
+  # unambiguous across environments.
+  if [[ -n "$method" ]]; then
+    args+=( --request "$method" )
+  fi
 
   if [[ -n "$body" ]]; then
-    args+=( -H 'Content-Type: application/json' -d "$body" )
+    args+=( -H "Content-Type: application/json" -d "$body" )
   fi
 
   if [[ ${#extra_headers[@]} -gt 0 ]]; then
