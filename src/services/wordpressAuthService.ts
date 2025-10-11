@@ -2963,22 +2963,28 @@ export const loginWithPassword = async ({
     getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
   const tokenExpiresAt = extractTokenExpiry(json as Record<string, unknown>);
 
-  if (!token && tokenLoginUrl) {
-    deviceLog.info('wordpressAuth.loginWithPassword.tokenLoginOnly', {
-      hasTokenLoginUrl: Boolean(tokenLoginUrl),
-      hasRestNonce: Boolean(restNonce),
-    });
-  } else if (!token) {
-    deviceLog.error('wordpressAuth.loginWithPassword.invalidToken', {
-      token: maskTokenForLogging(rawTokenValue ?? null),
-      rawTokenType,
-      rawTokenLength: rawTokenValue ? rawTokenValue.length : null,
-      rawTokenIsUrl: rawTokenValue ? isLikelyUrl(rawTokenValue) : null,
-      hasApiTokenField: Boolean(rawApiTokenValue),
-      hasTokenLoginUrl: Boolean(tokenLoginUrl),
-      responseStatus: response.status,
-    });
-    throw new Error('Unable to log in with WordPress credentials.');
+  if (!token) {
+    const errorMessage =
+      'Unable to retrieve the WordPress API token. Please ensure the Password Login API service is active.';
+
+    if (tokenLoginUrl) {
+      deviceLog.warn('wordpressAuth.loginWithPassword.tokenLoginOnly', {
+        hasTokenLoginUrl: Boolean(tokenLoginUrl),
+        hasRestNonce: Boolean(restNonce),
+      });
+    } else {
+      deviceLog.error('wordpressAuth.loginWithPassword.invalidToken', {
+        token: maskTokenForLogging(rawTokenValue ?? null),
+        rawTokenType,
+        rawTokenLength: rawTokenValue ? rawTokenValue.length : null,
+        rawTokenIsUrl: rawTokenValue ? isLikelyUrl(rawTokenValue) : null,
+        hasApiTokenField: Boolean(rawApiTokenValue),
+        hasTokenLoginUrl: Boolean(tokenLoginUrl),
+        responseStatus: response.status,
+      });
+    }
+
+    throw new Error(errorMessage);
   }
 
   const refreshToken =
