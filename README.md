@@ -233,6 +233,7 @@ For PIN storage and biometrics to work correctly, ensure the listed native depen
 - **`HomeScreen.tsx`** (under `src/screens/`): authenticated dashboard that now surfaces in-app notification banners, exposes notification preference toggles backed by AsyncStorage, and still offers quick access to membership benefits and logout controls.【F:src/screens/HomeScreen.tsx†L1-L236】
 - **`WordPressLoginForm.tsx`** and **`PinLoginForm.tsx`** (under `src/components/`): reusable forms that emit submit events to the context. The PIN form supports creation/reset flows with 4+ digit enforcement and inline validation feedback.【F:src/components/WordPressLoginForm.tsx†L1-L161】【F:src/components/PinLoginForm.tsx†L1-L170】
 - **`BiometricLoginButton.tsx`** and **`LoginHeader.tsx`**: presentation components that encapsulate native biometric triggers and shared branding for the login experience.【F:src/components/BiometricLoginButton.tsx†L1-L118】【F:src/components/LoginHeader.tsx†L1-L73】
+- **`PostLoginDiagnosticsScreen.tsx`**: runs the "Verifying your connection" flow after successful password login and surfaces actionable errors when the backend fails to issue tokens or accept protected requests. See [docs/support/post-login-diagnostics.md](docs/support/post-login-diagnostics.md) for a troubleshooting guide covering each check.【F:src/screens/PostLoginDiagnosticsScreen.tsx†L301-L610】【F:docs/support/post-login-diagnostics.md†L1-L61】
 
 ---
 
