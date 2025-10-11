@@ -104,7 +104,18 @@ export const MembershipDebugScreen: React.FC<{ onBack?: () => void }> = ({
     setSessionSummary(null);
     try {
       const token = await getSessionToken();
-      const result = await fetchMembershipPlans(token ?? undefined);
+
+      if (!token) {
+        const message =
+          'No authentication token is available. Refresh the session after logging in to load plans.';
+        setError(message);
+        setPlans([]);
+        setSelectedPlanId(null);
+        deviceLog.warn('debug.membership.plans.missingToken');
+        return;
+      }
+
+      const result = await fetchMembershipPlans(token);
       setPlans(result);
       setSelectedPlanId(result[0]?.id ?? null);
       deviceLog.info('debug.membership.plans.loaded', {
@@ -156,9 +167,18 @@ export const MembershipDebugScreen: React.FC<{ onBack?: () => void }> = ({
     setError(null);
     try {
       const token = await getSessionToken();
+
+      if (!token) {
+        const message =
+          'Cannot create a payment session without an authentication token. Refresh the session after logging in.';
+        setError(message);
+        deviceLog.warn('debug.membership.session.missingToken');
+        return;
+      }
+
       const session = await createMembershipPaymentSession(
         selectedPlan.id,
-        token ?? undefined,
+        token,
       );
 
       const piSecret =
