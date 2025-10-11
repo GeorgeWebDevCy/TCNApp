@@ -158,9 +158,17 @@ extract_body() {
 log_response() {
   local step=$1
   local response=$2
+  local pretty="$response"
 
   if [[ -n "$response" ]]; then
-    printf '\nResponse (%s):\n%s\n' "$step" "$response" >&2
+    if [[ $JQ_AVAILABLE -eq 1 ]]; then
+      if pretty=$(printf '%s' "$response" | jq '.' 2>/dev/null); then
+        :
+      else
+        pretty="$response"
+      fi
+    fi
+    printf '\nResponse (%s):\n%s\n' "$step" "$pretty" >&2
   else
     printf '\nResponse (%s): <empty body>\n' "$step" >&2
   fi
