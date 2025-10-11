@@ -216,7 +216,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       blockRemaining(key);
       setOverallError(
         t('auth.postLoginDiagnostics.errorSubtitle', {
-          message,
+          replace: { message },
         }),
       );
       setAllPassed(false);
@@ -245,7 +245,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         handleFailure(
           'server',
           t('auth.postLoginDiagnostics.server.failure', {
-            message: `HTTP ${response.status}`,
+            replace: { message: `HTTP ${response.status}` },
           }),
         );
         return;
@@ -256,7 +256,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         {
           status: 'success',
           details: t('auth.postLoginDiagnostics.server.success', {
-            status: response.status,
+            replace: { status: response.status },
           }),
         },
       );
@@ -271,7 +271,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         handleFailure(
           'server',
           t('auth.postLoginDiagnostics.server.failure', {
-            message,
+            replace: { message },
           }),
         );
       }
@@ -291,7 +291,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         {
           status: 'success',
           details: t('auth.postLoginDiagnostics.token.success', {
-            preview: maskToken(token),
+            replace: { preview: maskToken(token) },
           }),
         },
       );
@@ -334,7 +334,9 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       handleFailure(
         'lifetime',
         t('auth.postLoginDiagnostics.lifetime.expired', {
-          relative: formatRelativeDuration(secondsUntilExpiry),
+          replace: {
+            relative: formatRelativeDuration(secondsUntilExpiry),
+          },
         }),
       );
       return;
@@ -356,8 +358,10 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       handleFailure(
         'lifetime',
         t('auth.postLoginDiagnostics.lifetime.mismatch', {
-          expectedDays: (EXPECTED_TOKEN_LIFETIME_SECONDS / 86400).toFixed(0),
-          actualDays: (comparisonLifetime / 86400).toFixed(2),
+          replace: {
+            expectedDays: (EXPECTED_TOKEN_LIFETIME_SECONDS / 86400).toFixed(0),
+            actualDays: (comparisonLifetime / 86400).toFixed(2),
+          },
         }),
       );
       return;
@@ -365,8 +369,10 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
 
     const expiresDate = new Date(exp * 1000);
     let lifetimeMessage = t('auth.postLoginDiagnostics.lifetime.success', {
-      relative: formatRelativeDuration(secondsUntilExpiry),
-      date: expiresDate.toLocaleString(),
+      replace: {
+        relative: formatRelativeDuration(secondsUntilExpiry),
+        date: expiresDate.toLocaleString(),
+      },
     });
 
     if (lifetimeSeconds == null) {
@@ -396,7 +402,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         handleFailure(
           'endpoint',
           t('auth.postLoginDiagnostics.endpoint.unauthorized', {
-            status: response.status,
+            replace: { status: response.status },
           }),
         );
         return;
@@ -407,7 +413,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
         {
           status: 'success',
           details: t('auth.postLoginDiagnostics.endpoint.success', {
-            status: response.status,
+            replace: { status: response.status },
           }),
         },
       );
@@ -419,7 +425,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       handleFailure(
         'endpoint',
         t('auth.postLoginDiagnostics.endpoint.failure', {
-          message,
+          replace: { message },
         }),
       );
       return;
