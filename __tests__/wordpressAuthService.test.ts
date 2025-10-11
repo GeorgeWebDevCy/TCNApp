@@ -437,6 +437,70 @@ describe('wordpressAuthService', () => {
     );
   });
 
+  it('falls back to extracting the API token from token_login_url when no token field is returned', async () => {
+    const apiToken = 'abcdefghijklmnopqrstuvwxyz0123456789TOKENVALUE';
+    const tokenLoginUrl =
+      'https://example.com/wp-login.php?action=gn_token_login&token=' +
+      encodeURIComponent(apiToken) +
+      '&redirect_to=https%3A%2F%2Fexample.com%2Fapp';
+
+    const loginResponseBody = {
+      token: null,
+      token_login_url: tokenLoginUrl,
+      rest_nonce: 'rest-nonce-value',
+      user: {
+        id: 42,
+        email: 'member@example.com',
+        display: 'Member Example',
+        first_name: 'Member',
+        last_name: 'Example',
+      },
+    };
+
+    const profileResponseBody = {
+      id: 42,
+      email: 'member@example.com',
+      name: 'Member Example',
+      avatar_urls: {},
+    };
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(createJsonResponse(200, loginResponseBody))
+      .mockResolvedValueOnce(createJsonResponse(200, profileResponseBody));
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+      remember: false,
+    });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${WORDPRESS_CONFIG.baseUrl}${WORDPRESS_CONFIG.endpoints.profile}`,
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          Authorization: `Bearer ${apiToken}`,
+        }),
+      }),
+    );
+
+    expect(EncryptedStorage.setItem).toHaveBeenCalledWith(
+      AUTH_STORAGE_KEYS.token,
+      apiToken,
+    );
+
+    expect(AsyncStorage.multiSet).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        [AUTH_STORAGE_KEYS.token, apiToken],
+        [AUTH_STORAGE_KEYS.tokenLoginUrl, tokenLoginUrl],
+      ]),
+    );
+  });
+
   it('sends membership metadata when registering a new account so the blue plan is auto-purchased', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date('2024-02-01T10:00:00.000Z'));
