@@ -149,7 +149,7 @@ The application bootstraps the `OneSignalProvider`, initializes the SDK during s
 
 The React Native app now ships with a modular login flow connected to the **TCN Platform** WordPress plugin, which bundles the network marketing engine and Password Login REST API into a single deployable package.
 
-- **Password login**: Uses the [`/wp-json/gn/v1/login` endpoint](docs/wordpress/tcn-platform-plugin.md#-password-login-api-endpoints) exposed by the plugin's Password Login API module to validate credentials over REST. Enable HTTPS and configure the allowed origin so devices can authenticate without browser fallbacks.
+- **Password login**: Uses the [`/wp-json/gn/v1/login` endpoint](docs/wordpress/tcn-platform-plugin.md#-password-login-api-endpoints) exposed by the plugin's Password Login API module to validate credentials over REST. Enable HTTPS and configure the allowed origin so devices can authenticate without browser fallbacks. The WordPress plugin deliberately **does not** persist usernames or passwords, so mobile clients must keep encrypted credentials (or another secure re-auth mechanism) available if they need to call `/gn/v1/login` again after a token expires or is revoked.
 - **PIN login**: Stores a salted hash locally so returning users can unlock without credentials.
 - **Biometric login**: Leverages native biometrics (Face ID / Touch ID / etc.) as a fast path once a session exists.
 - **Account actions**: "Forgot password" and "Register" links point to the WordPress site and can be customised.
@@ -189,7 +189,7 @@ The top-level `App.tsx` wraps the UI with `SafeAreaProvider` and `AuthProvider`,
 
 ## 🔐 Authentication Flow Details
 
-- **Session Bootstrapping**: `AuthProvider` restores persisted tokens via `ensureValidSession` on launch, fetching fresh profile data if needed and respecting the session lock flag saved in AsyncStorage.
+- **Session Bootstrapping**: `AuthProvider` restores persisted tokens via `ensureValidSession` on launch, fetching fresh profile data if needed and respecting the session lock flag saved in AsyncStorage. When the stored bearer token no longer validates, the client should silently retry `/gn/v1/login` with the cached credentials to mint a new `api_token`, or fall back to the JWT `/jwt-auth/v1/token` + `/jwt-auth/v1/token/refresh` flow if refresh tokens are preferred.
 - **Password Login**: `loginWithPassword` posts credentials to the GN Password Login API endpoint, persists the returned WordPress user profile, and clears any existing session lock.
 - **PIN Login**: `pinService` securely stores a salted PIN hash. Users can create, reset, and verify PINs directly from the login screen.
 - **Biometrics**: `biometricService` wraps `react-native-biometrics` to check sensor availability and trigger prompts. Errors surface in the login UI for graceful fallbacks.
