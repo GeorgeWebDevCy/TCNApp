@@ -109,21 +109,82 @@ const extractTokenFromUrl = (value: string): string | undefined => {
       'api_token',
       'login_token',
     ];
+    const candidateKeySet = new Set(candidateKeys.map(key => key.toLowerCase()));
 
-    for (const key of candidateKeys) {
-      const paramValue = parsed.searchParams.get(key);
-      if (paramValue && paramValue.trim().length > 0) {
-        return paramValue.trim();
+    const extractFromParams = (params: URLSearchParams): string | undefined => {
+      for (const key of candidateKeys) {
+        const paramValue = params.get(key);
+        if (paramValue && paramValue.trim().length > 0) {
+          return paramValue.trim();
+        }
       }
+
+      let heuristicMatch: string | undefined;
+
+      for (const [rawKey, rawValue] of params.entries()) {
+        if (!rawValue) {
+          continue;
+        }
+
+        const trimmedValue = rawValue.trim();
+        if (!trimmedValue) {
+          continue;
+        }
+
+        const lowerKey = rawKey.toLowerCase();
+        if (candidateKeySet.has(lowerKey)) {
+          return trimmedValue;
+        }
+
+        const keyLooksLikeToken = /token|auth|jwt|bearer/i.test(lowerKey);
+        if (keyLooksLikeToken && trimmedValue.length >= MIN_API_TOKEN_LENGTH) {
+          return trimmedValue;
+        }
+
+        if (
+          !heuristicMatch ||
+          (trimmedValue.length >= MIN_API_TOKEN_LENGTH &&
+            trimmedValue.length > heuristicMatch.length)
+        ) {
+          heuristicMatch = trimmedValue;
+        }
+      }
+
+      if (heuristicMatch && heuristicMatch.length >= MIN_API_TOKEN_LENGTH) {
+        return heuristicMatch;
+      }
+
+      return undefined;
+    };
+
+    const queryToken = extractFromParams(parsed.searchParams);
+    if (queryToken) {
+      return queryToken;
     }
 
     if (parsed.hash) {
       const hashParams = new URLSearchParams(parsed.hash.replace(/^#/, ''));
-      for (const key of candidateKeys) {
-        const paramValue = hashParams.get(key);
-        if (paramValue && paramValue.trim().length > 0) {
-          return paramValue.trim();
+      const hashToken = extractFromParams(hashParams);
+      if (hashToken) {
+        return hashToken;
+      }
+    }
+
+    const pathSegments = parsed.pathname
+      .split('/')
+      .map(segment => segment.trim())
+      .filter(Boolean)
+      .reverse();
+
+    for (const segment of pathSegments) {
+      if (segment.length >= MIN_API_TOKEN_LENGTH && /token|auth|jwt/i.test(segment)) {
+        const cleaned = segment.replace(/^(token|auth|jwt)[-_]/i, '');
+        if (cleaned.length >= MIN_API_TOKEN_LENGTH) {
+          return cleaned;
         }
+      }
+      if (segment.length >= MIN_API_TOKEN_LENGTH && !segment.includes('.')) {
+        return segment;
       }
     }
   } catch (error) {
