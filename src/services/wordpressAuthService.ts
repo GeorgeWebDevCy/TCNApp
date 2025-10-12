@@ -94,7 +94,11 @@ const isLikelyUrl = (value: string): boolean => {
 
 const extractTokenFromUrl = (value: string): string | undefined => {
   try {
-    const parsed = new URL(value);
+    // Some servers HTML-encode ampersands in URLs inside JSON (e.g. &amp;)
+    // which prevents URLSearchParams from splitting keys correctly.
+    // Normalize common encodings before parsing.
+    const normalized = value.replace(/&amp;/gi, '&').trim();
+    const parsed = new URL(normalized);
     const candidateKeys = [
       'token',
       'jwt',
@@ -2895,9 +2899,21 @@ export const loginWithPassword = async ({
     throw new Error('Unable to log in with WordPress credentials.');
   }
 
+  // Some WordPress setups wrap successful payloads under `data`.
+  const dataWrapper =
+    json && typeof (json as any).data === 'object' && (json as any).data
+      ? ((json as any).data as Record<string, unknown>)
+      : null;
+
   const rawApiTokenValue =
-    getString(json.api_token) ?? getString((json as any).apiToken);
-  const rawTokenFieldValue = getString(json.token);
+    getString(json.api_token) ??
+    getString((json as any).apiToken) ??
+    (dataWrapper
+      ? getString((dataWrapper as any).api_token) ??
+        getString((dataWrapper as any).apiToken)
+      : null);
+  const rawTokenFieldValue =
+    getString(json.token) ?? (dataWrapper ? getString((dataWrapper as any).token) : null);
   const normalizedApiToken = normalizeApiToken(rawApiTokenValue);
   const normalizedTokenField = normalizeApiToken(rawTokenFieldValue);
   const tokenFieldIsJwt = isLikelyJwtToken(normalizedTokenField);
@@ -2912,7 +2928,12 @@ export const loginWithPassword = async ({
   const rawTokenLoginUrl =
     getString(json.token_login_url) ??
     getString(json.tokenLoginUrl) ??
-    getString((json as any).redirect);
+    getString((json as any).redirect) ??
+    (dataWrapper
+      ? getString((dataWrapper as any).token_login_url) ??
+        getString((dataWrapper as any).tokenLoginUrl) ??
+        getString((dataWrapper as any).redirect)
+      : null);
 
   let token: string | undefined;
   let tokenSource: 'jwt' | 'api' | null = null;
@@ -2940,6 +2961,26 @@ export const loginWithPassword = async ({
       token = extractedToken;
       tokenSource = tokenSource ?? 'api';
     }
+  }
+
+  // Defensive fallback: if the server provided an api_token string but the
+  // normalization heuristics above did not resolve a token (e.g., odd
+  // whitespace or unexpected formatting), accept the raw value when it
+  // clearly does not look like a URL.
+  if (!token && rawApiTokenValue) {
+    try {
+      const trimmed = rawApiTokenValue.trim();
+      if (trimmed && !isLikelyUrl(trimmed)) {
+        token = trimmed;
+        tokenSource = tokenSource ?? 'api';
+        try {
+          deviceLog.debug('wordpressAuth.loginWithPassword.apiFallback', {
+            usedRawApiToken: true,
+            length: trimmed.length,
+          });
+        } catch {}
+      }
+    } catch {}
   }
 
   const rawTokenValueForLogging =
@@ -2984,7 +3025,13 @@ export const loginWithPassword = async ({
   }
 
   const restNonce =
-    getString(json.rest_nonce) ?? getString(json.restNonce) ?? undefined;
+    getString(json.rest_nonce) ??
+    getString(json.restNonce) ??
+    (dataWrapper
+      ? getString((dataWrapper as any).rest_nonce) ??
+        getString((dataWrapper as any).restNonce)
+      : null) ??
+    undefined;
   const tokenExpiresAt = extractTokenExpiry(json as Record<string, unknown>);
 
   if (!token) {
@@ -3012,6 +3059,22 @@ export const loginWithPassword = async ({
       });
     }
 
+    // Emit additional diagnostics to help identify unusual payload shapes.
+    try {
+      deviceLog.warn('wordpressAuth.loginWithPassword.diagnostics', {
+        hasApiToken: Boolean(rawApiTokenValue),
+        apiTokenLength:
+          typeof rawApiTokenValue === 'string' ? rawApiTokenValue.length : null,
+        apiTokenLooksLikeUrl:
+          typeof rawApiTokenValue === 'string'
+            ? isLikelyUrl(rawApiTokenValue)
+            : null,
+        hasTokenField: Boolean(rawTokenFieldValue),
+        tokenFieldIsUrl: tokenFieldLooksLikeUrl,
+        tokenLoginUrlLength: tokenLoginUrl ? tokenLoginUrl.length : null,
+      });
+    } catch {}
+
     throw new Error(errorMessage);
   }
 
@@ -3021,7 +3084,11 @@ export const loginWithPassword = async ({
       ? json.refresh_token.trim()
       : undefined;
 
-  const loginUser = parseLoginUserPayload(json.user ?? null);
+  const loginUser = parseLoginUserPayload(
+    (json.user as Record<string, unknown> | undefined) ??
+      (dataWrapper?.user as Record<string, unknown> | undefined) ??
+      null,
+  );
   const profile = token ? await fetchUserProfile(token) : null;
 
   const fallbackEmail =

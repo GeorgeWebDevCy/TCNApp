@@ -205,21 +205,78 @@ step_login() {
   assert_success "$status" "login" || { printf "%s\n" "$response"; exit 2; }
   log_response "login" "$response"
 
+  # Try to extract a reusable API token from common fields.
+  # Accept top-level or nested under `data` and fall back to extracting
+  # from token_login_url when present.
   if [[ $JQ_AVAILABLE -eq 1 ]]; then
-    TOKEN=$(printf "%s" "$response" | jq -r '(.api_token // .apiToken // .token // empty)')
-    USER_ID=$(printf "%s" "$response" | jq -r '(.user?.id // .data?.id // .ID // .user_id // empty)')
-    ACCOUNT_TYPE=$(printf "%s" "$response" | jq -r '(.user?.account_type // .data?.account_type // .account_type // empty)')
+    # Prefer explicit API token fields
+    TOKEN=$(printf "%s" "$response" | jq -r '(.api_token // .apiToken // .data?.api_token // .data?.apiToken // empty)')
+    # Fallback: some servers continue to place the token in `token`
+    if [[ -z "$TOKEN" ]]; then
+      TOKEN=$(printf "%s" "$response" | jq -r '(.token // .data?.token // empty)')
+    fi
+
+    # Extract user metadata when available (supports nested data.user)
+    USER_ID=$(printf "%s" "$response" | jq -r '(.user?.id // .data?.user?.id // .data?.id // .ID // .user_id // empty)')
+    ACCOUNT_TYPE=$(printf "%s" "$response" | jq -r '(.user?.account_type // .data?.user?.account_type // .data?.account_type // .account_type // empty)')
+
+    # If we still have no token, try to derive it from a URL
+    if [[ -z "$TOKEN" ]]; then
+      TOKEN_LOGIN_URL=$(printf "%s" "$response" | jq -r '(.token_login_url // .tokenLoginUrl // .redirect // .data?.token_login_url // .data?.tokenLoginUrl // .data?.redirect // empty)')
+      if [[ -n "$TOKEN_LOGIN_URL" && "$TOKEN_LOGIN_URL" != "null" ]]; then
+        # Extract common query parameter keys that may hold the bearer token
+        # Prefer login_token when present; next try api_token; finally try token
+        # (which may be a short-lived hand-off and thus too short)
+        TOKEN=$(python3 - <<PY 2>/dev/null || true
+from urllib.parse import urlparse, parse_qs
+import sys
+u = urlparse(sys.stdin.read().strip())
+q = parse_qs(u.query)
+candidate_keys = [
+  'login_token', 'api_token', 'jwt', 'jwt_token', 'access_token', 'auth_token', 'bearer', 'token'
+]
+for key in candidate_keys:
+    v = q.get(key, [])
+    if v:
+        t = v[0].strip()
+        if t:
+            print(t)
+            break
+PY
+      <<<'"$TOKEN_LOGIN_URL"')
+        # Basic length heuristic to avoid short one-time hand-off tokens
+        if [[ -n "$TOKEN" && ${#TOKEN} -lt 16 ]]; then
+          TOKEN=""
+        fi
+      fi
+    fi
   else
+    # Fallback: regex extraction for API token fields
     TOKEN=$(printf "%s" "$response" | sed -n 's/.*"api_token"\s*:\s*"\([^"]\+\)".*/\1/p')
+    if [[ -z "$TOKEN" ]]; then
+      TOKEN=$(printf "%s" "$response" | sed -n 's/.*"apiToken"\s*:\s*"\([^"]\+\)".*/\1/p')
+    fi
     if [[ -z "$TOKEN" ]]; then
       TOKEN=$(printf "%s" "$response" | sed -n 's/.*"token"\s*:\s*"\([^"]\+\)".*/\1/p')
     fi
+
     USER_ID=$(printf "%s" "$response" | sed -n 's/.*"id"\s*:\s*\([0-9]\+\).*/\1/p' | head -n1)
     ACCOUNT_TYPE=$(printf "%s" "$response" | sed -n 's/.*"account_type"\s*:\s*"\([^"]\+\)".*/\1/p' | head -n1)
+
+    if [[ -z "$TOKEN" ]]; then
+      TOKEN_LOGIN_URL=$(printf "%s" "$response" | sed -n 's/.*"\(token_login_url\|tokenLoginUrl\|redirect\)"\s*:\s*"\([^"]\+\)".*/\2/p' | head -n1)
+      if [[ -n "$TOKEN_LOGIN_URL" ]]; then
+        # Try to pull token-like values from the URL
+        TOKEN=$(printf '%s' "$TOKEN_LOGIN_URL" | sed -n 's/.*[?&]\(login_token\|api_token\|jwt\|jwt_token\|access_token\|auth_token\|bearer\|token\)=\([^&#]*\).*/\2/p' | head -n1)
+        if [[ -n "$TOKEN" && ${#TOKEN} -lt 16 ]]; then
+          TOKEN=""
+        fi
+      fi
+    fi
   fi
 
   if [[ -z "$TOKEN" ]]; then
-    echo "Unable to extract bearer token from login response." >&2
+    echo "Unable to extract reusable WordPress API token from login response." >&2
     printf "%s\n" "$response"
     exit 3
   fi
