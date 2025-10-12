@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, ViewProps } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, ViewProps, Share, Pressable } from 'react-native';
 import { COLORS } from '../config/theme';
 import type { ActivityMonitorLogLevel } from '../services/activityMonitorService';
 import { enqueueActivityLog } from '../services/activityMonitorService';
@@ -94,6 +94,32 @@ const getRenderableEntries = (): LogEntry[] => {
     return entries.slice(-limit);
   }
   return [...entries];
+};
+
+const formatTimestamp = (timestamp: number, format?: string) => {
+  const date = new Date(timestamp);
+  if (format === 'HH:mm:ss') {
+    const pad = (value: number) => value.toString().padStart(2, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
+      date.getSeconds(),
+    )}`;
+  }
+  return date.toLocaleTimeString();
+};
+
+const getAllEntriesSnapshot = (): LogEntry[] => [...entries];
+
+const formatEntriesAsText = (data: LogEntry[], timeStampFormat?: string) => {
+  const lines: string[] = [];
+  lines.push('Device Logs');
+  lines.push(`Generated: ${new Date().toISOString()}`);
+  lines.push('');
+  data.forEach(entry => {
+    const ts = formatTimestamp(entry.timestamp, timeStampFormat);
+    lines.push(`[${ts}] ${entry.level.toUpperCase()} ${entry.message}`);
+  });
+  lines.push('');
+  return lines.join('\n');
 };
 
 const notifySubscribers = () => {
@@ -292,29 +318,43 @@ const deviceLog = {
   logTime(name: string) {
     this.stopTimer(name);
   },
+
+  getLogText(timeStampFormat: string = 'HH:mm:ss'): string {
+    try {
+      const all = getAllEntriesSnapshot();
+      return formatEntriesAsText(all, timeStampFormat);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return `Device Logs (export failed to format): ${msg}`;
+    }
+  },
+
+  async shareLogs(timeStampFormat: string = 'HH:mm:ss'): Promise<void> {
+    const text = this.getLogText(timeStampFormat);
+    try {
+      await Share.share({
+        message: text,
+        title: 'Device Logs',
+      });
+    } catch (error) {
+      const logger = originalConsole.warn ?? console.warn;
+      logger('DeviceLog failed to share logs', error);
+    }
+  },
 };
 
 interface LogViewProps extends ViewProps {
   inverted?: boolean;
   multiExpanded?: boolean;
   timeStampFormat?: string;
+  showDownloadButton?: boolean;
 }
-
-const formatTimestamp = (timestamp: number, format?: string) => {
-  const date = new Date(timestamp);
-  if (format === 'HH:mm:ss') {
-    const pad = (value: number) => value.toString().padStart(2, '0');
-    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(
-      date.getSeconds(),
-    )}`;
-  }
-  return date.toLocaleTimeString();
-};
 
 export const LogView: React.FC<LogViewProps> = ({
   style,
   inverted,
   timeStampFormat = 'HH:mm:ss',
+  showDownloadButton = true,
 }) => {
   const [logs, setLogs] = useState<LogEntry[]>(() => getRenderableEntries());
 
@@ -341,6 +381,18 @@ export const LogView: React.FC<LogViewProps> = ({
       style={[styles.container, style]}
       contentContainerStyle={styles.content}
     >
+      {showDownloadButton ? (
+        <View style={styles.toolbar}>
+          <Pressable
+            onPress={() => deviceLog.shareLogs(timeStampFormat)}
+            style={({ pressed }) => [styles.btn, pressed && styles.btnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Share device logs"
+          >
+            <Text style={styles.btnLabel}>Share</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {data.length === 0 ? (
         <Text style={styles.emptyText}>No logs recorded yet.</Text>
       ) : (
@@ -365,6 +417,26 @@ const styles = StyleSheet.create({
   content: {
     gap: 8,
     paddingBottom: 24,
+  },
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  btn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: COLORS.overlay,
+    borderRadius: 8,
+  },
+  btnPressed: {
+    opacity: 0.8,
+  },
+  btnLabel: {
+    color: COLORS.surface,
+    fontSize: 14,
+    fontWeight: '600',
   },
   item: {
     borderRadius: 12,
