@@ -2969,9 +2969,13 @@ export const loginWithPassword = async ({
   const rawApiTokenValue =
     getString(json.api_token) ??
     getString((json as any).apiToken) ??
+    getString(json.login_token) ??
+    getString((json as any).loginToken) ??
     (dataWrapper
       ? getString((dataWrapper as any).api_token) ??
-        getString((dataWrapper as any).apiToken)
+        getString((dataWrapper as any).apiToken) ??
+        getString((dataWrapper as any).login_token) ??
+        getString((dataWrapper as any).loginToken)
       : null);
   const rawTokenFieldValue =
     getString(json.token) ?? (dataWrapper ? getString((dataWrapper as any).token) : null);
