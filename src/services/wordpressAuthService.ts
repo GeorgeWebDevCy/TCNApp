@@ -52,6 +52,36 @@ const maskTokenForLogging = (token?: string | null): string | null => {
 };
 
 const MIN_API_TOKEN_LENGTH = 16;
+const MIN_SHORT_TOKEN_LENGTH = 8;
+
+const isHeuristicTokenCandidate = (value: string | null | undefined): boolean => {
+  if (!value || typeof value !== 'string') {
+    return false;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length < MIN_SHORT_TOKEN_LENGTH) {
+    return false;
+  }
+
+  if (trimmed.includes('://')) {
+    return false;
+  }
+
+  if (!/^[A-Za-z0-9._~+=-]+$/.test(trimmed)) {
+    return false;
+  }
+
+  if (!/[A-Za-z]/.test(trimmed)) {
+    return false;
+  }
+
+  if (!/\d/.test(trimmed) && !/[=+-]/.test(trimmed)) {
+    return false;
+  }
+
+  return true;
+};
 
 const describeUrlForLogging = (
   value?: string | null,
@@ -112,14 +142,15 @@ const extractTokenFromUrl = (value: string): string | undefined => {
     const candidateKeySet = new Set(candidateKeys.map(key => key.toLowerCase()));
 
     const extractFromParams = (params: URLSearchParams): string | undefined => {
+      let tokenishMatch: string | undefined;
+      let heuristicMatch: string | undefined;
+
       for (const key of candidateKeys) {
         const paramValue = params.get(key);
         if (paramValue && paramValue.trim().length > 0) {
           return paramValue.trim();
         }
       }
-
-      let heuristicMatch: string | undefined;
 
       for (const [rawKey, rawValue] of params.entries()) {
         if (!rawValue) {
@@ -137,8 +168,18 @@ const extractTokenFromUrl = (value: string): string | undefined => {
         }
 
         const keyLooksLikeToken = /token|auth|jwt|bearer/i.test(lowerKey);
-        if (keyLooksLikeToken && trimmedValue.length >= MIN_API_TOKEN_LENGTH) {
+        if (
+          keyLooksLikeToken &&
+          (trimmedValue.length >= MIN_API_TOKEN_LENGTH ||
+            isHeuristicTokenCandidate(trimmedValue))
+        ) {
           return trimmedValue;
+        }
+
+        if (isHeuristicTokenCandidate(trimmedValue)) {
+          if (!tokenishMatch || trimmedValue.length > tokenishMatch.length) {
+            tokenishMatch = trimmedValue;
+          }
         }
 
         if (
@@ -148,6 +189,10 @@ const extractTokenFromUrl = (value: string): string | undefined => {
         ) {
           heuristicMatch = trimmedValue;
         }
+      }
+
+      if (tokenishMatch) {
+        return tokenishMatch;
       }
 
       if (heuristicMatch && heuristicMatch.length >= MIN_API_TOKEN_LENGTH) {
@@ -177,13 +222,22 @@ const extractTokenFromUrl = (value: string): string | undefined => {
       .reverse();
 
     for (const segment of pathSegments) {
-      if (segment.length >= MIN_API_TOKEN_LENGTH && /token|auth|jwt/i.test(segment)) {
+      if (
+        (segment.length >= MIN_API_TOKEN_LENGTH && /token|auth|jwt/i.test(segment)) ||
+        isHeuristicTokenCandidate(segment)
+      ) {
         const cleaned = segment.replace(/^(token|auth|jwt)[-_]/i, '');
         if (cleaned.length >= MIN_API_TOKEN_LENGTH) {
           return cleaned;
         }
+        if (isHeuristicTokenCandidate(cleaned)) {
+          return cleaned;
+        }
       }
       if (segment.length >= MIN_API_TOKEN_LENGTH && !segment.includes('.')) {
+        return segment;
+      }
+      if (isHeuristicTokenCandidate(segment) && !segment.includes('.')) {
         return segment;
       }
     }
