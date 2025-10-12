@@ -206,6 +206,42 @@ describe('wordpressAuthService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('derives short bearer tokens from nested redirect parameters in token_login_url responses', async () => {
+    const nestedToken = 'abc123xyz789';
+    const nestedRedirect = `https://app.example.com/auth?code=${nestedToken}`;
+    const tokenLoginUrl = `https://example.com/wp-login.php?action=gn_token_login&redirect_to=${encodeURIComponent(
+      nestedRedirect,
+    )}`;
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          success: true,
+          api_token: tokenLoginUrl,
+          token_login_url: tokenLoginUrl,
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
+
+    expect(session.token).toBe(nestedToken);
+    expect(session.tokenLoginUrl).toBe(tokenLoginUrl);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('persists the avatar URL returned by the WordPress profile endpoint', async () => {
     const loginResponseBody = {
       token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
