@@ -2973,6 +2973,7 @@ export const loginWithPassword = async ({
 
   const requestBody: Record<string, unknown> = {
     username: email,
+    email,
     password,
   };
 
