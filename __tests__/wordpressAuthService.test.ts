@@ -491,6 +491,7 @@ describe('wordpressAuthService', () => {
         method: 'POST',
         body: JSON.stringify({
           username: 'member@example.com',
+          email: 'member@example.com',
           password: 'passw0rd',
           mode: 'token',
           remember: true,
@@ -660,6 +661,7 @@ describe('wordpressAuthService', () => {
         method: 'POST',
         body: JSON.stringify({
           username: 'member@example.com',
+          email: 'member@example.com',
           password: 'passw0rd',
           remember: true,
         }),
@@ -950,6 +952,7 @@ describe('wordpressAuthService', () => {
         method: 'POST',
         body: JSON.stringify({
           username: 'fallback@example.com',
+          email: 'fallback@example.com',
           password: 'pa55word!',
           remember: true,
         }),
