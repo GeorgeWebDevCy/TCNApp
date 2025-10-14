@@ -26,6 +26,7 @@ import {
 import { COLORS } from '../config/theme';
 import QrScanner from '../components/QrScanner';
 import deviceLog from '../utils/deviceLog';
+import { ensureAppError } from '../errors';
 
 type VendorScanScreenProps = {
   onShowAnalytics?: () => void;
@@ -41,7 +42,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
   } = useAuthContext();
   const { transactions, addTransaction, replaceTransaction, patchTransaction } =
     useTransactionContext();
-  const { t } = useLocalization();
+  const { t, translateError } = useLocalization();
   const [manualToken, setManualToken] = useState('');
   const [isValidating, setIsValidating] = useState(false);
   const [result, setResult] = useState<MemberLookupResult | null>(null);
@@ -96,15 +97,19 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
           });
         }
       } catch (validationError) {
+        const appError = ensureAppError(
+          validationError,
+          'TRANSACTION_MEMBER_LOOKUP_FAILED',
+          { propagateMessage: true },
+        );
         const message =
-          validationError instanceof Error
-            ? validationError.message
-            : t('vendor.screen.errors.generic');
+          translateError(appError) ?? appError.toDisplayString();
         setError(message);
         setSubmissionError(message);
         setResult(null);
         deviceLog.warn('vendor.validation.error', {
-          message,
+          code: appError.code,
+          message: appError.displayMessage,
         });
       } finally {
         setIsValidating(false);
@@ -114,7 +119,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         });
       }
     },
-    [getSessionToken, t, vendorId],
+    [getSessionToken, t, translateError, vendorId],
   );
 
   const handleManualSubmit = useCallback(() => {
@@ -337,6 +342,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
 
       if (finalRecord.status === 'failed') {
         const message =
+          translateError(finalRecord.errorMessage) ??
           finalRecord.errorMessage ??
           t('vendor.screen.transaction.errors.submit');
         setSubmissionError(message);
@@ -344,15 +350,22 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
         setGrossAmount('');
       }
     } catch (submissionError) {
+      const appError = ensureAppError(
+        submissionError,
+        'TRANSACTION_RECORD_FAILED',
+        { propagateMessage: true },
+      );
       const message =
-        submissionError instanceof Error
-          ? submissionError.message
-          : t('vendor.screen.transaction.errors.submit');
+        translateError(appError) ?? appError.toDisplayString();
       patchTransaction(optimisticTransaction.id, {
         status: 'failed',
         errorMessage: message,
       });
       setSubmissionError(message);
+      deviceLog.warn('vendor.transaction.submit.error', {
+        code: appError.code,
+        message: appError.displayMessage,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -365,6 +378,7 @@ export const VendorScanScreen: React.FC<VendorScanScreenProps> = ({
     replaceTransaction,
     result,
     t,
+    translateError,
     user?.name,
     vendorId,
     vendorTier,

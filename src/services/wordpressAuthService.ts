@@ -26,6 +26,7 @@ import {
   RegisterOptions,
   WooCommerceCredentialBundle,
 } from '../types/auth';
+import { createAppError, ensureAppError } from '../errors';
 
 export interface PersistedSession {
   token?: string;
@@ -1669,9 +1670,10 @@ export const validateMemberQrCode = async (
 
   const normalizedAuth = normalizeApiToken(authToken);
   if (!normalizedAuth) {
-    throw new Error(
-      'Authentication token is required to validate member QR codes.',
-    );
+    throw createAppError('SESSION_TOKEN_UNAVAILABLE', {
+      overrideMessage:
+        'Authentication token is required to validate member QR codes.',
+    });
   }
 
   const endpoint =
@@ -2053,9 +2055,10 @@ type UploadProfileAvatarOptions = {
 const resolveAvatarEndpoint = (): string => {
   let endpoint = WORDPRESS_CONFIG.endpoints.profileAvatar;
   if (!endpoint || typeof endpoint !== 'string') {
-    throw new Error(
-      'Profile avatar endpoint is not configured. Please expose a WordPress REST endpoint that accepts avatar uploads.',
-    );
+    throw createAppError('PROFILE_AVATAR_UPDATE_FAILED', {
+      overrideMessage:
+        'Profile avatar endpoint is not configured. Please expose a WordPress REST endpoint that accepts avatar uploads.',
+    });
   }
 
   const trimmed = endpoint.trim();
@@ -2073,7 +2076,7 @@ const buildAvatarFormData = ({
   mimeType,
 }: UploadProfileAvatarOptions): FormData => {
   if (!uri || typeof uri !== 'string') {
-    throw new Error('A valid image selection is required.');
+    throw createAppError('AUTH_IMAGE_SELECTION_REQUIRED');
   }
 
   const normalizedName =
@@ -2377,11 +2380,12 @@ export const uploadProfileAvatar = async (
         status: response.status,
         errorBody,
       });
-      throw new Error(
-        `Avatar upload failed (${response.status}). ${
+      throw createAppError('PROFILE_AVATAR_UPDATE_FAILED', {
+        overrideMessage: `Avatar upload failed (${response.status}). ${
           errorBody || 'Enable the WordPress avatar upload endpoint.'
         }`,
-      );
+        metadata: { status: response.status },
+      });
     }
 
     const json = (await response.json()) as Record<string, unknown>;
@@ -2404,13 +2408,9 @@ export const uploadProfileAvatar = async (
       message: error instanceof Error ? error.message : String(error),
       session: describeSessionForLogging(session),
     });
-    if (error instanceof Error) {
-      throw error;
-    }
-
-    throw new Error(
-      'Unable to upload profile photo. Please ensure the WordPress avatar upload endpoint is available.',
-    );
+    throw ensureAppError(error, 'PROFILE_AVATAR_UPDATE_FAILED', {
+      propagateMessage: true,
+    });
   }
 };
 
@@ -2547,11 +2547,12 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
       status: response.status,
       errorBody,
     });
-    throw new Error(
-      `Avatar removal failed (${response.status}). ${
+    throw createAppError('PROFILE_AVATAR_REMOVE_FAILED', {
+      overrideMessage: `Avatar removal failed (${response.status}). ${
         errorBody || 'Enable the WordPress avatar endpoint.'
       }`,
-    );
+      metadata: { status: response.status },
+    });
   }
 
   let user: AuthUser | null = null;
@@ -2577,9 +2578,10 @@ export const deleteProfileAvatar = async (): Promise<AuthUser> => {
   }
 
   if (!user) {
-    throw new Error(
-      'Unable to remove profile photo. Please ensure the WordPress avatar endpoint is available.',
-    );
+    throw createAppError('PROFILE_AVATAR_REMOVE_FAILED', {
+      overrideMessage:
+        'Unable to remove profile photo. Please ensure the WordPress avatar endpoint is available.',
+    });
   }
 
   if (session) {
@@ -3005,14 +3007,14 @@ export const loginWithPassword = async ({
       message: error instanceof Error ? error.message : String(error),
       status: response.status,
     });
-    throw new Error('Unable to log in with WordPress credentials.');
+    throw createAppError('AUTH_WORDPRESS_CREDENTIALS');
   }
 
   if (!json || typeof json !== 'object') {
     deviceLog.error('wordpressAuth.loginWithPassword.invalidPayload', {
       status: response.status,
     });
-    throw new Error('Unable to log in with WordPress credentials.');
+    throw createAppError('AUTH_WORDPRESS_CREDENTIALS');
   }
 
   // Some WordPress setups wrap successful payloads under `data`.
@@ -3141,7 +3143,13 @@ export const loginWithPassword = async ({
       message: loginErrorMessage,
       hasTokenLoginUrl: Boolean(tokenLoginUrl),
     });
-    throw new Error(loginErrorMessage);
+    throw createAppError('AUTH_PASSWORD_LOGIN_FAILED', {
+      overrideMessage: loginErrorMessage,
+      metadata: {
+        status: response.status,
+        code: json.code ?? null,
+      },
+    });
   }
 
   const restNonce =
@@ -3195,7 +3203,12 @@ export const loginWithPassword = async ({
       });
     } catch {}
 
-    throw new Error(errorMessage);
+    throw createAppError('AUTH_WORDPRESS_CREDENTIALS', {
+      overrideMessage: errorMessage,
+      metadata: {
+        status: response.status,
+      },
+    });
   }
 
   const refreshToken =
@@ -3334,7 +3347,7 @@ export const updatePassword = async ({
   const trimmedCurrent = currentPassword.trim();
   const trimmedNew = newPassword.trim();
   if (!trimmedCurrent || !trimmedNew) {
-    throw new Error('Unable to change password.');
+    throw createAppError('AUTH_CHANGE_PASSWORD_FAILED');
   }
 
   await hydrateWordPressCookieSession(tokenLoginUrl, token ?? undefined);
@@ -3372,16 +3385,19 @@ export const updatePassword = async ({
         response,
         'Unable to change password.',
       );
-      throw new Error(message);
+      throw createAppError('AUTH_CHANGE_PASSWORD_FAILED', {
+        overrideMessage: message,
+        metadata: { status: response.status },
+      });
     }
   };
 
   try {
     await performRestPasswordUpdate();
   } catch (error) {
-    throw error instanceof Error
-      ? error
-      : new Error('Unable to change password.');
+    throw ensureAppError(error, 'AUTH_CHANGE_PASSWORD_FAILED', {
+      propagateMessage: true,
+    });
   }
 
   await refreshPersistedUserProfile(token);
@@ -3392,7 +3408,7 @@ export const requestPasswordReset = async (
 ): Promise<string | undefined> => {
   const trimmed = identifier.trim();
   if (trimmed.length === 0) {
-    throw new Error('Unable to send password reset email.');
+    throw createAppError('AUTH_PASSWORD_RESET_EMAIL_FAILED');
   }
 
   const payload: Record<string, string> = {
@@ -3424,7 +3440,10 @@ export const requestPasswordReset = async (
       response,
       'Unable to send password reset email.',
     );
-    throw new Error(message);
+    throw createAppError('AUTH_PASSWORD_RESET_EMAIL_FAILED', {
+      overrideMessage: message,
+      metadata: { status: response.status },
+    });
   }
 
   const messageSource =
@@ -3491,7 +3510,7 @@ export const registerAccount = async (
   };
 
   if (!payload.username || !payload.email || !payload.password) {
-    throw new Error('Unable to register a new account.');
+    throw createAppError('AUTH_REGISTER_ACCOUNT_FAILED');
   }
 
   if (firstName) {
@@ -3612,7 +3631,10 @@ export const registerAccount = async (
       response,
       'Unable to register a new account.',
     );
-    throw new Error(message);
+    throw createAppError('AUTH_REGISTER_ACCOUNT_FAILED', {
+      overrideMessage: message,
+      metadata: { status: response.status },
+    });
   }
 
   if (isVendor) {
@@ -3642,7 +3664,7 @@ export const resetPasswordWithCode = async ({
       : undefined;
 
   if (!trimmedIdentifier || !trimmedCode || !trimmedPassword) {
-    throw new Error('Unable to reset password.');
+    throw createAppError('AUTH_RESET_PASSWORD_FAILED');
   }
 
   const payload: Record<string, string> = {
@@ -3682,7 +3704,10 @@ export const resetPasswordWithCode = async ({
       response,
       'Unable to reset password.',
     );
-    throw new Error(message);
+    throw createAppError('AUTH_RESET_PASSWORD_FAILED', {
+      overrideMessage: message,
+      metadata: { status: response.status },
+    });
   }
 
   const messageSource =

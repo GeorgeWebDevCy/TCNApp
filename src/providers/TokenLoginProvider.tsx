@@ -11,6 +11,7 @@ import { ActivityIndicator, Modal, StyleSheet, Text, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { COLORS } from '../config/theme';
 import deviceLog from '../utils/deviceLog';
+import { createAppError } from '../errors';
 
 interface TokenLoginContextValue {
   hydrateTokenLogin: (url?: string | null) => Promise<void>;
@@ -199,7 +200,7 @@ export const TokenLoginProvider: React.FC<React.PropsWithChildren> = ({
 export const useTokenLogin = (): TokenLoginContextValue => {
   const context = useContext(TokenLoginContext);
   if (!context) {
-    throw new Error('useTokenLogin must be used within TokenLoginProvider.');
+    throw createAppError('PROVIDER_TOKEN_LOGIN_MISSING');
   }
   return context;
 };

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useTransactionContext } from '../contexts/TransactionContext';
+import { useLocalization } from '../contexts/LocalizationContext';
 import {
   fetchMemberTransactions,
   fetchVendorTransactions,
@@ -16,6 +17,7 @@ import {
   calculateCompletedCount,
   calculateTotalSavings,
 } from '../utils/transactionAnalytics';
+import { ensureAppError } from '../errors';
 
 interface UseTransactionsAnalyticsOptions {
   preservePending?: boolean;
@@ -71,6 +73,7 @@ const useTransactionsAnalytics = (
 ): UseTransactionsAnalyticsResult => {
   const { getSessionToken } = useAuthContext();
   const { transactions, setTransactions } = useTransactionContext();
+  const { translateError } = useLocalization();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -90,15 +93,15 @@ const useTransactionsAnalytics = (
       setTransactions(merged);
       setLastUpdated(new Date());
     } catch (fetchError) {
-      const message =
-        fetchError instanceof Error
-          ? fetchError.message
-          : 'Unable to load transactions.';
+      const appError = ensureAppError(fetchError, 'TRANSACTION_FETCH_FAILED', {
+        propagateMessage: true,
+      });
+      const message = translateError(appError) ?? appError.toDisplayString();
       setError(message);
     } finally {
       setIsLoading(false);
     }
-  }, [fetcher, getSessionToken, options.preservePending, setTransactions, transactions]);
+  }, [fetcher, getSessionToken, options.preservePending, setTransactions, transactions, translateError]);
 
   useEffect(() => {
     if (!transactions.length) {

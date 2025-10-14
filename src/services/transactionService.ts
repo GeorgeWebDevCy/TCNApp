@@ -17,6 +17,7 @@ import {
   ensureValidSessionToken,
   validateMemberQrCode,
 } from './wordpressAuthService';
+import { createAppError, ensureAppError, ErrorId } from '../errors';
 
 const TRANSACTION_ENDPOINTS = {
   lookupMember: '/wp-json/gn/v1/discounts/lookup',
@@ -41,18 +42,40 @@ const buildHeaders = (token?: string | null): Record<string, string> => {
   return headers;
 };
 
-const parseJson = async <T>(response: Response): Promise<T> => {
+const parseJson = async <T>(
+  response: Response,
+  fallbackId: ErrorId,
+  metadata: Record<string, unknown> = {},
+): Promise<T> => {
   const contentType = response.headers.get('content-type');
   const isJson = contentType?.includes('application/json');
-  const payload = isJson ? await response.json() : await response.text();
+
+  let payload: unknown;
+  try {
+    payload = isJson ? await response.json() : await response.text();
+  } catch (error) {
+    throw ensureAppError(error, fallbackId, {
+      propagateMessage: true,
+      metadata: {
+        status: response.status,
+        ...metadata,
+      },
+    });
+  }
 
   if (!response.ok) {
-    const message =
+    const overrideMessage =
       typeof payload === 'string'
         ? payload
         : ((payload as Record<string, unknown>)?.message as string) ??
-          'Unable to complete the request.';
-    throw new Error(message);
+          undefined;
+    throw createAppError(fallbackId, {
+      overrideMessage,
+      metadata: {
+        status: response.status,
+        ...metadata,
+      },
+    });
   }
 
   return (payload as T) ?? ({} as T);
@@ -409,11 +432,16 @@ const parseTransactionList = (
 const performRequest = async <T>(
   endpoint: string,
   init: RequestInit,
+  fallbackId: ErrorId,
+  metadata: Record<string, unknown> = {},
 ): Promise<T> => {
   const requestInit = await buildWordPressRequestInit(init);
-  const response = await fetch(`${WORDPRESS_CONFIG.baseUrl}${endpoint}`, requestInit);
+  const response = await fetch(
+    `${WORDPRESS_CONFIG.baseUrl}${endpoint}`,
+    requestInit,
+  );
   await syncWordPressCookiesFromResponse(response);
-  return parseJson<T>(response);
+  return parseJson<T>(response, fallbackId, metadata);
 };
 
 export const lookupMember = async (
@@ -423,7 +451,7 @@ export const lookupMember = async (
 ): Promise<MemberLookupResult> => {
   const resolvedAuthToken = await ensureValidSessionToken(authToken);
   if (!resolvedAuthToken) {
-    throw new Error('Authentication token is unavailable.');
+    throw createAppError('SESSION_TOKEN_UNAVAILABLE');
   }
 
   try {
@@ -442,28 +470,37 @@ export const lookupMember = async (
         headers: buildHeaders(resolvedAuthToken),
         body: JSON.stringify(body),
       },
+      'TRANSACTION_MEMBER_LOOKUP_FAILED',
+      { endpoint: TRANSACTION_ENDPOINTS.lookupMember },
     );
 
     const result = parseMemberLookup(payload);
     deviceLog.debug('transaction.lookupMember.success', result);
     return result;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unable to lookup member.';
-    deviceLog.warn('transaction.lookupMember.error', { message });
+    const appError = ensureAppError(error, 'TRANSACTION_MEMBER_LOOKUP_FAILED', {
+      propagateMessage: true,
+    });
+    deviceLog.warn('transaction.lookupMember.error', {
+      code: appError.code,
+      message: appError.displayMessage,
+    });
 
     try {
       const fallback = await validateMemberQrCode(token, resolvedAuthToken);
       deviceLog.debug('transaction.lookupMember.fallback', fallback);
       return fallback as MemberLookupResult;
     } catch (fallbackError) {
+      const fallbackAppError = ensureAppError(
+        fallbackError,
+        'AUTH_MEMBER_QR_VALIDATE_FAILED',
+        { propagateMessage: true },
+      );
       deviceLog.warn('transaction.lookupMember.fallbackError', {
-        message:
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : String(fallbackError),
+        code: fallbackAppError.code,
+        message: fallbackAppError.displayMessage,
       });
-      throw error instanceof Error ? error : new Error(message);
+      throw appError;
     }
   }
 };
@@ -490,7 +527,7 @@ export const calculateDiscount = async (
   if (!descriptor && params.memberToken) {
     const resolvedAuthToken = await ensureValidSessionToken(authToken);
     if (!resolvedAuthToken) {
-      throw new Error('Authentication token is unavailable.');
+      throw createAppError('SESSION_TOKEN_UNAVAILABLE');
     }
 
     try {
@@ -521,13 +558,17 @@ export const calculateDiscount = async (
       message = lookup.message ?? null;
       deviceLog.debug('transaction.calculateDiscount.lookup', lookup);
     } catch (error) {
-      const lookupMessage =
-        error instanceof Error ? error.message : undefined;
-      if (lookupMessage) {
-        message = lookupMessage;
-      }
+      const appError = ensureAppError(
+        error,
+        'TRANSACTION_DISCOUNT_REFRESH_FAILED',
+        {
+          propagateMessage: true,
+        },
+      );
+      message = appError.toDisplayString();
       deviceLog.warn('transaction.calculateDiscount.lookupError', {
-        message: lookupMessage ?? 'Unable to refresh discount descriptor.',
+        code: appError.code,
+        message: appError.displayMessage,
       });
     }
   }
@@ -565,7 +606,7 @@ export const recordTransaction = async (
 ): Promise<TransactionRecord> => {
   const resolvedAuthToken = await ensureValidSessionToken(authToken);
   if (!resolvedAuthToken) {
-    throw new Error('Authentication token is unavailable.');
+    throw createAppError('SESSION_TOKEN_UNAVAILABLE');
   }
 
   const optimisticDiscount = calculateDiscountForAmount(
@@ -618,6 +659,8 @@ export const recordTransaction = async (
           currency: request.currency,
         }),
       },
+      'TRANSACTION_RECORD_FAILED',
+      { endpoint: TRANSACTION_ENDPOINTS.recordTransaction },
     );
 
     const result = parseTransactionRecord(payload, {
@@ -627,13 +670,17 @@ export const recordTransaction = async (
     deviceLog.debug('transaction.recordTransaction.success', result);
     return result;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unable to record transaction.';
-    deviceLog.warn('transaction.recordTransaction.error', { message });
+    const appError = ensureAppError(error, 'TRANSACTION_RECORD_FAILED', {
+      propagateMessage: true,
+    });
+    deviceLog.warn('transaction.recordTransaction.error', {
+      code: appError.code,
+      message: appError.displayMessage,
+    });
     return {
       ...optimisticRecord,
       status: 'failed',
-      errorMessage: message,
+      errorMessage: appError.toDisplayString(),
     };
   }
 };
@@ -644,7 +691,7 @@ export const fetchMemberTransactions = async (
   try {
     const resolvedAuthToken = await ensureValidSessionToken(authToken);
     if (!resolvedAuthToken) {
-      throw new Error('Authentication token is unavailable.');
+      throw createAppError('SESSION_TOKEN_UNAVAILABLE');
     }
 
     const payload = await performRequest<unknown>(
@@ -653,6 +700,8 @@ export const fetchMemberTransactions = async (
         method: 'GET',
         headers: buildHeaders(resolvedAuthToken),
       },
+      'TRANSACTION_HISTORY_FETCH_FAILED',
+      { scope: 'member' },
     );
 
     const records = parseTransactionList(payload);
@@ -661,10 +710,15 @@ export const fetchMemberTransactions = async (
     });
     return records;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unable to fetch member transactions.';
-    deviceLog.warn('transaction.fetchMemberTransactions.error', { message });
-    return [];
+    const appError = ensureAppError(error, 'TRANSACTION_HISTORY_FETCH_FAILED', {
+      propagateMessage: true,
+      metadata: { scope: 'member' },
+    });
+    deviceLog.warn('transaction.fetchMemberTransactions.error', {
+      code: appError.code,
+      message: appError.displayMessage,
+    });
+    throw appError;
   }
 };
 
@@ -674,7 +728,7 @@ export const fetchVendorTransactions = async (
   try {
     const resolvedAuthToken = await ensureValidSessionToken(authToken);
     if (!resolvedAuthToken) {
-      throw new Error('Authentication token is unavailable.');
+      throw createAppError('SESSION_TOKEN_UNAVAILABLE');
     }
 
     const payload = await performRequest<unknown>(
@@ -683,6 +737,8 @@ export const fetchVendorTransactions = async (
         method: 'GET',
         headers: buildHeaders(resolvedAuthToken),
       },
+      'TRANSACTION_HISTORY_FETCH_FAILED',
+      { scope: 'vendor' },
     );
 
     const records = parseTransactionList(payload);
@@ -691,9 +747,14 @@ export const fetchVendorTransactions = async (
     });
     return records;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unable to fetch vendor transactions.';
-    deviceLog.warn('transaction.fetchVendorTransactions.error', { message });
-    return [];
+    const appError = ensureAppError(error, 'TRANSACTION_HISTORY_FETCH_FAILED', {
+      propagateMessage: true,
+      metadata: { scope: 'vendor' },
+    });
+    deviceLog.warn('transaction.fetchVendorTransactions.error', {
+      code: appError.code,
+      message: appError.displayMessage,
+    });
+    throw appError;
   }
 };

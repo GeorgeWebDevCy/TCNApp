@@ -1,5 +1,6 @@
 import { WORDPRESS_CONFIG } from '../config/authConfig';
 import { AccountStatus, AccountType } from '../types/auth';
+import { createAppError, ensureAppError, ErrorId } from '../errors';
 
 export interface AdminAccountSummary {
   id: number;
@@ -213,59 +214,78 @@ export const fetchAdminAccounts = async (
   token: string,
 ): Promise<AdminAccountSummary[]> => {
   const endpoint = WORDPRESS_CONFIG.endpoints.admin.accounts;
-  const response = await fetch(buildUrl(endpoint), {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-  let json: unknown = null;
   try {
-    json = await response.json();
-  } catch {
-    json = null;
-  }
+    const response = await fetch(buildUrl(endpoint), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-  if (!response.ok) {
-    const message =
-      extractErrorMessage(json) ?? 'Unable to load admin data.';
-    throw new Error(message);
-  }
+    let json: unknown = null;
+    try {
+      json = await response.json();
+    } catch {
+      json = null;
+    }
 
-  return extractAccountsFromPayload(json);
+    if (!response.ok) {
+      const overrideMessage = extractErrorMessage(json) ?? undefined;
+      throw createAppError('ADMIN_DASHBOARD_LOAD_FAILED', {
+        overrideMessage,
+        metadata: {
+          status: response.status,
+        },
+      });
+    }
+
+    return extractAccountsFromPayload(json);
+  } catch (error) {
+    throw ensureAppError(error, 'ADMIN_DASHBOARD_LOAD_FAILED', {
+      propagateMessage: true,
+    });
+  }
 };
 
 const postAdminAction = async (
   token: string,
   path: string,
+  fallbackId: ErrorId,
   body?: Record<string, unknown>,
 ): Promise<void> => {
-  const response = await fetch(buildUrl(path), {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  if (response.ok) {
-    return;
-  }
-
-  let payload: unknown = null;
   try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
+    const response = await fetch(buildUrl(path), {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
 
-  const message =
-    extractErrorMessage(payload) ?? 'Unable to update vendor status.';
-  throw new Error(message);
+    if (response.ok) {
+      return;
+    }
+
+    let payload: unknown = null;
+    try {
+      payload = await response.json();
+    } catch {
+      payload = null;
+    }
+
+    const overrideMessage = extractErrorMessage(payload) ?? undefined;
+    throw createAppError(fallbackId, {
+      overrideMessage,
+      metadata: {
+        status: response.status,
+      },
+    });
+  } catch (error) {
+    throw ensureAppError(error, fallbackId, { propagateMessage: true });
+  }
 };
 
 export const approveVendorAccount = async (
@@ -273,7 +293,7 @@ export const approveVendorAccount = async (
   vendorId: number,
 ): Promise<void> => {
   const path = WORDPRESS_CONFIG.endpoints.admin.approveVendor(vendorId);
-  await postAdminAction(token, path);
+  await postAdminAction(token, path, 'ADMIN_VENDOR_APPROVE_FAILED');
 };
 
 export const rejectVendorAccount = async (
@@ -283,5 +303,10 @@ export const rejectVendorAccount = async (
 ): Promise<void> => {
   const path = WORDPRESS_CONFIG.endpoints.admin.rejectVendor(vendorId);
   const payload = reason ? { reason } : undefined;
-  await postAdminAction(token, path, payload);
+  await postAdminAction(
+    token,
+    path,
+    'ADMIN_VENDOR_REJECT_FAILED',
+    payload,
+  );
 };

@@ -5,6 +5,7 @@ import React, {
   useReducer,
   useRef,
 } from 'react';
+import { ErrorId, createAppError, ensureAppError } from '../errors';
 import deviceLog from '../utils/deviceLog';
 import {
   authenticateWithBiometrics,
@@ -364,25 +365,25 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             ? statusSource.toLowerCase()
             : 'active';
 
-        let blockingMessage: string | null = null;
+        let blockingErrorId: ErrorId | null = null;
         if (normalizedStatus === 'pending') {
-          blockingMessage = 'Your vendor account is pending approval.';
+          blockingErrorId = 'AUTH_VENDOR_PENDING';
         } else if (normalizedStatus === 'rejected') {
-          blockingMessage = 'Your vendor application has been rejected.';
+          blockingErrorId = 'AUTH_VENDOR_REJECTED';
         } else if (normalizedStatus === 'suspended') {
-          blockingMessage =
-            'Your vendor account has been suspended. Contact support for assistance.';
+          blockingErrorId = 'AUTH_VENDOR_SUSPENDED';
         }
 
-        if (blockingMessage) {
+        if (blockingErrorId) {
           deviceLog.warn('Vendor login blocked', {
             status: normalizedStatus,
             userId: resolvedUser?.id ?? null,
+            errorCode: blockingErrorId,
           });
           await clearSession();
           await clearPasswordAuthenticated();
           sessionRef.current = null;
-          throw new Error(blockingMessage);
+          throw createAppError(blockingErrorId);
         }
       }
 
@@ -398,12 +399,19 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       });
       deviceLog.success('Password login succeeded');
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unable to complete password login.';
-      deviceLog.error('Password login failed', error);
-      dispatch({ type: 'LOGIN_ERROR', payload: message });
+      const appError = ensureAppError(error, 'AUTH_PASSWORD_LOGIN_FAILED', {
+        propagateMessage: true,
+      });
+      deviceLog.error('Password login failed', {
+        code: appError.code,
+        message: appError.displayMessage,
+        cause:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
+      dispatch({
+        type: 'LOGIN_ERROR',
+        payload: appError.toDisplayString(),
+      });
     }
   }, [fetchMemberQrCode, hydrateTokenLogin, logCookieHydration]);
 
@@ -413,7 +421,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       try {
         const isValidPin = await verifyPin(pin);
         if (!isValidPin) {
-          throw new Error('Incorrect PIN.');
+          throw createAppError('AUTH_PIN_INCORRECT');
         }
 
         let session = await ensureValidSession();
@@ -428,9 +436,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 
         if (!session) {
           logSessionSnapshot('auth.pin.sessionMissing', null);
-          throw new Error(
-            'No saved session. Please log in with your password first.',
-          );
+          throw createAppError('AUTH_NO_SAVED_SESSION');
         }
 
         logSessionSnapshot('auth.pin.sessionBeforeUnlock', session);
@@ -460,9 +466,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             : null;
 
           if (!refreshedUser) {
-            throw new Error(
-              'No saved session. Please log in with your password first.',
-            );
+            throw createAppError('AUTH_NO_SAVED_SESSION');
           }
 
           sessionRef.current = { ...session, user: refreshedUser };
@@ -498,12 +502,19 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         deviceLog.success('PIN login succeeded');
         logSessionSnapshot('auth.pin.sessionAfterUnlock', sessionRef.current);
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'Unable to sign in with PIN.';
-        deviceLog.error('PIN login failed', error);
-        dispatch({ type: 'LOGIN_ERROR', payload: message });
+        const appError = ensureAppError(error, 'AUTH_PIN_LOGIN_FAILED', {
+          propagateMessage: true,
+        });
+        deviceLog.error('PIN login failed', {
+          code: appError.code,
+          message: appError.displayMessage,
+          cause:
+            error instanceof Error ? error.message : String(error ?? 'unknown'),
+        });
+        dispatch({
+          type: 'LOGIN_ERROR',
+          payload: appError.toDisplayString(),
+        });
       }
     },
     [
@@ -522,19 +533,17 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       try {
         const { available } = await isBiometricsAvailable();
         if (!available) {
-          throw new Error(
-            'Biometric authentication is not available on this device.',
-          );
+          throw createAppError('AUTH_BIOMETRICS_UNAVAILABLE');
         }
 
         const enabled = await isBiometricLoginEnabled();
         if (!enabled) {
-          throw new Error('Biometric authentication is not configured.');
+          throw createAppError('AUTH_BIOMETRICS_NOT_CONFIGURED');
         }
 
         const success = await authenticateWithBiometrics(promptMessage);
         if (!success) {
-          throw new Error('Biometric authentication was cancelled.');
+          throw createAppError('AUTH_BIOMETRICS_CANCELLED');
         }
 
         let session = await ensureValidSession();
@@ -549,9 +558,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 
         if (!session) {
           logSessionSnapshot('auth.biometrics.sessionMissing', null);
-          throw new Error(
-            'No saved session. Please log in with your password first.',
-          );
+          throw createAppError('AUTH_NO_SAVED_SESSION');
         }
 
         logSessionSnapshot('auth.biometrics.sessionBeforeUnlock', session);
@@ -581,9 +588,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             : null;
 
           if (!refreshedUser) {
-            throw new Error(
-              'No saved session. Please log in with your password first.',
-            );
+            throw createAppError('AUTH_NO_SAVED_SESSION');
           }
 
           sessionRef.current = { ...session, user: refreshedUser };
@@ -619,12 +624,19 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         deviceLog.success('Biometric login succeeded');
         logSessionSnapshot('auth.biometrics.sessionAfterUnlock', sessionRef.current);
       } catch (error) {
-        const message =
-          error instanceof Error
-            ? error.message
-            : 'Unable to complete biometric login.';
-        deviceLog.error('Biometric login failed', error);
-        dispatch({ type: 'LOGIN_ERROR', payload: message });
+        const appError = ensureAppError(error, 'AUTH_BIOMETRIC_LOGIN_FAILED', {
+          propagateMessage: true,
+        });
+        deviceLog.error('Biometric login failed', {
+          code: appError.code,
+          message: appError.displayMessage,
+          cause:
+            error instanceof Error ? error.message : String(error ?? 'unknown'),
+        });
+        dispatch({
+          type: 'LOGIN_ERROR',
+          payload: appError.toDisplayString(),
+        });
       }
     },
     [
@@ -646,9 +658,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   const registerPin = useCallback(
     async (pin: string) => {
       if (!canManagePin) {
-        throw new Error(
-          'Please log in with your username and password before creating a PIN.',
-        );
+        throw createAppError('AUTH_LOGIN_BEFORE_PIN_CREATION');
       }
 
       let session = await ensureValidSession();
@@ -667,9 +677,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
             locked: false,
           };
         } else {
-          throw new Error(
-            'You must log in with your password before setting a PIN.',
-          );
+          throw createAppError('AUTH_LOGIN_BEFORE_PIN_SETTING');
         }
       }
 
@@ -691,9 +699,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 
   const removePin = useCallback(async () => {
     if (!canManagePin) {
-      throw new Error(
-        'Please log in with your username and password before changing your PIN.',
-      );
+      throw createAppError('AUTH_LOGIN_BEFORE_PIN_CHANGE');
     }
 
     await clearPin();
@@ -748,10 +754,20 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       deviceLog.info('Password reset requested', { identifier });
       return message;
     } catch (error) {
-      deviceLog.error('Password reset request failed', error);
-      throw error instanceof Error
-        ? error
-        : new Error('Unable to send password reset email.');
+      const appError = ensureAppError(
+        error,
+        'AUTH_PASSWORD_RESET_EMAIL_FAILED',
+        {
+          propagateMessage: true,
+        },
+      );
+      deviceLog.error('Password reset request failed', {
+        code: appError.code,
+        message: appError.displayMessage,
+        cause:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
+      throw appError;
     }
   }, []);
 
@@ -764,10 +780,16 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         });
         return message;
       } catch (error) {
-        deviceLog.error('Direct password reset failed', error);
-        throw error instanceof Error
-          ? error
-          : new Error('Unable to reset password.');
+        const appError = ensureAppError(error, 'AUTH_RESET_PASSWORD_FAILED', {
+          propagateMessage: true,
+        });
+        deviceLog.error('Direct password reset failed', {
+          code: appError.code,
+          message: appError.displayMessage,
+          cause:
+            error instanceof Error ? error.message : String(error ?? 'unknown'),
+        });
+        throw appError;
       }
     },
     [],
@@ -809,10 +831,20 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         deviceLog.success('Profile avatar updated');
         return updatedUser;
       } catch (error) {
-        deviceLog.error('Profile avatar update failed', error);
-        throw error instanceof Error
-          ? error
-          : new Error('Unable to update profile photo.');
+        const appError = ensureAppError(
+          error,
+          'PROFILE_AVATAR_UPDATE_FAILED',
+          {
+            propagateMessage: true,
+          },
+        );
+        deviceLog.error('Profile avatar update failed', {
+          code: appError.code,
+          message: appError.displayMessage,
+          cause:
+            error instanceof Error ? error.message : String(error ?? 'unknown'),
+        });
+        throw appError;
       }
   },
     [
@@ -854,10 +886,20 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       deviceLog.success('Profile avatar removed');
       return updatedUser;
     } catch (error) {
-      deviceLog.error('Profile avatar removal failed', error);
-      throw error instanceof Error
-        ? error
-        : new Error('Unable to remove profile photo.');
+      const appError = ensureAppError(
+        error,
+        'PROFILE_AVATAR_REMOVE_FAILED',
+        {
+          propagateMessage: true,
+        },
+      );
+      deviceLog.error('Profile avatar removal failed', {
+        code: appError.code,
+        message: appError.displayMessage,
+        cause:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
+      throw appError;
     }
   }, [
     deleteWordPressProfileAvatar,
@@ -1019,10 +1061,16 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       }
       return message;
     } catch (error) {
-      deviceLog.error('Account registration failed', error);
-      throw error instanceof Error
-        ? error
-        : new Error('Unable to register a new account.');
+      const appError = ensureAppError(error, 'AUTH_REGISTER_ACCOUNT_FAILED', {
+        propagateMessage: true,
+      });
+      deviceLog.error('Account registration failed', {
+        code: appError.code,
+        message: appError.displayMessage,
+        cause:
+          error instanceof Error ? error.message : String(error ?? 'unknown'),
+      });
+      throw appError;
     }
   }, []);
 
@@ -1039,7 +1087,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       try {
         let session = sessionRef.current ?? (await ensureValidSession());
         if (!session) {
-          throw new Error('Unable to change password.');
+          throw createAppError('AUTH_CHANGE_PASSWORD_FAILED');
         }
 
         const identifier = userEmail?.trim() ?? session.user?.email?.trim();
@@ -1104,10 +1152,16 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         await refreshSession();
         deviceLog.success('Password updated successfully');
       } catch (error) {
-        deviceLog.error('Password update failed', error);
-        throw error instanceof Error
-          ? error
-          : new Error('Unable to change password.');
+        const appError = ensureAppError(error, 'AUTH_CHANGE_PASSWORD_FAILED', {
+          propagateMessage: true,
+        });
+        deviceLog.error('Password update failed', {
+          code: appError.code,
+          message: appError.displayMessage,
+          cause:
+            error instanceof Error ? error.message : String(error ?? 'unknown'),
+        });
+        throw appError;
       }
     },
     [hydrateTokenLogin, logCookieHydration, refreshSession, userEmail],
@@ -1158,7 +1212,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
 export const useAuthContext = (): AuthContextValue => {
   const context = React.useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuthContext must be used within an AuthProvider.');
+    throw createAppError('PROVIDER_AUTH_MISSING');
   }
   return context;
 };

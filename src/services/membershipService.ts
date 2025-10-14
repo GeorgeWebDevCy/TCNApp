@@ -8,6 +8,7 @@ import {
   syncWordPressCookiesFromResponse,
 } from './wordpressCookieService';
 import { ensureValidSessionToken } from './wordpressAuthService';
+import { createAppError, ensureAppError, ErrorId } from '../errors';
 
 export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
@@ -134,17 +135,48 @@ const buildHeaders = (token?: string): Record<string, string> => {
   return headers;
 };
 
-const handleResponse = async <T>(response: Response): Promise<T> => {
+const handleResponse = async <T>(
+  response: Response,
+  fallbackId: ErrorId,
+  metadata: Record<string, unknown> = {},
+): Promise<T> => {
   const contentType = response.headers.get('content-type');
   const isJson = contentType?.includes('application/json');
-  const payload = isJson ? await response.json() : await response.text();
+
+  let payload: unknown;
+  try {
+    payload = isJson ? await response.json() : await response.text();
+  } catch (error) {
+    const appError = ensureAppError(error, fallbackId, {
+      propagateMessage: true,
+      metadata: {
+        status: response.status,
+        ...metadata,
+      },
+    });
+    throw appError;
+  }
 
   if (!response.ok) {
-    const message =
+    const overrideMessage =
       typeof payload === 'string'
         ? payload
-        : (payload?.message as string) ?? 'Unable to complete the request.';
-    throw new Error(message);
+        : typeof (payload as Record<string, unknown>)?.message === 'string'
+          ? ((payload as Record<string, unknown>).message as string)
+          : undefined;
+
+    const appError = createAppError(fallbackId, {
+      overrideMessage,
+      metadata: {
+        status: response.status,
+        responseCode:
+          payload && typeof payload === 'object'
+            ? (payload as Record<string, unknown>).code ?? null
+            : null,
+        ...metadata,
+      },
+    });
+    throw appError;
   }
 
   return (payload as T) ?? ({} as T);
@@ -392,7 +424,7 @@ export const fetchMembershipPlans = async (
 ): Promise<MembershipPlan[]> => {
   const resolvedToken = await ensureValidSessionToken(token);
   if (!resolvedToken) {
-    throw new Error('Authentication token is unavailable.');
+    throw createAppError('SESSION_TOKEN_UNAVAILABLE');
   }
 
   const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.plans}`;
@@ -425,7 +457,7 @@ export const fetchMembershipPlans = async (
 
     const payload = await handleResponse<
       MembershipPlansResponse | MembershipPlan[]
-    >(response);
+    >(response, 'MEMBERSHIP_PLANS_FETCH_FAILED', { endpoint: requestUrl });
 
     const plans = Array.isArray(payload)
       ? normalizePlans(payload as WordPressMembershipPlan[])
@@ -446,7 +478,9 @@ export const fetchMembershipPlans = async (
     return plans;
   } catch (error) {
     deviceLog.error('membership.plans.fetch.error', buildErrorLogPayload(error));
-    throw error;
+    throw ensureAppError(error, 'MEMBERSHIP_PLANS_FETCH_FAILED', {
+      propagateMessage: true,
+    });
   }
 };
 
@@ -473,7 +507,7 @@ export const createMembershipPaymentSession = async (
 ): Promise<PaymentSessionResponse> => {
   const resolvedToken = await ensureValidSessionToken(token);
   if (!resolvedToken) {
-    throw new Error('Authentication token is unavailable.');
+    throw createAppError('SESSION_TOKEN_UNAVAILABLE');
   }
 
   const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.createPaymentSession}`;
@@ -507,7 +541,11 @@ export const createMembershipPaymentSession = async (
 
     await syncWordPressCookiesFromResponse(response);
 
-    const payload = await handleResponse<PaymentSessionApiResponse>(response);
+    const payload = await handleResponse<PaymentSessionApiResponse>(
+      response,
+      'MEMBERSHIP_PAYMENT_SESSION_FAILED',
+      { plan },
+    );
 
     const requiresPayment =
       typeof payload.requiresPayment === 'boolean'
@@ -546,7 +584,7 @@ export const createMembershipPaymentSession = async (
     const normalizedPayload: PaymentSessionResponse = requiresPayment
       ? (() => {
           if (!paymentIntentClientSecret) {
-            throw new Error('Missing payment intent client secret.');
+            throw createAppError('MEMBERSHIP_PAYMENT_SECRET_MISSING');
           }
 
           // For basic card collection we can initialise PaymentSheet with only the
@@ -620,7 +658,9 @@ export const createMembershipPaymentSession = async (
       'membership.paymentSession.create.error',
       buildErrorLogPayload(error, { plan }),
     );
-    throw error;
+    throw ensureAppError(error, 'MEMBERSHIP_PAYMENT_SESSION_FAILED', {
+      propagateMessage: true,
+    });
   }
 };
 
@@ -631,7 +671,7 @@ export const confirmMembershipUpgrade = async (
 ): Promise<ConfirmUpgradeResponse> => {
   const resolvedToken = await ensureValidSessionToken(token);
   if (!resolvedToken) {
-    throw new Error('Authentication token is unavailable.');
+    throw createAppError('SESSION_TOKEN_UNAVAILABLE');
   }
 
   const requestUrl = `${MEMBERSHIP_CONFIG.baseUrl}${MEMBERSHIP_CONFIG.endpoints.confirm}`;
@@ -676,7 +716,14 @@ export const confirmMembershipUpgrade = async (
 
     await syncWordPressCookiesFromResponse(response);
 
-    const payload = await handleResponse<ConfirmUpgradeResponse>(response);
+    const payload = await handleResponse<ConfirmUpgradeResponse>(
+      response,
+      'MEMBERSHIP_CONFIRM_FAILED',
+      {
+        plan,
+        hasPaymentIntentId: Boolean(paymentIntentId),
+      },
+    );
 
     deviceLog.success('membership.upgrade.confirm.success', {
       plan,
@@ -699,6 +746,8 @@ export const confirmMembershipUpgrade = async (
         hasPaymentIntentId: Boolean(paymentIntentId),
       }),
     );
-    throw error;
+    throw ensureAppError(error, 'MEMBERSHIP_CONFIRM_FAILED', {
+      propagateMessage: true,
+    });
   }
 };

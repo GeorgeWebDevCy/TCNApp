@@ -5,6 +5,7 @@ import { LogLevel, OneSignal } from 'react-native-onesignal';
 import { DEFAULT_NOTIFICATION_PREFERENCES, NOTIFICATIONS_CONFIG, NotificationPreferences } from '../config/notificationsConfig';
 import { useAuthContext } from '../contexts/AuthContext';
 import { useLocalization } from '../contexts/LocalizationContext';
+import { createAppError } from '../errors';
 
 export type NotificationTarget = 'vendors' | 'membership';
 
@@ -305,7 +306,7 @@ export const OneSignalProvider: React.FC<React.PropsWithChildren> = ({ children 
 export const useOneSignalNotifications = (): OneSignalContextValue => {
   const context = React.useContext(OneSignalContext);
   if (!context) {
-    throw new Error('useOneSignalNotifications must be used within a OneSignalProvider.');
+    throw createAppError('PROVIDER_ONESIGNAL_MISSING');
   }
   return context;
 };

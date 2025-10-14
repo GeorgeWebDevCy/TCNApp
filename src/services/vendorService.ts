@@ -6,6 +6,7 @@ import {
 } from './wordpressCookieService';
 import { ensureValidSessionToken } from './wordpressAuthService';
 import { VendorTierDefinition, VendorTierDiscounts } from '../types/vendor';
+import { createAppError, ensureAppError } from '../errors';
 
 const VENDOR_ENDPOINTS = {
   tiers: '/wp-json/gn/v1/vendors/tiers',
@@ -126,7 +127,7 @@ export const fetchVendorTiers = async (
   try {
     const resolvedToken = await ensureValidSessionToken(authToken);
     if (!resolvedToken) {
-      throw new Error('Authentication token is unavailable.');
+      throw createAppError('SESSION_TOKEN_UNAVAILABLE');
     }
 
     const init = await buildWordPressRequestInit({
@@ -151,12 +152,16 @@ export const fetchVendorTiers = async (
     const json = isJson ? await response.json() : await response.text();
 
     if (!response.ok) {
-      const message =
+      const overrideMessage =
         typeof json === 'string'
           ? json
-          : getString((json as Record<string, unknown>)?.message) ??
-            'Unable to load vendor tiers.';
-      throw new Error(message);
+          : getString((json as Record<string, unknown>)?.message) ?? undefined;
+      throw createAppError('VENDOR_TIERS_FETCH_FAILED', {
+        overrideMessage,
+        metadata: {
+          status: response.status,
+        },
+      });
     }
 
     const root = json as Record<string, unknown>;
@@ -179,9 +184,13 @@ export const fetchVendorTiers = async (
     });
     return tiers;
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : 'Unable to load vendor tiers.';
-    deviceLog.warn('vendorService.fetchVendorTiers.error', { message });
-    throw error instanceof Error ? error : new Error(message);
+    const appError = ensureAppError(error, 'VENDOR_TIERS_FETCH_FAILED', {
+      propagateMessage: true,
+    });
+    deviceLog.warn('vendorService.fetchVendorTiers.error', {
+      code: appError.code,
+      message: appError.displayMessage,
+    });
+    throw appError;
   }
 };

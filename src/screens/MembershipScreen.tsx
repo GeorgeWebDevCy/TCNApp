@@ -30,6 +30,7 @@ import { COLORS } from '../config/theme';
 import { BrandLogo } from '../components/BrandLogo';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import deviceLog from '../utils/deviceLog';
+import { createAppError, ensureAppError } from '../errors';
 
 type MembershipScreenProps = {
   onBack?: () => void;
@@ -124,7 +125,7 @@ const PlanCard: React.FC<{
 export const MembershipScreen: React.FC<MembershipScreenProps> = ({
   onBack,
 }) => {
-  const { t, language } = useLocalization();
+  const { t, language, translateError } = useLocalization();
   const { getSessionToken, refreshSession, state } = useAuthContext();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const layout = useResponsiveLayout();
@@ -280,17 +281,27 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       applyPlans(fetchedPlans);
       logEvent('plans.load.success', { count: fetchedPlans.length });
     } catch (loadError) {
-      const message =
-        loadError instanceof Error
-          ? loadError.message
-          : t('membership.screen.loadError');
-      setError(message);
+      const appError = ensureAppError(
+        loadError,
+        'MEMBERSHIP_PLANS_FETCH_FAILED',
+        { propagateMessage: true },
+      );
+      const displayMessage =
+        translateError(appError) ?? appError.toDisplayString();
+      setError(displayMessage);
       applyPlans([]);
-      logEvent('plans.load.error', { message });
+      logEvent('plans.load.error', {
+        code: appError.code,
+        message: appError.displayMessage,
+      });
+      deviceLog.error('membership.plans.fetch.error', {
+        code: appError.code,
+        message: appError.displayMessage,
+      });
     } finally {
       setLoading(false);
     }
-  }, [applyPlans, getSessionToken, logEvent, t]);
+  }, [applyPlans, getSessionToken, logEvent, translateError]);
 
   useEffect(() => {
     loadPlans();
@@ -432,7 +443,9 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         });
 
         if (initResult.error) {
-          throw new Error(initResult.error.message);
+          throw createAppError('MEMBERSHIP_PAYMENT_SESSION_FAILED', {
+            overrideMessage: initResult.error.message,
+          });
         }
 
         deviceLog.debug('membership.checkout.paymentSheet.present.start', {
@@ -447,7 +460,9 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           errorMessage: presentResult.error?.message ?? null,
         });
         if (presentResult.error) {
-          throw new Error(presentResult.error.message);
+          throw createAppError('MEMBERSHIP_PAYMENT_PRESENT_FAILED', {
+            overrideMessage: presentResult.error.message,
+          });
         }
       } else {
         deviceLog.debug('membership.checkout.paymentSession.freeUpgrade', {
@@ -468,20 +483,24 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
           paymentSession.paymentIntentId ?? null,
         );
       } catch (confirmError) {
+        const appError = ensureAppError(
+          confirmError,
+          'MEMBERSHIP_CONFIRM_FAILED',
+          {
+            propagateMessage: true,
+          },
+        );
         deviceLog.warn('membership.checkout.confirmUpgrade.error', {
           planId: selectedPlan.id,
           requestPlanId,
-          message:
-            confirmError instanceof Error
-              ? confirmError.message
-              : String(confirmError),
+          code: appError.code,
+          message: appError.displayMessage,
         });
         logEvent('checkout.confirmationError', {
-          message:
-            confirmError instanceof Error
-              ? confirmError.message
-              : String(confirmError),
+          code: appError.code,
+          message: appError.displayMessage,
         });
+        throw appError;
       }
 
       await refreshSession();
@@ -504,16 +523,24 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
         ],
       );
     } catch (checkoutError) {
-      const message =
-        checkoutError instanceof Error
-          ? checkoutError.message
-          : t('membership.screen.checkoutError');
+      const appError = ensureAppError(
+        checkoutError,
+        'MEMBERSHIP_CHECKOUT_FAILED',
+        {
+          propagateMessage: true,
+        },
+      );
+      const message = translateError(appError) ?? appError.toDisplayString();
       Alert.alert(t('membership.screen.checkoutErrorTitle'), message);
       deviceLog.error('membership.checkout.error', {
         planId: selectedPlan?.id ?? null,
-        message,
+        code: appError.code,
+        message: appError.displayMessage,
       });
-      logEvent('checkout.error', { message });
+      logEvent('checkout.error', {
+        code: appError.code,
+        message: appError.displayMessage,
+      });
     } finally {
       setProcessing(false);
       deviceLog.debug('membership.checkout.complete', {
@@ -521,6 +548,8 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
       });
     }
   }, [
+    confirmMembershipUpgrade,
+    createMembershipPaymentSession,
     getSessionToken,
     logEvent,
     initPaymentSheet,
@@ -529,6 +558,7 @@ export const MembershipScreen: React.FC<MembershipScreenProps> = ({
     refreshSession,
     selectedPlan,
     t,
+    translateError,
   ]);
 
   const handleBackPress = useCallback(() => {

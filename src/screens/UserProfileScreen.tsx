@@ -24,6 +24,7 @@ import { getUserDisplayName, getUserInitials } from '../utils/user';
 import { PasswordVisibilityToggle } from '../components/PasswordVisibilityToggle';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 import deviceLog from '../utils/deviceLog';
+import { createAppError, ensureAppError } from '../errors';
 
 type UserProfileScreenProps = {
   onBack?: () => void;
@@ -199,7 +200,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       const asset = result.assets[0];
       if (!asset?.uri) {
         logEvent('avatar.change.invalidSelection');
-        throw new Error(t('profile.avatar.errors.invalidSelection'));
+        throw createAppError('AUTH_IMAGE_SELECTION_REQUIRED');
       }
 
       setAvatarSubmitting(true);
@@ -215,16 +216,16 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         t('profile.avatar.successMessage'),
       );
     } catch (error) {
-      const translated = translateError(
-        error instanceof Error ? error.message : null,
-      );
+      const appError = ensureAppError(error, 'PROFILE_AVATAR_UPDATE_FAILED', {
+        propagateMessage: true,
+      });
       logEvent('avatar.change.error', {
-        message:
-          error instanceof Error ? error.message : String(error ?? 'unknown'),
+        code: appError.code,
+        message: appError.displayMessage,
       });
       Alert.alert(
         t('profile.avatar.errorTitle'),
-        translated ?? t('profile.avatar.errorMessage'),
+        translateError(appError) ?? t('profile.avatar.errorMessage'),
       );
     } finally {
       setAvatarSubmitting(false);
@@ -242,16 +243,16 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         t('profile.avatar.removeSuccessMessage'),
       );
     } catch (error) {
-      const translated = translateError(
-        error instanceof Error ? error.message : null,
-      );
+      const appError = ensureAppError(error, 'PROFILE_AVATAR_REMOVE_FAILED', {
+        propagateMessage: true,
+      });
       logEvent('avatar.remove.error', {
-        message:
-          error instanceof Error ? error.message : String(error ?? 'unknown'),
+        code: appError.code,
+        message: appError.displayMessage,
       });
       Alert.alert(
         t('profile.avatar.errorTitle'),
-        translated ?? t('profile.avatar.removeErrorMessage'),
+        translateError(appError) ?? t('profile.avatar.removeErrorMessage'),
       );
     } finally {
       setAvatarSubmitting(false);
@@ -313,13 +314,15 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       setNewPassword('');
       setConfirmPassword('');
     } catch (error) {
-      const translated = translateError(
-        error instanceof Error ? error.message : 'Unable to change password.',
+      const appError = ensureAppError(error, 'AUTH_CHANGE_PASSWORD_FAILED', {
+        propagateMessage: true,
+      });
+      setPasswordError(
+        translateError(appError) ?? t('errors.changePassword'),
       );
-      setPasswordError(translated ?? t('errors.changePassword'));
       logEvent('password.change.error', {
-        message:
-          error instanceof Error ? error.message : String(error ?? 'unknown'),
+        code: appError.code,
+        message: appError.displayMessage,
       });
     } finally {
       setPasswordSubmitting(false);
@@ -366,15 +369,15 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       setNewPin('');
       setConfirmPin('');
     } catch (error) {
-      const translated = translateError(
-        error instanceof Error
-          ? error.message
-          : 'Something went wrong while saving your PIN.',
+      const appError = ensureAppError(error, 'AUTH_PIN_SAVE_FAILED', {
+        propagateMessage: true,
+      });
+      setPinError(
+        translateError(appError) ?? t('errors.pinSaveGeneric'),
       );
-      setPinError(translated ?? t('errors.pinSaveGeneric'));
       logEvent('pin.create.error', {
-        message:
-          error instanceof Error ? error.message : String(error ?? 'unknown'),
+        code: appError.code,
+        message: appError.displayMessage,
       });
     } finally {
       setPinSubmitting(false);
@@ -416,15 +419,15 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
               setNewPin('');
               setConfirmPin('');
             } catch (error) {
-              const translated = translateError(
-                error instanceof Error
-                  ? error.message
-                  : 'Something went wrong while removing your PIN.',
+              const appError = ensureAppError(error, 'AUTH_PIN_REMOVE_FAILED', {
+                propagateMessage: true,
+              });
+              setPinError(
+                translateError(appError) ?? t('errors.pinRemoveGeneric'),
               );
-              setPinError(translated ?? t('errors.pinRemoveGeneric'));
               logEvent('pin.remove.error', {
-                message:
-                  error instanceof Error ? error.message : String(error ?? 'unknown'),
+                code: appError.code,
+                message: appError.displayMessage,
               });
             } finally {
               setPinSubmitting(false);
@@ -469,15 +472,15 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         }),
       );
     } catch (error) {
-      const translated = translateError(
-        error instanceof Error
-          ? error.message
-          : 'Unable to complete biometric login.',
+      const appError = ensureAppError(error, 'AUTH_BIOMETRIC_LOGIN_FAILED', {
+        propagateMessage: true,
+      });
+      setBiometricError(
+        translateError(appError) ?? t('errors.biometricLogin'),
       );
-      setBiometricError(translated ?? t('errors.biometricLogin'));
       logEvent('biometric.enable.error', {
-        message:
-          error instanceof Error ? error.message : String(error ?? 'unknown'),
+        code: appError.code,
+        message: appError.displayMessage,
       });
     } finally {
       setBiometricSubmitting(false);
@@ -518,17 +521,19 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
                 t('profile.biometric.disabledMessage'),
               );
             } catch (error) {
-              const translated = translateError(
-                error instanceof Error
-                  ? error.message
-                  : 'Unable to complete biometric login.',
+              const appError = ensureAppError(
+                error,
+                'AUTH_BIOMETRIC_LOGIN_FAILED',
+                {
+                  propagateMessage: true,
+                },
               );
-              setBiometricError(translated ?? t('errors.biometricLogin'));
+              setBiometricError(
+                translateError(appError) ?? t('errors.biometricLogin'),
+              );
               logEvent('biometric.disable.error', {
-                message:
-                  error instanceof Error
-                    ? error.message
-                    : String(error ?? 'unknown'),
+                code: appError.code,
+                message: appError.displayMessage,
               });
             } finally {
               setBiometricSubmitting(false);

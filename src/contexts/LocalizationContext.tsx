@@ -12,6 +12,14 @@ import {
   TranslationValue,
   translations,
 } from '../localization/translations';
+import {
+  AppError,
+  ERROR_CATALOG,
+  ErrorDescriptor,
+  createAppError,
+  findDescriptorByCode,
+  isAppError,
+} from '../errors';
 import deviceLog from '../utils/deviceLog';
 
 const LANGUAGE_STORAGE_KEY = '@tcnapp/language';
@@ -27,7 +35,8 @@ type LocalizationContextValue = {
   setLanguage: (language: Language) => Promise<void>;
   t: (key: string, options?: TranslateOptions) => string;
   translateError: (
-    value: string | null | undefined,
+    value: string | AppError | null | undefined,
+    options?: { includeCode?: boolean },
   ) => string | null | undefined;
 };
 
@@ -83,6 +92,9 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Biometric authentication is not configured.':
     'errors.biometricsNotConfigured',
   'Unable to log in with WordPress credentials.': 'errors.wordpressCredentials',
+  'Username, email, and password are required.': 'errors.passwordLogin',
+  'Too many attempts. Try again shortly.': 'errors.passwordLogin',
+  'Your account is suspended. Contact support for assistance.': 'errors.vendorSuspended',
   'Something went wrong while saving your PIN.': 'errors.pinSaveGeneric',
   'Something went wrong while removing your PIN.': 'errors.pinRemoveGeneric',
   'Unable to send password reset email.': 'errors.passwordReset',
@@ -91,11 +103,63 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Passwords do not match.': 'errors.passwordMismatch',
   'Please select a vendor tier.': 'errors.vendorTierRequired',
   'Unable to change password.': 'errors.changePassword',
+  'Unable to update profile photo.': 'profile.avatar.errors.updateFailed',
+  'Unable to remove profile photo.': 'profile.avatar.errors.removeFailed',
+  'Unable to load vendor tiers.': 'auth.registerModal.vendorTierError',
+  'Unable to load membership plans. Please try again.':
+    'membership.screen.loadError',
+  'Unable to load admin data. Pull to refresh to try again.':
+    'admin.dashboard.errors.load',
+  'Unable to approve the vendor. Please try again.':
+    'admin.dashboard.errors.approve',
+  'Unable to reject the vendor. Please try again.':
+    'admin.dashboard.errors.reject',
+  'Unable to load transactions.': 'analytics.errors.fetch',
+  'Unable to store secure credential.': 'errors.generic',
   'PIN entries do not match.': 'errors.pinMismatch',
   'Your vendor account is pending approval.': 'errors.vendorPending',
   'Your vendor application has been rejected.': 'errors.vendorRejected',
   'Your vendor account has been suspended. Contact support for assistance.':
     'errors.vendorSuspended',
+};
+
+const translationKeyToDescriptor: Record<string, ErrorDescriptor> =
+  Object.values(ERROR_CATALOG).reduce<Record<string, ErrorDescriptor>>(
+    (accumulator, descriptor) => {
+      if (descriptor.translationKey) {
+        accumulator[descriptor.translationKey] = descriptor;
+      }
+      return accumulator;
+    },
+    {},
+  );
+
+type ParsedCodedMessage = {
+  code: string;
+  message: string;
+};
+
+const parseCodedMessage = (value: string): ParsedCodedMessage | null => {
+  const match = value.match(/^(E\d{4})\s*:\s*(.+)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    code: match[1],
+    message: match[2],
+  };
+};
+
+const formatWithCode = (
+  code: string | undefined,
+  message: string,
+  includeCode: boolean,
+): string => {
+  if (!code || !includeCode) {
+    return message;
+  }
+  return `${code}: ${message}`;
 };
 
 export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
@@ -178,23 +242,80 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
   const translateError = useCallback<
     LocalizationContextValue['translateError']
   >(
-    value => {
-      if (!value) {
-        return value;
+    (value, options) => {
+      if (value === null || value === undefined) {
+        return value ?? null;
       }
 
-      const key =
-        errorMessageToKeyMap[value] ??
-        (value.startsWith('errors.') ? value : undefined);
-      if (key) {
+      const includeCode = options?.includeCode ?? true;
+
+      if (isAppError(value)) {
+        const descriptor = value.descriptor;
+        const localized =
+          descriptor.translationKey
+            ? translate(descriptor.translationKey, {
+                defaultValue: value.displayMessage,
+              })
+            : value.displayMessage;
+        const finalMessage =
+          value.overrideMessage && value.overrideMessage.trim().length > 0
+            ? value.overrideMessage.trim()
+            : localized;
+        const formatted = formatWithCode(
+          value.code,
+          finalMessage,
+          includeCode,
+        );
         deviceLog.debug('localization.translateError', {
-          key,
+          id: value.id,
+          code: value.code,
           language,
         });
-        return translate(key);
+        return formatted;
       }
 
-      return value;
+      if (typeof value !== 'string') {
+        return String(value);
+      }
+
+      const parsed = parseCodedMessage(value);
+      if (parsed) {
+        const descriptor = findDescriptorByCode(parsed.code);
+        const localized =
+          descriptor?.translationKey
+            ? translate(descriptor.translationKey, {
+                defaultValue: descriptor.defaultMessage,
+              })
+            : descriptor?.defaultMessage ?? parsed.message;
+        const finalMessage =
+          parsed.message && parsed.message.trim().length > 0
+            ? parsed.message.trim()
+            : localized;
+        return formatWithCode(parsed.code, finalMessage, includeCode);
+      }
+
+      const translationKey =
+        errorMessageToKeyMap[value] ??
+        (value.startsWith('errors.') ? value : undefined);
+      if (translationKey) {
+        const descriptor = translationKeyToDescriptor[translationKey];
+        const localized = translate(translationKey);
+        const formatted = formatWithCode(
+          descriptor?.code,
+          localized,
+          includeCode && Boolean(descriptor?.code),
+        );
+        deviceLog.debug('localization.translateError', {
+          key: translationKey,
+          language,
+          code: descriptor?.code ?? null,
+        });
+        return formatted;
+      }
+
+      return includeCode
+        ? value
+        : value.replace(/^[A-Z]\d{4}:\s*/, '');
     },
     [language, translate],
   );
@@ -219,9 +340,7 @@ export const LocalizationProvider: React.FC<React.PropsWithChildren> = ({
 export const useLocalization = (): LocalizationContextValue => {
   const context = React.useContext(LocalizationContext);
   if (!context) {
-    throw new Error(
-      'useLocalization must be used within a LocalizationProvider.',
-    );
+    throw createAppError('PROVIDER_LOCALIZATION_MISSING');
   }
   return context;
 };

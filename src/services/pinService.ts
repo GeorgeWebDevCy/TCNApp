@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PIN_CONFIG } from '../config/authConfig';
 import { generateSalt, hashWithSalt } from '../utils/hash';
+import { createAppError } from '../errors';
 
 const getStoredHash = async (): Promise<string | null> => {
   return AsyncStorage.getItem(PIN_CONFIG.storageKey);
@@ -17,7 +18,7 @@ export const hasPin = async (): Promise<boolean> => {
 
 export const registerPin = async (pin: string): Promise<void> => {
   if (pin.length < 4) {
-    throw new Error('PIN must contain at least 4 digits.');
+    throw createAppError('AUTH_PIN_LENGTH');
   }
 
   const salt = generateSalt();

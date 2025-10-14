@@ -1,4 +1,5 @@
 import { ONESIGNAL_APP_ID } from '@env';
+import { createAppError } from '../errors';
 
 type MaybeString = string | undefined | null;
 
@@ -31,7 +32,7 @@ const resolveAppId = (): string => {
   const candidate = coalesceAppId(ONESIGNAL_APP_ID, getProcessEnvAppId());
 
   if (!candidate) {
-    throw new Error('ONESIGNAL_APP_ID is not configured.');
+    throw createAppError('NOTIFICATIONS_APP_ID_MISSING');
   }
 
   return candidate.trim();

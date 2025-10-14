@@ -447,6 +447,9 @@ export const translations: Record<Language, TranslationDictionary> = {
           empty: 'No transaction history to chart yet.',
         },
       },
+      errors: {
+        fetch: 'Unable to load transactions.',
+      },
     },
     profile: {
       title: 'Your profile',
@@ -473,6 +476,8 @@ export const translations: Record<Language, TranslationDictionary> = {
           'Please try again or ensure the WordPress avatar endpoint supports removal.',
         errors: {
           invalidSelection: 'Select a valid image to continue.',
+          updateFailed: 'Unable to update profile photo.',
+          removeFailed: 'Unable to remove profile photo.',
         },
       },
       qr: {
@@ -555,6 +560,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       },
     },
     errors: {
+      generic: 'Something went wrong. Please try again.',
       passwordLogin: 'Unable to complete password login.',
       incorrectPin: 'Incorrect PIN.',
       noSavedSession:
@@ -1020,6 +1026,9 @@ export const translations: Record<Language, TranslationDictionary> = {
           empty: 'ยังไม่มีประวัติธุรกรรมสำหรับสร้างกราฟ',
         },
       },
+      errors: {
+        fetch: 'ไม่สามารถโหลดข้อมูลรายการได้',
+      },
     },
     profile: {
       title: 'โปรไฟล์ของคุณ',
@@ -1043,6 +1052,8 @@ export const translations: Record<Language, TranslationDictionary> = {
           'โปรดลองอีกครั้งหรือตรวจสอบว่าเอ็นด์พอยต์รองรับการลบรูปภาพ.',
         errors: {
           invalidSelection: 'โปรดเลือกรูปภาพที่ถูกต้องเพื่อดำเนินการต่อ.',
+          updateFailed: 'ไม่สามารถอัปเดตรูปโปรไฟล์ได้',
+          removeFailed: 'ไม่สามารถลบรูปโปรไฟล์ได้',
         },
       },
       qr: {
@@ -1126,6 +1137,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       },
     },
     errors: {
+      generic: 'เกิดข้อผิดพลาดที่ไม่คาดคิด โปรดลองอีกครั้ง',
       passwordLogin: 'ไม่สามารถเข้าสู่ระบบด้วยรหัสผ่านได้',
       incorrectPin: 'พินไม่ถูกต้อง',
       noSavedSession: 'ไม่มีเซสชันที่บันทึกไว้ โปรดเข้าสู่ระบบด้วยรหัสผ่านก่อน',

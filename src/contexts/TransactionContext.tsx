@@ -9,6 +9,7 @@ import React, {
 import { useAuthContext } from './AuthContext';
 import { TransactionRecord } from '../types/transactions';
 import deviceLog from '../utils/deviceLog';
+import { createAppError } from '../errors';
 
 interface TransactionState {
   transactions: TransactionRecord[];
@@ -183,7 +184,7 @@ export const TransactionProvider: React.FC<PropsWithChildren> = ({
 export const useTransactionContext = (): TransactionContextValue => {
   const context = useContext(TransactionContext);
   if (!context) {
-    throw new Error('useTransactionContext must be used within a TransactionProvider');
+    throw createAppError('PROVIDER_TRANSACTION_MISSING');
   }
   return context;
 };

@@ -1,6 +1,7 @@
 import 'react-native-get-random-values';
 import SHA256 from 'crypto-js/sha256';
 import encHex from 'crypto-js/enc-hex';
+import { createAppError } from '../errors';
 
 export const hashWithSalt = (value: string, salt: string): string => {
   return SHA256(`${salt}:${value}`).toString(encHex);
@@ -21,7 +22,7 @@ const getSecureRandomBytes = (size: number): Uint8Array => {
     return buffer;
   }
 
-  throw new Error('Secure random number generator is not available.');
+  throw createAppError('CRYPTO_RANDOM_UNAVAILABLE');
 };
 
 export const generateSalt = (length = 16): string => {

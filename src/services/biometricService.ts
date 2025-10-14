@@ -1,3 +1,5 @@
+import { createAppError } from '../errors';
+
 export type BiometryType =
   | 'TouchID'
   | 'FaceID'
@@ -53,7 +55,7 @@ export const authenticateWithBiometrics = async (
   message = 'Log in with biometrics',
 ): Promise<boolean> => {
   if (!biometricsClient) {
-    throw new Error('Biometric authentication is not configured.');
+    throw createAppError('AUTH_BIOMETRICS_NOT_CONFIGURED');
   }
 
   try {

@@ -1,5 +1,6 @@
 import EncryptedStorage from 'react-native-encrypted-storage';
 import deviceLog from '../utils/deviceLog';
+import { ensureAppError } from '../errors';
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -22,9 +23,10 @@ export const setSecureValue = async (
       key,
       message: describeError(error),
     });
-    throw error instanceof Error
-      ? error
-      : new Error('Unable to store secure credential.');
+    const appError = ensureAppError(error, 'SECURE_CREDENTIAL_STORE_FAILED', {
+      propagateMessage: true,
+    });
+    throw appError;
   }
 };
 

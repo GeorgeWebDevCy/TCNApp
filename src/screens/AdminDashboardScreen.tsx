@@ -20,6 +20,7 @@ import {
 } from '../services/adminService';
 import { COLORS } from '../config/theme';
 import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
+import { createAppError, ensureAppError } from '../errors';
 
 interface AdminDashboardScreenProps {
   onOpenMemberExperience?: () => void;
@@ -63,7 +64,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
   onOpenMemberExperience,
 }) => {
   const { state, getSessionToken } = useAuthContext();
-  const { t } = useLocalization();
+  const { t, translateError } = useLocalization();
   const layout = useResponsiveLayout();
 
   const [accounts, setAccounts] = useState<AdminAccountSummary[]>([]);
@@ -78,18 +79,20 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
     try {
       const token = await getSessionToken();
       if (!token) {
-        throw new Error(t('admin.dashboard.errors.load'));
+        throw createAppError('SESSION_TOKEN_UNAVAILABLE');
       }
       const directory = await fetchAdminAccounts(token);
       setAccounts(directory);
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : t('admin.dashboard.errors.load');
+      const appError = ensureAppError(err, 'ADMIN_DASHBOARD_LOAD_FAILED', {
+        propagateMessage: true,
+      });
+      const message = translateError(appError) ?? appError.toDisplayString();
       setError(message);
     } finally {
       setLoading(false);
     }
-  }, [getSessionToken, t]);
+  }, [getSessionToken, translateError]);
 
   useEffect(() => {
     void loadAccounts();
@@ -125,21 +128,27 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({
       try {
         const token = await getSessionToken();
         if (!token) {
-          throw new Error(t(`admin.dashboard.errors.${errorKey}`));
+          throw createAppError('SESSION_TOKEN_UNAVAILABLE');
         }
         await performer(token);
         await loadAccounts();
       } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : t(`admin.dashboard.errors.${errorKey}`);
-        Alert.alert(t('admin.dashboard.title'), message);
+        const fallbackId =
+          errorKey === 'approve'
+            ? 'ADMIN_VENDOR_APPROVE_FAILED'
+            : 'ADMIN_VENDOR_REJECT_FAILED';
+        const appError = ensureAppError(err, fallbackId, {
+          propagateMessage: true,
+        });
+        Alert.alert(
+          t('admin.dashboard.title'),
+          translateError(appError) ?? appError.toDisplayString(),
+        );
       } finally {
         setActiveAction(null);
       }
     },
-    [getSessionToken, loadAccounts, t],
+    [getSessionToken, loadAccounts, t, translateError],
   );
 
   const confirmApprove = useCallback(
