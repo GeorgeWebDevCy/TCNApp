@@ -26,6 +26,7 @@ interface LogEntry {
   level: LogLevel;
   message: string;
   timestamp: number;
+  params?: unknown[];
 }
 
 type ConsoleMethod = 'log' | 'info' | 'debug' | 'warn' | 'error';
@@ -181,6 +182,11 @@ const handleNewEntry = (
     message: formattedMessage,
     timestamp: Date.now(),
   };
+
+  Object.defineProperty(entry, 'params', {
+    value: params,
+    enumerable: false,
+  });
 
   entries = [...entries, entry];
   notifySubscribers();
