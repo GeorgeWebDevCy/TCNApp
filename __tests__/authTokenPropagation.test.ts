@@ -15,11 +15,16 @@ jest.mock('@react-native-async-storage/async-storage', () =>
 jest.mock('../src/utils/deviceLog', () => ({
   __esModule: true,
   default: {
+    init: jest.fn(() => Promise.resolve()),
     debug: jest.fn(),
     info: jest.fn(),
     warn: jest.fn(),
     error: jest.fn(),
     success: jest.fn(),
+    clear: jest.fn(),
+    getEntries: jest.fn(() => []),
+    subscribe: jest.fn(() => jest.fn()),
+    onEntry: jest.fn(() => jest.fn()),
   },
 }));
 

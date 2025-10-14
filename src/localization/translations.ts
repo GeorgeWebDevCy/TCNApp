@@ -12,6 +12,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       appName: 'The Consumer Network',
       appAbbreviation: 'TCN',
       appTagline: 'Trusted as {{abbreviation}}',
+      errorTitle: 'Something went wrong',
       or: 'or',
     },
     languages: {
@@ -599,6 +600,7 @@ export const translations: Record<Language, TranslationDictionary> = {
       appName: 'เครือข่ายผู้บริโภค',
       appAbbreviation: 'TCN',
       appTagline: 'เชื่อมั่นใน {{abbreviation}}',
+      errorTitle: 'เกิดข้อผิดพลาด',
       or: 'หรือ',
     },
     languages: {

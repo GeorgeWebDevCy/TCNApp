@@ -32,6 +32,7 @@ import { PostLoginDiagnosticsScreen } from './src/screens/PostLoginDiagnosticsSc
 import { STRIPE_CONFIG } from './src/config/stripeConfig';
 import { MembershipDebugScreen } from './src/screens/MembershipDebugScreen';
 import { COLORS } from './src/config/theme';
+import { ErrorNotifier } from './src/components/ErrorNotifier';
 
 // AppContent is intentionally separated from the surrounding provider tree so we can
 // consume the AuthContext without worrying about provider order in the JSX tree below.
@@ -233,9 +234,10 @@ function App(): JSX.Element {
             <AuthProvider>
               <TransactionProvider>
                 <OneSignalProvider>
-                <View style={styles.appContainer}>
-                  {/* Render the conditional app content discussed above. */}
-                  <AppContent />
+                  <View style={styles.appContainer}>
+                    <ErrorNotifier />
+                    {/* Render the conditional app content discussed above. */}
+                    <AppContent />
                   {!areLogsVisible && (
                     // When the log overlay is hidden we show a floating action button
                     // styled as "Show Logs" to let developers bring it into view.
@@ -281,7 +283,7 @@ function App(): JSX.Element {
                       />
                     </View>
                   )}
-                </View>
+                  </View>
                 </OneSignalProvider>
               </TransactionProvider>
             </AuthProvider>

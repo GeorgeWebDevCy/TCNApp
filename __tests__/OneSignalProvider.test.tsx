@@ -8,10 +8,16 @@ jest.mock('@react-native-async-storage/async-storage', () =>
   require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
 );
 jest.mock('../src/utils/deviceLog', () => ({
+  init: jest.fn(() => Promise.resolve()),
+  debug: jest.fn(),
   info: jest.fn(),
   warn: jest.fn(),
   error: jest.fn(),
   success: jest.fn(),
+  clear: jest.fn(),
+  getEntries: jest.fn(() => []),
+  subscribe: jest.fn(() => jest.fn()),
+  onEntry: jest.fn(() => jest.fn()),
 }));
 
 jest.mock('../src/contexts/AuthContext', () => ({

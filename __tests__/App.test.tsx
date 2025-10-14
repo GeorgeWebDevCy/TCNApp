@@ -27,6 +27,13 @@ jest.mock(
       warn: jest.fn(),
       error: jest.fn(),
       success: jest.fn(),
+      clear: jest.fn(),
+      getEntries: jest.fn(() => []),
+      subscribe: jest.fn((callback: (entries: unknown[]) => void) => {
+        callback([]);
+        return jest.fn();
+      }),
+      onEntry: jest.fn(() => jest.fn()),
     },
     LogView: jest.fn(() => null),
   }),

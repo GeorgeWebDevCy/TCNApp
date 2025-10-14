@@ -31,6 +31,8 @@ interface LogEntry {
 type ConsoleMethod = 'log' | 'info' | 'debug' | 'warn' | 'error';
 
 type Subscriber = (entries: LogEntry[]) => void;
+export type DeviceLogEntry = LogEntry;
+export type DeviceLogListener = (entry: DeviceLogEntry) => void;
 
 const LOG_STORAGE_KEY = '@device-log';
 const defaultOptions: Required<
@@ -52,6 +54,7 @@ const defaultOptions: Required<
 };
 
 const subscribers = new Set<Subscriber>();
+const entrySubscribers = new Set<DeviceLogListener>();
 let entries: LogEntry[] = [];
 let activeOptions: DeviceLogOptions = { ...defaultOptions };
 let storageAdapter: StorageAdapter | null = null;
@@ -181,6 +184,14 @@ const handleNewEntry = (
 
   entries = [...entries, entry];
   notifySubscribers();
+  entrySubscribers.forEach(callback => {
+    try {
+      callback(entry);
+    } catch (error) {
+      const logger = originalConsole.warn ?? console.warn;
+      logger('DeviceLog entry subscriber threw an error', error);
+    }
+  });
   void persistEntries();
 
   if (shouldSendToActivityMonitor(level)) {
@@ -302,6 +313,25 @@ const deviceLog = {
     })();
   },
 
+  getEntries(): DeviceLogEntry[] {
+    return getRenderableEntries();
+  },
+
+  subscribe(callback: Subscriber): () => void {
+    subscribers.add(callback);
+    callback(getRenderableEntries());
+    return () => {
+      subscribers.delete(callback);
+    };
+  },
+
+  onEntry(callback: DeviceLogListener): () => void {
+    entrySubscribers.add(callback);
+    return () => {
+      entrySubscribers.delete(callback);
+    };
+  },
+
   startTimer(name: string) {
     timers.set(name, Date.now());
   },
@@ -359,14 +389,10 @@ export const LogView: React.FC<LogViewProps> = ({
   const [logs, setLogs] = useState<LogEntry[]>(() => getRenderableEntries());
 
   useEffect(() => {
-    const subscriber: Subscriber = nextEntries => {
+    const unsubscribe = deviceLog.subscribe(nextEntries => {
       setLogs(nextEntries);
-    };
-
-    subscribers.add(subscriber);
-    return () => {
-      subscribers.delete(subscriber);
-    };
+    });
+    return unsubscribe;
   }, []);
 
   const data = useMemo(() => {
