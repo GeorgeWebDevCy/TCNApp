@@ -249,6 +249,92 @@ const extractTokenFromUrl = (value: string): string | undefined => {
   return undefined;
 };
 
+const TOKEN_KEY_PRIORITY = [
+  'token',
+  'api_token',
+  'apiToken',
+  'login_token',
+  'loginToken',
+  'jwt',
+  'jwt_token',
+  'jwtToken',
+  'bearer',
+  'access_token',
+  'accessToken',
+];
+
+const TOKEN_KEY_PATTERN = /token|auth|jwt|bearer/i;
+
+const extractTokenCandidate = (value: unknown, depth = 0): string | null => {
+  if (value == null || depth > 5) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const candidate = extractTokenCandidate(entry, depth + 1);
+      if (candidate) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+
+    for (const key of TOKEN_KEY_PRIORITY) {
+      if (key in record) {
+        const candidate = extractTokenCandidate(record[key], depth + 1);
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+
+    for (const [key, entry] of Object.entries(record)) {
+      if (!TOKEN_KEY_PATTERN.test(key)) {
+        continue;
+      }
+
+      const candidate = extractTokenCandidate(entry, depth + 1);
+      if (candidate) {
+        return candidate;
+      }
+    }
+
+    for (const entry of Object.values(record)) {
+      if (typeof entry === 'string') {
+        const trimmed = entry.trim();
+        if (
+          trimmed &&
+          trimmed.length >= MIN_API_TOKEN_LENGTH &&
+          !/\s/.test(trimmed) &&
+          !isLikelyUrl(trimmed)
+        ) {
+          return trimmed;
+        }
+      }
+    }
+
+    for (const entry of Object.values(record)) {
+      if (entry && typeof entry === 'object') {
+        const candidate = extractTokenCandidate(entry, depth + 1);
+        if (candidate) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
 const isLikelyJwtToken = (value?: string | null): boolean => {
   if (!value || typeof value !== 'string') {
     return false;
@@ -694,6 +780,11 @@ const getString = (value: unknown): string | null => {
     return value.trim();
   }
   return null;
+};
+
+const resolveTokenString = (value: unknown): string | null => {
+  const candidate = extractTokenCandidate(value);
+  return candidate ?? null;
 };
 
 const parseExpiresInSeconds = (value: unknown): number | null => {
@@ -3024,18 +3115,19 @@ export const loginWithPassword = async ({
       : null;
 
   const rawApiTokenValue =
-    getString(json.api_token) ??
-    getString((json as any).apiToken) ??
-    getString(json.login_token) ??
-    getString((json as any).loginToken) ??
+    resolveTokenString(json.api_token) ??
+    resolveTokenString((json as any).apiToken) ??
+    resolveTokenString(json.login_token) ??
+    resolveTokenString((json as any).loginToken) ??
     (dataWrapper
-      ? getString((dataWrapper as any).api_token) ??
-        getString((dataWrapper as any).apiToken) ??
-        getString((dataWrapper as any).login_token) ??
-        getString((dataWrapper as any).loginToken)
+      ? resolveTokenString((dataWrapper as any).api_token) ??
+        resolveTokenString((dataWrapper as any).apiToken) ??
+        resolveTokenString((dataWrapper as any).login_token) ??
+        resolveTokenString((dataWrapper as any).loginToken)
       : null);
   const rawTokenFieldValue =
-    getString(json.token) ?? (dataWrapper ? getString((dataWrapper as any).token) : null);
+    resolveTokenString(json.token) ??
+    (dataWrapper ? resolveTokenString((dataWrapper as any).token) : null);
   const normalizedApiToken = normalizeApiToken(rawApiTokenValue);
   const normalizedTokenField = normalizeApiToken(rawTokenFieldValue);
   const tokenFieldIsJwt = isLikelyJwtToken(normalizedTokenField);

@@ -242,6 +242,41 @@ describe('wordpressAuthService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('extracts reusable API tokens from nested token objects in the response payload', async () => {
+    const apiToken = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl';
+
+    const fetchMock = jest
+      .fn()
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          success: true,
+          data: {
+            token: {
+              token: apiToken,
+              expires_in: 3600,
+            },
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse(200, {
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+        }),
+      );
+
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const session = await loginWithPassword({
+      email: 'member@example.com',
+      password: 'passw0rd',
+    });
+
+    expect(session.token).toBe(apiToken);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('persists the avatar URL returned by the WordPress profile endpoint', async () => {
     const loginResponseBody = {
       token: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl',
