@@ -3070,7 +3070,7 @@ export const loginWithPassword = async ({
   const looksLikeEmail = trimmedIdentifier.includes('@');
 
   const requestBody: Record<string, unknown> = {
-    username: looksLikeEmail ? '' : trimmedIdentifier,
+    username: trimmedIdentifier,
     password,
   };
 

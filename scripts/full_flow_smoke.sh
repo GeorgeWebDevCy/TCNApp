@@ -189,15 +189,18 @@ ACCOUNT_TYPE=""
 
 step_login() {
   echo "\n[1/8] Authenticating user..." >&2
-  local body=""
+  local body
+  local email_fragment=""
 
-  # When an email address is supplied, mirror the mobile app behaviour by
-  # sending it under the `email` key and leaving `username` blank.
+  # The WordPress connector expects both `username` and `email` keys when an
+  # email address is supplied. Mirror the mobile app behaviour by including an
+  # `email` field whenever the identifier looks like an email, while still
+  # supporting username-only logins.
   if [[ "$USERNAME" == *"@"* ]]; then
-    body=$(printf '{"username":"","email":"%s","password":"%s"}' "$USERNAME" "$PASSWORD")
-  else
-    body=$(printf '{"username":"%s","password":"%s"}' "$USERNAME" "$PASSWORD")
+    email_fragment=$(printf ',"email":"%s"' "$USERNAME")
   fi
+
+  body=$(printf '{"username":"%s"%s,"password":"%s"}' "$USERNAME" "$email_fragment" "$PASSWORD")
   local raw
   raw=$(api POST "/wp-json/gn/v1/login" "$body")
   local status
