@@ -649,55 +649,44 @@ const refreshJwtTokenIfPossible = async (
     return null;
   }
 
-  const endpoints = [
-    WORDPRESS_CONFIG.endpoints.refreshToken,
-    WORDPRESS_CONFIG.endpoints.legacyRefreshToken,
-  ].filter(
-    (value, index, array): value is string =>
-      typeof value === 'string' &&
-      value.length > 0 &&
-      array.indexOf(value) === index,
-  );
-
-  for (const endpoint of endpoints) {
-    try {
-      const response = await fetchWithRouteFallback(endpoint, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `Bearer ${normalized}`,
-        },
-      });
-
-      const status = response.status;
-      const json = await parseJsonResponse<JwtTokenResponse>(response);
-
-      if (status === 404) {
-        continue;
-      }
-
-      if (!response.ok || !json || typeof json !== 'object') {
-        return null;
-      }
-
-      const jsonRecord = json as Record<string, unknown>;
-      const rawToken =
-        getString(json.token) ??
-        getString(json.api_token) ??
-        getString(jsonRecord['apiToken']);
-      const nextToken = normalizeApiToken(rawToken ?? undefined);
-      if (!nextToken) {
-        return null;
-      }
-
-      const expiresAt = extractTokenExpiry(jsonRecord);
-      return { token: nextToken, expiresAt };
-    } catch (error) {
-      continue;
-    }
+  const endpoint = WORDPRESS_CONFIG.endpoints.refreshToken;
+  if (!endpoint) {
+    return null;
   }
 
-  return null;
+  try {
+    const response = await fetchWithRouteFallback(endpoint, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${normalized}`,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = await parseJsonResponse<JwtTokenResponse>(response);
+    if (!json || typeof json !== 'object') {
+      return null;
+    }
+
+    const jsonRecord = json as Record<string, unknown>;
+    const rawToken =
+      getString(json.token) ??
+      getString(json.api_token) ??
+      getString(jsonRecord['apiToken']);
+    const nextToken = normalizeApiToken(rawToken ?? undefined);
+    if (!nextToken) {
+      return null;
+    }
+
+    const expiresAt = extractTokenExpiry(jsonRecord);
+    return { token: nextToken, expiresAt };
+  } catch (error) {
+    return null;
+  }
 };
 
 const fetchWithRouteFallback = async (
@@ -1622,50 +1611,6 @@ const parseMembershipInfo = (
   };
 };
 
-const parseMemberQrCodePayload = (
-  payload: Record<string, unknown> | null | undefined,
-  fallbackPayload?: string | null,
-): MemberQrCode | null => {
-  if (!payload) {
-    return null;
-  }
-
-  const token =
-    getString(payload.token) ??
-    getString(payload.qr_token) ??
-    getString(payload.code) ??
-    null;
-
-  if (!token) {
-    return null;
-  }
-
-  const payloadValue =
-    getString(payload.payload) ??
-    getString(payload.qr_payload) ??
-    fallbackPayload ??
-    null;
-
-  const issuedAt =
-    getString(payload.issued_at) ??
-    getString(payload.issuedAt) ??
-    getString(payload.created_at) ??
-    getString(payload.createdAt) ??
-    null;
-
-  const expiresAt =
-    getString(payload.expires_at) ??
-    getString(payload.expiresAt) ??
-    null;
-
-  return {
-    token,
-    payload: payloadValue ?? null,
-    issuedAt,
-    expiresAt,
-  };
-};
-
 const fetchUserProfile = async (token: string): Promise<AuthUser | null> => {
   try {
     const result = await fetchSessionUser(token);
@@ -1690,60 +1635,15 @@ export const ensureMemberQrCode = async ({
     return null;
   }
 
-  const endpoint =
-    WORDPRESS_CONFIG.endpoints.membershipQr ?? '/wp-json/gn/v1/membership/qr';
+  deviceLog.info('wordpressAuth.ensureMemberQrCode.disabled', {
+    tokenPreview:
+      normalizedToken.length > 4
+        ? normalizedToken.slice(-4)
+        : normalizedToken,
+    hasPayload: Boolean(payload),
+  });
 
-  try {
-    const response = await fetchWithRouteFallback(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${normalizedToken}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(
-        payload && payload.trim().length > 0 ? { payload } : {},
-      ),
-    });
-
-    deviceLog.debug('wordpressAuth.ensureMemberQrCode.response', {
-      status: response.status,
-      ok: response.ok,
-    });
-
-    const json = await parseJsonResponse<Record<string, unknown> | null>(
-      response,
-    );
-
-    if (!response.ok) {
-      const message =
-        (json?.message && typeof json.message === 'string'
-          ? sanitizeErrorMessage(json.message)
-          : null) ?? null;
-      deviceLog.warn('wordpressAuth.ensureMemberQrCode.failed', {
-        status: response.status,
-        message,
-      });
-      return null;
-    }
-
-    const qrCode = parseMemberQrCodePayload(json ?? undefined, payload ?? null);
-    if (!qrCode) {
-      deviceLog.warn('wordpressAuth.ensureMemberQrCode.emptyPayload', {
-        status: response.status,
-      });
-    } else {
-      deviceLog.debug('wordpressAuth.ensureMemberQrCode.success', {
-        tokenPreview: qrCode.token.slice(-4),
-      });
-    }
-    return qrCode;
-  } catch (error) {
-    deviceLog.warn('wordpressAuth.ensureMemberQrCode.error', {
-      message: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  }
+  return null;
 };
 
 export const validateMemberQrCode = async (
@@ -1759,116 +1659,20 @@ export const validateMemberQrCode = async (
     };
   }
 
-  const normalizedAuth = normalizeApiToken(authToken);
-  if (!normalizedAuth) {
-    throw createAppError('SESSION_TOKEN_UNAVAILABLE', {
-      overrideMessage:
-        'Authentication token is required to validate member QR codes.',
-    });
-  }
+  deviceLog.info('wordpressAuth.validateMemberQrCode.disabled', {
+    tokenPreview:
+      trimmedToken.length > 4 ? trimmedToken.slice(-4) : trimmedToken,
+    hasAuthToken: Boolean(normalizeApiToken(authToken)),
+  });
 
-  const endpoint =
-    WORDPRESS_CONFIG.endpoints.validateQr ??
-    '/wp-json/gn/v1/membership/qr/validate';
-
-  try {
-    const response = await fetchWithRouteFallback(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${normalizedAuth}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ token: trimmedToken }),
-    });
-
-    const json = await parseJsonResponse<Record<string, unknown> | null>(
-      response,
-    );
-
-    if (!response.ok) {
-      const message =
-        (json?.message && typeof json.message === 'string'
-          ? sanitizeErrorMessage(json.message)
-          : 'Unable to validate member QR code.');
-      deviceLog.warn('wordpressAuth.validateMemberQrCode.failed', {
-        status: response.status,
-        message,
-      });
-      return {
-        token: trimmedToken,
-        valid: false,
-        message,
-      };
-    }
-
-    const membership = parseMembershipInfo(
-      (json?.membership as Record<string, unknown> | undefined) ??
-        (json?.member as Record<string, unknown> | undefined)?.membership ??
-        undefined,
-    );
-
-    const membershipTier =
-      membership?.tier ??
-      getString(json?.membership_tier) ??
-      getString(
-        (json?.member as Record<string, unknown> | undefined)?.membership_tier,
-      ) ??
-      null;
-
-    const allowedDiscount =
-      parseDiscountValue(json?.allowed_discount) ??
-      parseDiscountValue(json?.discount) ??
-      parseDiscountValue(
-        (json?.member as Record<string, unknown> | undefined)?.discount,
-      ) ??
-      null;
-
-    const memberName =
-      getString(
-        (json?.member as Record<string, unknown> | undefined)?.name ??
-          json?.member_name ??
-          json?.customer_name ??
-          json?.user_name,
-      ) ?? null;
-
-    const validFlag = json?.valid;
-    const isValid =
-      typeof validFlag === 'boolean'
-        ? validFlag
-        : typeof validFlag === 'string'
-        ? validFlag.toLowerCase() === 'true'
-        : typeof validFlag === 'number'
-        ? validFlag === 1
-        : true;
-
-    const result: MemberValidationResult = {
-      token: trimmedToken,
-      valid: Boolean(isValid),
-      memberName,
-      membershipTier,
-      allowedDiscount: allowedDiscount ?? null,
-      membership: membership ?? null,
-      message: getString(json?.message) ?? null,
-    };
-
-    deviceLog.debug('wordpressAuth.validateMemberQrCode.success', {
-      tokenPreview: trimmedToken.slice(-4),
-      valid: result.valid,
-      membershipTier: result.membershipTier ?? null,
-      discount: result.allowedDiscount ?? null,
-    });
-
-    return result;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    deviceLog.warn('wordpressAuth.validateMemberQrCode.error', { message });
-    return {
-      token: trimmedToken,
-      valid: false,
-      message,
-    };
-  }
+  return {
+    token: trimmedToken,
+    valid: false,
+    membership: null,
+    membershipTier: null,
+    allowedDiscount: null,
+    message: 'Member QR validation is not supported.',
+  };
 };
 
 export const setSessionLock = async (locked: boolean) => {
@@ -3516,13 +3320,9 @@ export const requestPasswordReset = async (
     throw createAppError('AUTH_PASSWORD_RESET_EMAIL_FAILED');
   }
 
-  const payload: Record<string, string> = {
-    identifier: trimmed,
-    user_login: trimmed,
-    user_email: trimmed,
-    username: trimmed,
-    email: trimmed,
+  const payload: Record<string, unknown> = {
     login: trimmed,
+    return_verification_code: true,
   };
 
   const response = await fetchWithRouteFallback(
@@ -3572,51 +3372,27 @@ export const requestPasswordReset = async (
 export const registerAccount = async (
   options: RegisterOptions,
 ): Promise<string | undefined> => {
-  const registrationDate =
-    typeof options.registrationDate === 'string' &&
-    options.registrationDate.trim().length > 0
-      ? options.registrationDate
-      : new Date().toISOString();
-
   const username = options.username.trim();
   const email = options.email.trim();
-  const firstName = options.firstName?.trim() ?? '';
-  const lastName = options.lastName?.trim() ?? '';
-
-  const billing: Record<string, string | undefined> = {
-    first_name: firstName || undefined,
-    last_name: lastName || undefined,
-    email,
-  };
-
-  const shipping: Record<string, string | undefined> = {
-    first_name: firstName || undefined,
-    last_name: lastName || undefined,
-  };
-
+  const password = options.password;
+  const firstName = options.firstName?.trim();
+  const lastName = options.lastName?.trim();
   const requestedAccountType =
     (options.accountType ?? 'member').toLowerCase();
   const normalizedAccountType =
     requestedAccountType === 'vendor' ? 'vendor' : 'member';
   const isVendor = normalizedAccountType === 'vendor';
-  const selectedVendorTier =
-    typeof options.vendorTier === 'string' && options.vendorTier.trim().length > 0
-      ? options.vendorTier.trim()
-      : undefined;
+
+  if (!username || !email || !password) {
+    throw createAppError('AUTH_REGISTER_ACCOUNT_FAILED');
+  }
 
   const payload: Record<string, unknown> = {
     username,
     email,
-    password: options.password,
-    suppress_emails: true,
-    suppress_registration_email: true,
-    suppress_order_email: true,
-    send_user_notification: false,
+    password,
+    account_type: normalizedAccountType,
   };
-
-  if (!payload.username || !payload.email || !payload.password) {
-    throw createAppError('AUTH_REGISTER_ACCOUNT_FAILED');
-  }
 
   if (firstName) {
     payload.first_name = firstName;
@@ -3627,93 +3403,24 @@ export const registerAccount = async (
   }
 
   if (isVendor) {
-    const vendorMeta = {
-      account_type: 'vendor',
-      account_status: 'pending',
-      vendor_status: 'pending',
-      vendor_tier: selectedVendorTier ?? undefined,
-    };
+    const vendorTier =
+      typeof options.vendorTier === 'string' && options.vendorTier.trim().length > 0
+        ? options.vendorTier.trim()
+        : undefined;
 
-    payload.role = 'vendor';
-    payload.account_type = 'vendor';
-    payload.accountType = 'vendor';
-    payload.status = 'pending';
-    payload.account_status = 'pending';
-    payload.vendor_status = 'pending';
-    if (selectedVendorTier) {
-      payload.vendor_tier = selectedVendorTier;
+    if (vendorTier) {
+      payload.vendor_tier = vendorTier;
     }
-    payload.meta = vendorMeta;
-    payload.woocommerce_customer = {
-      role: 'vendor',
-      email,
-      username,
-      first_name: firstName || undefined,
-      last_name: lastName || undefined,
-      billing,
-      shipping,
-      meta_data: [
-        { key: 'account_status', value: 'pending' },
-        { key: 'vendor_status', value: 'pending' },
-        selectedVendorTier
-          ? { key: 'vendor_tier', value: selectedVendorTier }
-          : null,
-      ],
-    };
-    payload.woocommerce_customer.meta_data = payload.woocommerce_customer.meta_data
-      .filter(Boolean)
-      .map(entry => entry as { key: string; value: string });
   } else {
-    payload.role = 'customer';
-    payload.membership_tier = 'blue';
-    payload.membership_plan = 'blue-membership';
-    payload.create_membership_order = true;
-    payload.membership_order_status = 'completed';
-    payload.membership_status = 'active';
-    payload.membership_purchase_date = registrationDate;
-    payload.membership_subscription_date = registrationDate;
-    payload.woocommerce_customer = {
-      role: 'customer',
-      email,
-      username,
-      first_name: firstName || undefined,
-      last_name: lastName || undefined,
-      billing,
-      shipping,
-      meta_data: [
-        { key: 'membership_tier', value: 'blue' },
-        { key: 'membership_plan', value: 'blue-membership' },
-      ],
-    };
-    payload.woocommerce_order = {
-      status: 'completed',
-      set_paid: true,
-      payment_method: 'app_membership_auto',
-      payment_method_title: 'TCN App Membership',
-      currency: 'THB',
-      total: '0',
-      line_items: [
-        {
-          name: 'Blue Membership',
-          product_sku: 'blue-membership',
-          quantity: 1,
-          subtotal: '0',
-          total: '0',
-          meta_data: [
-            { key: 'membership_tier', value: 'blue' },
-            { key: 'membership_plan', value: 'blue-membership' },
-          ],
-        },
-      ],
-      billing,
-      shipping,
-      date_created_gmt: registrationDate,
-      date_paid_gmt: registrationDate,
-      meta_data: [
-        { key: 'membership_purchase_date', value: registrationDate },
-        { key: 'membership_subscription_date', value: registrationDate },
-      ],
-    };
+    const membershipPlan =
+      typeof options.membershipPlan === 'string' &&
+      options.membershipPlan.trim().length > 0
+        ? options.membershipPlan.trim()
+        : undefined;
+
+    if (membershipPlan) {
+      payload.membership_plan = membershipPlan;
+    }
   }
 
   const response = await fetchWithRouteFallback(
@@ -3756,34 +3463,33 @@ export const resetPasswordWithCode = async ({
   resetKey,
 }: {
   identifier: string;
-  verificationCode: string;
+  verificationCode?: string;
   newPassword: string;
   resetKey?: string;
 }): Promise<string | undefined> => {
   const trimmedIdentifier = identifier.trim();
-  const trimmedCode = verificationCode.trim();
+  const trimmedCode =
+    typeof verificationCode === 'string' && verificationCode.trim().length > 0
+      ? verificationCode.trim()
+      : '';
   const trimmedPassword = newPassword.trim();
   const trimmedKey =
     typeof resetKey === 'string' && resetKey.trim().length > 0
       ? resetKey.trim()
       : undefined;
 
-  if (!trimmedIdentifier || !trimmedCode || !trimmedPassword) {
+  if (!trimmedIdentifier || (!trimmedCode && !trimmedKey) || !trimmedPassword) {
     throw createAppError('AUTH_RESET_PASSWORD_FAILED');
   }
 
-  const payload: Record<string, string> = {
-    identifier: trimmedIdentifier,
-    user_login: trimmedIdentifier,
-    user_email: trimmedIdentifier,
-    username: trimmedIdentifier,
-    email: trimmedIdentifier,
+  const payload: Record<string, unknown> = {
     login: trimmedIdentifier,
-    verification_code: trimmedCode,
-    code: trimmedCode,
     password: trimmedPassword,
-    new_password: trimmedPassword,
   };
+
+  if (trimmedCode) {
+    payload.verification_code = trimmedCode;
+  }
 
   if (trimmedKey) {
     payload.key = trimmedKey;

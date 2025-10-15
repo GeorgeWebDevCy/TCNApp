@@ -494,6 +494,7 @@ type PaymentSessionApiResponse = {
   payment_intent_client_secret?: string | null;
   client_secret?: string | null; // Stripe PI client secret when returning raw PaymentIntent
   customerId?: string | null;
+  customer_id?: string | null;
   customer?: string | null;
   customerEphemeralKeySecret?: string | null;
   customer_ephemeral_key_secret?: string | null;
@@ -569,6 +570,7 @@ export const createMembershipPaymentSession = async (
     })();
     const customerId =
       payload.customerId ??
+      payload.customer_id ??
       (typeof payload.customer === 'string' ? payload.customer : null);
     const customerEphemeralKeySecret =
       payload.customerEphemeralKeySecret ??

@@ -13,10 +13,7 @@ import {
   TransactionRecord,
 } from '../types/transactions';
 import { calculateDiscountForAmount } from '../utils/discount';
-import {
-  ensureValidSessionToken,
-  validateMemberQrCode,
-} from './wordpressAuthService';
+import { ensureValidSession, ensureValidSessionToken } from './wordpressAuthService';
 import { createAppError, ensureAppError, ErrorId } from '../errors';
 
 const TRANSACTION_ENDPOINTS = {
@@ -485,23 +482,7 @@ export const lookupMember = async (
       code: appError.code,
       message: appError.displayMessage,
     });
-
-    try {
-      const fallback = await validateMemberQrCode(token, resolvedAuthToken);
-      deviceLog.debug('transaction.lookupMember.fallback', fallback);
-      return fallback as MemberLookupResult;
-    } catch (fallbackError) {
-      const fallbackAppError = ensureAppError(
-        fallbackError,
-        'AUTH_MEMBER_QR_VALIDATE_FAILED',
-        { propagateMessage: true },
-      );
-      deviceLog.warn('transaction.lookupMember.fallbackError', {
-        code: fallbackAppError.code,
-        message: fallbackAppError.displayMessage,
-      });
-      throw appError;
-    }
+    throw appError;
   }
 };
 
@@ -688,20 +669,33 @@ export const recordTransaction = async (
 export const fetchMemberTransactions = async (
   authToken?: string | null,
 ): Promise<TransactionRecord[]> => {
+  let memberId: number | null = null;
   try {
     const resolvedAuthToken = await ensureValidSessionToken(authToken);
     if (!resolvedAuthToken) {
       throw createAppError('SESSION_TOKEN_UNAVAILABLE');
     }
 
+    const session = await ensureValidSession();
+    memberId = session?.user?.id ?? null;
+    const params = new URLSearchParams();
+    if (typeof memberId === 'number' && Number.isFinite(memberId)) {
+      params.set('member_id', String(memberId));
+    }
+
+    const query = params.toString();
+    const historyEndpoint = `${TRANSACTION_ENDPOINTS.history}${
+      query ? `?${query}` : ''
+    }`;
+
     const payload = await performRequest<unknown>(
-      `${TRANSACTION_ENDPOINTS.history}?scope=member`,
+      historyEndpoint,
       {
         method: 'GET',
         headers: buildHeaders(resolvedAuthToken),
       },
       'TRANSACTION_HISTORY_FETCH_FAILED',
-      { scope: 'member' },
+      { memberId: memberId ?? undefined },
     );
 
     const records = parseTransactionList(payload);
@@ -712,7 +706,7 @@ export const fetchMemberTransactions = async (
   } catch (error) {
     const appError = ensureAppError(error, 'TRANSACTION_HISTORY_FETCH_FAILED', {
       propagateMessage: true,
-      metadata: { scope: 'member' },
+      metadata: { memberId: memberId ?? undefined },
     });
     deviceLog.warn('transaction.fetchMemberTransactions.error', {
       code: appError.code,
@@ -725,20 +719,33 @@ export const fetchMemberTransactions = async (
 export const fetchVendorTransactions = async (
   authToken?: string | null,
 ): Promise<TransactionRecord[]> => {
+  let vendorId: number | null = null;
   try {
     const resolvedAuthToken = await ensureValidSessionToken(authToken);
     if (!resolvedAuthToken) {
       throw createAppError('SESSION_TOKEN_UNAVAILABLE');
     }
 
+    const session = await ensureValidSession();
+    vendorId = session?.user?.id ?? null;
+    const params = new URLSearchParams();
+    if (typeof vendorId === 'number' && Number.isFinite(vendorId)) {
+      params.set('vendor_id', String(vendorId));
+    }
+
+    const query = params.toString();
+    const historyEndpoint = `${TRANSACTION_ENDPOINTS.history}${
+      query ? `?${query}` : ''
+    }`;
+
     const payload = await performRequest<unknown>(
-      `${TRANSACTION_ENDPOINTS.history}?scope=vendor`,
+      historyEndpoint,
       {
         method: 'GET',
         headers: buildHeaders(resolvedAuthToken),
       },
       'TRANSACTION_HISTORY_FETCH_FAILED',
-      { scope: 'vendor' },
+      { vendorId: vendorId ?? undefined },
     );
 
     const records = parseTransactionList(payload);
@@ -749,7 +756,7 @@ export const fetchVendorTransactions = async (
   } catch (error) {
     const appError = ensureAppError(error, 'TRANSACTION_HISTORY_FETCH_FAILED', {
       propagateMessage: true,
-      metadata: { scope: 'vendor' },
+      metadata: { vendorId: vendorId ?? undefined },
     });
     deviceLog.warn('transaction.fetchVendorTransactions.error', {
       code: appError.code,

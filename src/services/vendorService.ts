@@ -93,11 +93,24 @@ const parseTier = (input: unknown): VendorTierDefinition | null => {
     parseDiscounts(payload.discounts) ??
     parseDiscounts(payload.discount_matrix);
 
-  const promotionSummary =
+  const promotionAllowance =
+    getNumber(payload.promotion_allowance) ??
+    getNumber(payload.promotionAllowance) ??
+    null;
+
+  let promotionSummary =
     getString(payload.promotionSummary) ??
     getString(payload.promotion_frequency) ??
     getString(payload.promotion) ??
     null;
+
+  if (promotionAllowance != null) {
+    const normalizedAllowance =
+      promotionAllowance > 1 || promotionAllowance < 0
+        ? Number(promotionAllowance.toFixed(2))
+        : Number((promotionAllowance * 100).toFixed(2));
+    promotionSummary = `${normalizedAllowance}%`;
+  }
 
   const benefits =
     parseStringArray(payload.benefits) ??
