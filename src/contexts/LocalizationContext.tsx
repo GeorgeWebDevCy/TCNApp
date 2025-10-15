@@ -92,7 +92,7 @@ const errorMessageToKeyMap: Record<string, string> = {
   'Biometric authentication is not configured.':
     'errors.biometricsNotConfigured',
   'Unable to log in with WordPress credentials.': 'errors.wordpressCredentials',
-  'Username, email, and password are required.': 'errors.passwordLogin',
+  'A username or email address and password are required.': 'errors.passwordLogin',
   'Too many attempts. Try again shortly.': 'errors.passwordLogin',
   'Your account is suspended. Contact support for assistance.': 'errors.vendorSuspended',
   'Something went wrong while saving your PIN.': 'errors.pinSaveGeneric',
