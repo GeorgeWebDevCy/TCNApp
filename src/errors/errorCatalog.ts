@@ -274,7 +274,7 @@ export const ERROR_CATALOG = {
   AUTH_LOGIN_MISSING_CREDENTIALS: {
     id: 'AUTH_LOGIN_MISSING_CREDENTIALS',
     code: 'E2029',
-    defaultMessage: 'Username, email, and password are required.',
+    defaultMessage: 'A username or email address and password are required.',
     description:
       'Login endpoint rejected the request because required fields were missing.',
   },

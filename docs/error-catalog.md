@@ -34,7 +34,7 @@ This directory lists every public-facing error used by the TCN mobile app and th
 | E2026 | PROFILE_AVATAR_UPDATE_FAILED | Unable to update profile photo. |  | profile.avatar.errors.updateFailed | App |
 | E2027 | PROFILE_AVATAR_REMOVE_FAILED | Unable to remove profile photo. |  | profile.avatar.errors.removeFailed | App |
 | E2028 | AUTH_MEMBER_QR_VALIDATE_FAILED | Unable to validate member QR code. | Member QR validation endpoint rejected the supplied token. | — | App |
-| E2029 | AUTH_LOGIN_MISSING_CREDENTIALS | Username, email, and password are required. | Login attempt omitted one or more required fields. | — | App + Plugin |
+| E2029 | AUTH_LOGIN_MISSING_CREDENTIALS | A username or email address and password are required. | Login attempt omitted one or more required fields. | — | App + Plugin |
 | E2030 | AUTH_LOGIN_RATE_LIMITED | Too many attempts. Try again shortly. | Login endpoint throttled due to repeated failures. | — | App + Plugin |
 | E2031 | AUTH_ACCOUNT_SUSPENDED | Your account is suspended. Contact support for assistance. | Authentication blocked because the account is suspended. | — | App + Plugin |
 | E1001 | SECURE_CREDENTIAL_STORE_FAILED | Unable to store secure credential. | Persisting encrypted data to device storage failed. | — | App |
