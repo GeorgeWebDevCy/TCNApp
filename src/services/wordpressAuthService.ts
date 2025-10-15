@@ -2245,14 +2245,16 @@ export const uploadProfileAvatar = async (
   // using securely stored credentials (mirrors the smoke script's login-first flow).
   if (!token) {
     try {
-      const savedEmail = await getSecureValue(AUTH_STORAGE_KEYS.credentialEmail);
+      const savedIdentifier = await getSecureValue(
+        AUTH_STORAGE_KEYS.credentialEmail,
+      );
       const savedPassword = await getSecureValue(
         AUTH_STORAGE_KEYS.credentialPassword,
       );
-      if (savedEmail && savedPassword) {
+      if (savedIdentifier && savedPassword) {
         deviceLog.info('wordpressAuth.uploadProfileAvatar.preauth.attempt');
         const reauthSession = await loginWithPassword({
-          email: savedEmail,
+          identifier: savedIdentifier,
           password: savedPassword,
           remember: true,
         });
@@ -2403,18 +2405,18 @@ export const uploadProfileAvatar = async (
         deviceLog.warn('wordpressAuth.uploadProfileAvatar.refreshToken.unavailable');
         // Last-chance fallback: if stored credentials exist, perform a quick re-login
         try {
-          const savedEmail = await getSecureValue(
+          const savedIdentifier = await getSecureValue(
             AUTH_STORAGE_KEYS.credentialEmail,
           );
           const savedPassword = await getSecureValue(
             AUTH_STORAGE_KEYS.credentialPassword,
           );
-          if (savedEmail && savedPassword) {
+          if (savedIdentifier && savedPassword) {
             deviceLog.info('wordpressAuth.uploadProfileAvatar.reauth.attempt', {
               hasSavedCredentials: true,
             });
             const reauthSession = await loginWithPassword({
-              email: savedEmail,
+              identifier: savedIdentifier,
               password: savedPassword,
               remember: true,
             });
@@ -2720,19 +2722,19 @@ export const ensureValidSession =
 
     const attemptReauthenticationWithStoredCredentials = async () => {
       try {
-        const [savedEmail, savedPassword] = await Promise.all([
+        const [savedIdentifier, savedPassword] = await Promise.all([
           getSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
           getSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
         ]);
 
-        if (savedEmail && savedPassword) {
+        if (savedIdentifier && savedPassword) {
           deviceLog.info('wordpressAuth.ensureValidSession.reauth.attempt', {
             hasSavedCredentials: true,
           });
 
           try {
             const reauthSession = await loginWithPassword({
-              email: savedEmail,
+              identifier: savedIdentifier,
               password: savedPassword,
               remember: true,
             });
@@ -2763,7 +2765,7 @@ export const ensureValidSession =
           }
         } else {
           deviceLog.info('wordpressAuth.ensureValidSession.reauth.unavailable', {
-            hasSavedEmail: Boolean(savedEmail),
+            hasSavedIdentifier: Boolean(savedIdentifier),
             hasSavedPassword: Boolean(savedPassword),
           });
         }
@@ -2948,21 +2950,21 @@ export const reauthenticateWithStoredCredentials = async (): Promise<
   PersistedSession | null
 > => {
   try {
-    const [savedEmail, savedPassword] = await Promise.all([
+    const [savedIdentifier, savedPassword] = await Promise.all([
       getSecureValue(AUTH_STORAGE_KEYS.credentialEmail),
       getSecureValue(AUTH_STORAGE_KEYS.credentialPassword),
     ]);
 
     deviceLog.info('wordpressAuth.reauthenticateWithStoredCredentials.start', {
-      hasSavedEmail: Boolean(savedEmail),
+      hasSavedIdentifier: Boolean(savedIdentifier),
       hasSavedPassword: Boolean(savedPassword),
     });
 
-    if (!savedEmail || !savedPassword) {
+    if (!savedIdentifier || !savedPassword) {
       deviceLog.warn(
         'wordpressAuth.reauthenticateWithStoredCredentials.missingCredentials',
         {
-          hasSavedEmail: Boolean(savedEmail),
+          hasSavedIdentifier: Boolean(savedIdentifier),
           hasSavedPassword: Boolean(savedPassword),
         },
       );
@@ -2971,7 +2973,7 @@ export const reauthenticateWithStoredCredentials = async (): Promise<
 
     try {
       const session = await loginWithPassword({
-        email: savedEmail,
+        identifier: savedIdentifier,
         password: savedPassword,
         remember: true,
       });
@@ -3055,20 +3057,26 @@ interface JwtTokenResponse {
 }
 
 export const loginWithPassword = async ({
-  email,
+  identifier,
   password,
   mode,
   remember,
 }: LoginOptions): Promise<PersistedSession> => {
   deviceLog.info('wordpressAuth.loginWithPassword.start', {
-    email,
+    identifier,
   });
 
+  const trimmedIdentifier = identifier.trim();
+  const looksLikeEmail = trimmedIdentifier.includes('@');
+
   const requestBody: Record<string, unknown> = {
-    username: email,
-    email,
+    username: trimmedIdentifier,
     password,
   };
+
+  if (looksLikeEmail) {
+    requestBody.email = trimmedIdentifier;
+  }
 
   if (mode) {
     requestBody.mode = mode;
@@ -3321,7 +3329,7 @@ export const loginWithPassword = async ({
     (typeof json.user_email === 'string' && json.user_email.trim().length > 0
       ? json.user_email.trim()
       : null) ??
-    email;
+    (looksLikeEmail ? trimmedIdentifier : null);
 
   const fallbackName =
     loginUser?.name ??
@@ -3332,7 +3340,8 @@ export const loginWithPassword = async ({
         json.user_nicename.trim().length > 0
       ? json.user_nicename.trim()
       : null) ??
-    fallbackEmail;
+    fallbackEmail ??
+    trimmedIdentifier;
 
   const defaultWooCredentials = createWooCommerceCredentialBundle(
     WORDPRESS_CONFIG.woocommerce.consumerKey,
@@ -3394,7 +3403,10 @@ export const loginWithPassword = async ({
   // Optionally persist credentials for re-auth fallback (only when remember is true)
   try {
     if (remember) {
-      await setSecureValue(AUTH_STORAGE_KEYS.credentialEmail, email);
+      await setSecureValue(
+        AUTH_STORAGE_KEYS.credentialEmail,
+        trimmedIdentifier,
+      );
       await setSecureValue(AUTH_STORAGE_KEYS.credentialPassword, password);
       deviceLog.debug('wordpressAuth.loginWithPassword.credentialsStored');
     } else {
@@ -3408,7 +3420,8 @@ export const loginWithPassword = async ({
   }
 
   deviceLog.success('wordpressAuth.loginWithPassword.success', {
-    email,
+    identifier: trimmedIdentifier,
+    providedEmail: looksLikeEmail,
     userId: user?.id ?? null,
     tokenSource,
     hasToken: Boolean(token),

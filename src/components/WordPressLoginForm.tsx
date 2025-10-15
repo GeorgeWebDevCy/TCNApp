@@ -17,7 +17,7 @@ import { useResponsiveLayout } from '../hooks/useResponsiveLayout';
 interface WordPressLoginFormProps {
   loading?: boolean;
   error?: string | null;
-  onSubmit: (payload: { email: string; password: string }) => void;
+  onSubmit: (payload: { identifier: string; password: string }) => void;
   onForgotPassword: () => void;
   onRegister: () => void;
 }
@@ -29,7 +29,7 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
   onForgotPassword,
   onRegister,
 }) => {
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const { t } = useLocalization();
@@ -61,10 +61,10 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
       return;
     }
 
-    onSubmit({ email, password });
+    onSubmit({ identifier, password });
   };
 
-  const disabled = loading || !email || !password;
+  const disabled = loading || !identifier || !password;
 
   return (
     <KeyboardAvoidingView
@@ -73,17 +73,16 @@ export const WordPressLoginForm: React.FC<WordPressLoginFormProps> = ({
       style={[styles.container, responsiveStyles.container]}
     >
       <View style={styles.formGroup}>
-        <Text style={styles.label}>{t('auth.forms.emailLabel')}</Text>
+        <Text style={styles.label}>{t('auth.forms.identifierLabel')}</Text>
         <TextInput
-          value={email}
-          onChangeText={setEmail}
+          value={identifier}
+          onChangeText={setIdentifier}
           autoCapitalize="none"
           autoCorrect={false}
-          textContentType="emailAddress"
-          autoComplete="email"
-          keyboardType="email-address"
+          textContentType="username"
+          autoComplete="username"
           style={[styles.input, responsiveStyles.input]}
-          placeholder={t('auth.forms.emailPlaceholder')}
+          placeholder={t('auth.forms.identifierPlaceholder')}
         />
       </View>
       <View style={styles.formGroup}>

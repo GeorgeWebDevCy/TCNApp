@@ -58,8 +58,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     auth: {
       forms: {
-        emailLabel: 'Email',
-        emailPlaceholder: 'name@example.com',
+        identifierLabel: 'Email or username',
+        identifierPlaceholder: 'Email or username',
         passwordLabel: 'Password',
         passwordPlaceholder: 'Your WordPress password',
         showPassword: 'Show password',
@@ -86,7 +86,7 @@ export const translations: Record<Language, TranslationDictionary> = {
         description:
           'Enter your email or username to receive reset instructions.',
         identifierLabel: 'Email or username',
-        identifierPlaceholder: 'name@example.com',
+        identifierPlaceholder: 'Email or username',
         submit: 'Send reset link',
         cancel: 'Cancel',
         closeAfterSuccess: 'Close',
@@ -646,8 +646,8 @@ export const translations: Record<Language, TranslationDictionary> = {
     },
     auth: {
       forms: {
-        emailLabel: 'อีเมล',
-        emailPlaceholder: 'name@example.com',
+        identifierLabel: 'อีเมลหรือชื่อผู้ใช้',
+        identifierPlaceholder: 'อีเมลหรือชื่อผู้ใช้',
         passwordLabel: 'รหัสผ่าน',
         passwordPlaceholder: 'รหัสผ่าน WordPress ของคุณ',
         showPassword: 'แสดงรหัสผ่าน',
@@ -673,7 +673,7 @@ export const translations: Record<Language, TranslationDictionary> = {
         title: 'รีเซ็ตรหัสผ่าน',
         description: 'กรอกอีเมลหรือชื่อผู้ใช้เพื่อรับลิงก์รีเซ็ต.',
         identifierLabel: 'อีเมลหรือชื่อผู้ใช้',
-        identifierPlaceholder: 'name@example.com',
+        identifierPlaceholder: 'อีเมลหรือชื่อผู้ใช้',
         submit: 'ส่งลิงก์รีเซ็ต',
         cancel: 'ยกเลิก',
         closeAfterSuccess: 'ปิด',
