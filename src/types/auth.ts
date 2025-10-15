@@ -104,12 +104,13 @@ export interface RegisterOptions {
   registrationDate?: string;
   accountType?: RegisterAccountType;
   vendorTier?: string;
+  membershipPlan?: string;
 }
 
 export interface ResetPasswordOptions {
   identifier: string;
-  verificationCode: string;
   newPassword: string;
+  verificationCode?: string;
   resetKey?: string;
 }
 

@@ -1026,15 +1026,15 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
   ]);
 
   const registerAccount = useCallback(async (options: RegisterOptions) => {
-    const registrationDate = new Date().toISOString();
     const normalizedAccountType =
       (options.accountType ?? 'member').toLowerCase();
     const isVendor = normalizedAccountType === 'vendor';
+    const defaultMembershipPlan = isVendor ? undefined : 'blue-membership';
 
     try {
       const message = await registerWordPressAccount({
         ...options,
-        registrationDate,
+        membershipPlan: options.membershipPlan ?? defaultMembershipPlan,
       });
       deviceLog.success('Account registration succeeded', {
         username: options.username,
@@ -1046,17 +1046,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           status: 'pending',
         });
       } else {
-        deviceLog.info('WooCommerce customer created', {
+        deviceLog.info('Member account registered', {
           username: options.username,
-          role: 'customer',
-          membershipPlan: 'blue-membership',
-        });
-        deviceLog.info('WooCommerce order created', {
-          username: options.username,
-          membershipPlan: 'blue-membership',
-          status: 'completed',
-          purchaseDate: registrationDate,
-          subscriptionDate: registrationDate,
+          membershipPlan: options.membershipPlan ?? defaultMembershipPlan ?? null,
         });
       }
       return message;
