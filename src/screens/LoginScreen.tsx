@@ -114,12 +114,18 @@ export const LoginScreen: React.FC = () => {
   }, [activeTab, logEvent]);
 
   const handlePasswordSubmit = useCallback(
-    async ({ email, password }: { email: string; password: string }) => {
+    async ({
+      identifier,
+      password,
+    }: {
+      identifier: string;
+      password: string;
+    }) => {
       setLastAttempt('password');
       resetError();
-      logEvent('password.submit', { hasEmail: Boolean(email) });
+      logEvent('password.submit', { hasIdentifier: Boolean(identifier) });
       // Persist credentials for secure re-auth fallback
-      await loginWithPassword({ email, password, remember: true });
+      await loginWithPassword({ identifier, password, remember: true });
     },
     [logEvent, loginWithPassword, resetError],
   );
