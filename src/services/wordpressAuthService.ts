@@ -2022,6 +2022,8 @@ export const restoreSession = async (
 
   let user: AuthUser | null = null;
 
+  let shouldPersistUserProfile = false;
+
   if (userJson) {
     try {
       user = JSON.parse(userJson) as AuthUser;
@@ -2033,6 +2035,25 @@ export const restoreSession = async (
       }
       user = null;
     }
+  }
+
+  if (user?.avatarUrl) {
+    const refreshedAvatarUrl = appendAvatarCacheBuster(user.avatarUrl);
+
+    if (refreshedAvatarUrl !== user.avatarUrl) {
+      user = {
+        ...user,
+        avatarUrl: refreshedAvatarUrl,
+      };
+      shouldPersistUserProfile = true;
+    }
+  }
+
+  if (shouldPersistUserProfile && user) {
+    await AsyncStorage.setItem(
+      AUTH_STORAGE_KEYS.userProfile,
+      JSON.stringify(user),
+    );
   }
 
   const session: PersistedSession = {
