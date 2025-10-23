@@ -121,13 +121,24 @@ const describeUrlForLogging = (
 };
 
 const isLikelyUrl = (value: string): boolean => {
-  try {
-    // eslint-disable-next-line no-new
-    new URL(value);
-    return true;
-  } catch (error) {
+  if (!value) {
     return false;
   }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (trimmed.includes('://')) {
+    return true;
+  }
+
+  if (trimmed.startsWith('/')) {
+    return true;
+  }
+
+  return /[?#]/.test(trimmed);
 };
 
 const extractTokenFromUrl = (value: string): string | undefined => {
@@ -374,7 +385,7 @@ const normalizeApiToken = (value?: string | null): string | undefined => {
     if (extracted) {
       return normalizeApiToken(extracted);
     }
-    return undefined;
+    return trimmed;
   }
 
   return trimmed;
@@ -3498,6 +3509,11 @@ export const requestPasswordReset = async (
     null;
 
   return messageSource ? sanitizeErrorMessage(messageSource) : undefined;
+};
+
+export const __test = {
+  normalizeApiToken,
+  isLikelyUrl,
 };
 
 export const registerAccount = async (
