@@ -18,6 +18,7 @@ export interface ActivityMonitorLogEntry {
   timestamp: number;
   params?: unknown[];
   username?: string | null;
+  sequence?: number;
 }
 
 interface PendingLogPayload {
@@ -27,6 +28,7 @@ interface PendingLogPayload {
   log_timestamp: number;
   log_source: string;
   log_params?: unknown[];
+  log_sequence?: number;
 }
 
 const queue: ActivityMonitorLogEntry[] = [];
@@ -80,6 +82,10 @@ const buildPayload = async (
 
   if (Array.isArray(entry.params) && entry.params.length > 0) {
     payload.log_params = sanitizeParams(entry.params);
+  }
+
+  if (typeof entry.sequence === 'number') {
+    payload.log_sequence = entry.sequence;
   }
 
   return payload;
