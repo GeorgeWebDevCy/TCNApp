@@ -333,6 +333,26 @@ describe('wordpressAuthService', () => {
     expect(JSON.parse(storedProfile as string)).toEqual(session.user);
   });
 
+  it('falls back to avatar_url when avatar_urls are not provided in the profile payload', () => {
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(1700000000000);
+
+    try {
+      const parsedUser =
+        wordpressAuthTestUtils.parseProfileUserPayload({
+          id: 42,
+          email: 'member@example.com',
+          name: 'Member Example',
+          avatar_url: 'https://example.com/uploads/avatar.jpg',
+        });
+
+      expect(parsedUser.avatarUrl).toBe(
+        'https://example.com/uploads/avatar.jpg?tcn_cache=1700000000000',
+      );
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('applies the API token authorization header to subsequent requests after login', async () => {
     const fetchMock = jest
       .fn()

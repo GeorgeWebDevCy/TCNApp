@@ -1386,8 +1386,19 @@ const parseProfileUserPayload = (
     payload.meta_last_name ??
     undefined;
 
-  const avatarUrls = payload.avatar_urls as Record<string, unknown> | undefined;
-  const resolvedAvatarUrl = avatarUrls ? pickAvatarUrlFromMap(avatarUrls) : null;
+  const avatarUrls =
+    (payload.avatar_urls as Record<string, unknown> | undefined) ??
+    (payload.avatarUrls as Record<string, unknown> | undefined);
+  let resolvedAvatarUrl = avatarUrls ? pickAvatarUrlFromMap(avatarUrls) : null;
+
+  if (!resolvedAvatarUrl) {
+    resolvedAvatarUrl =
+      getString(payload.avatar) ??
+      getString(payload.avatar_url) ??
+      getString(payload.avatarUrl) ??
+      null;
+  }
+
   const cacheBustedAvatarUrl =
     resolvedAvatarUrl != null ? appendAvatarCacheBuster(resolvedAvatarUrl) : null;
 
@@ -3514,6 +3525,7 @@ export const requestPasswordReset = async (
 export const __test = {
   normalizeApiToken,
   isLikelyUrl,
+  parseProfileUserPayload,
 };
 
 export const registerAccount = async (
