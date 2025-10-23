@@ -9,6 +9,12 @@ import {
 } from './wordpressCookieService';
 import { ensureValidSessionToken } from './wordpressAuthService';
 import { createAppError, ensureAppError, ErrorId } from '../errors';
+import {
+  describeBodyForLog,
+  extractQueryParamsForLog,
+  logNumberedDebugBlock,
+  normalizeHeadersForLog,
+} from './loggingHelpers';
 
 export const DEFAULT_MEMBERSHIP_PLANS: MembershipPlan[] = [
   {
@@ -343,44 +349,6 @@ export const getMembershipPlanRequestId = (
   plan: Pick<MembershipPlan, 'id' | 'metadata'>,
 ): string => extractPlanRequestId(plan as MembershipPlan);
 
-const headersToRecord = (headers?: HeadersInit): Record<string, string> => {
-  if (!headers) {
-    return {};
-  }
-
-  if (typeof Headers !== 'undefined' && headers instanceof Headers) {
-    const entries: Record<string, string> = {};
-    headers.forEach((value, key) => {
-      entries[key] = value;
-    });
-    return entries;
-  }
-
-  if (Array.isArray(headers)) {
-    return headers.reduce<Record<string, string>>((acc, [key, value]) => {
-      acc[key] = value;
-      return acc;
-    }, {});
-  }
-
-  return { ...(headers as Record<string, string>) };
-};
-
-const sanitizeHeadersForLog = (headers?: HeadersInit): Record<string, string> => {
-  const normalized = headersToRecord(headers);
-  return Object.entries(normalized).reduce<Record<string, string>>(
-    (acc, [key, value]) => {
-      if (key.toLowerCase().includes('authorization')) {
-        acc[key] = '[REDACTED]';
-      } else {
-        acc[key] = value;
-      }
-      return acc;
-    },
-    {},
-  );
-};
-
 const summarizeSecretForLog = (
   label: string,
   value: string | null | undefined,
@@ -439,11 +407,16 @@ export const fetchMembershipPlans = async (
       headers: buildHeaders(resolvedToken),
     });
 
-    deviceLog.debug('membership.plans.fetch.request', {
+    logNumberedDebugBlock('membership.plans.fetch.request', 1, 'request', () => ({
       url: requestUrl,
       method: requestInit.method ?? 'GET',
-      headers: sanitizeHeadersForLog(requestInit.headers),
-    });
+      headers: normalizeHeadersForLog(requestInit.headers, {
+        redactAuthorization: false,
+      }),
+      query: extractQueryParamsForLog(requestUrl),
+      hasBody: Boolean(requestInit.body),
+      body: describeBodyForLog(requestInit.body ?? null),
+    }));
 
     const response = await fetch(requestUrl, requestInit);
 
@@ -458,6 +431,13 @@ export const fetchMembershipPlans = async (
     const payload = await handleResponse<
       MembershipPlansResponse | MembershipPlan[]
     >(response, 'MEMBERSHIP_PLANS_FETCH_FAILED', { endpoint: requestUrl });
+
+    logNumberedDebugBlock('membership.plans.fetch.response', 2, 'response', () => ({
+      status: response.status,
+      ok: response.ok,
+      endpoint: requestUrl,
+      payload,
+    }));
 
     const plans = Array.isArray(payload)
       ? normalizePlans(payload as WordPressMembershipPlan[])
@@ -474,6 +454,12 @@ export const fetchMembershipPlans = async (
       planIds: plans.map(plan => plan.id),
       currencies: Array.from(new Set(plans.map(plan => plan.currency))),
     });
+
+    logNumberedDebugBlock('membership.plans.fetch.summary', 3, 'summary', () => ({
+      planCount: plans.length,
+      planIds: plans.map(plan => plan.id),
+      highlightedPlan: plans.find(plan => plan.highlight)?.id ?? null,
+    }));
 
     return plans;
   } catch (error) {
@@ -525,12 +511,21 @@ export const createMembershipPaymentSession = async (
       body: JSON.stringify({ plan }),
     });
 
-    deviceLog.debug('membership.paymentSession.create.request', {
-      url: requestUrl,
-      method: requestInit.method ?? 'POST',
-      headers: sanitizeHeadersForLog(requestInit.headers),
-      hasBody: Boolean(requestInit.body),
-    });
+    logNumberedDebugBlock(
+      'membership.paymentSession.create.request',
+      1,
+      'request',
+      () => ({
+        url: requestUrl,
+        method: requestInit.method ?? 'POST',
+        headers: normalizeHeadersForLog(requestInit.headers, {
+          redactAuthorization: false,
+        }),
+        query: extractQueryParamsForLog(requestUrl),
+        hasBody: Boolean(requestInit.body),
+        body: describeBodyForLog(requestInit.body ?? null),
+      }),
+    );
 
     const response = await fetch(requestUrl, requestInit);
 
@@ -546,6 +541,18 @@ export const createMembershipPaymentSession = async (
       response,
       'MEMBERSHIP_PAYMENT_SESSION_FAILED',
       { plan },
+    );
+
+    logNumberedDebugBlock(
+      'membership.paymentSession.create.response',
+      2,
+      'response',
+      () => ({
+        status: response.status,
+        ok: response.ok,
+        plan,
+        payload,
+      }),
     );
 
     const requiresPayment =
@@ -654,6 +661,23 @@ export const createMembershipPaymentSession = async (
       ),
     });
 
+    logNumberedDebugBlock(
+      'membership.paymentSession.create.summary',
+      3,
+      'summary',
+      () => ({
+        plan,
+        requiresPayment: normalizedPayload.requiresPayment,
+        paymentIntentId: normalizedPayload.paymentIntentId ?? null,
+        customerId:
+          'customerId' in normalizedPayload ? normalizedPayload.customerId ?? null : null,
+        publishableKey:
+          'publishableKey' in normalizedPayload
+            ? normalizedPayload.publishableKey ?? null
+            : null,
+      }),
+    );
+
     return normalizedPayload;
   } catch (error) {
     deviceLog.error(
@@ -700,13 +724,22 @@ export const confirmMembershipUpgrade = async (
       body: JSON.stringify(requestBody),
     });
 
-    deviceLog.debug('membership.upgrade.confirm.request', {
-      url: requestUrl,
-      method: requestInit.method ?? 'POST',
-      headers: sanitizeHeadersForLog(requestInit.headers),
-      hasBody: Boolean(requestInit.body),
-      bodyKeys: Object.keys(requestBody),
-    });
+    logNumberedDebugBlock(
+      'membership.upgrade.confirm.request',
+      1,
+      'request',
+      () => ({
+        url: requestUrl,
+        method: requestInit.method ?? 'POST',
+        headers: normalizeHeadersForLog(requestInit.headers, {
+          redactAuthorization: false,
+        }),
+        query: extractQueryParamsForLog(requestUrl),
+        hasBody: Boolean(requestInit.body),
+        body: describeBodyForLog(requestInit.body ?? null),
+        bodyKeys: Object.keys(requestBody),
+      }),
+    );
 
     const response = await fetch(requestUrl, requestInit);
 
@@ -727,6 +760,14 @@ export const confirmMembershipUpgrade = async (
       },
     );
 
+    logNumberedDebugBlock('membership.upgrade.confirm.response', 2, 'response', () => ({
+      status: response.status,
+      ok: response.ok,
+      plan,
+      hasPaymentIntentId: Boolean(paymentIntentId),
+      payload,
+    }));
+
     deviceLog.success('membership.upgrade.confirm.success', {
       plan,
       acknowledged: payload.success,
@@ -738,6 +779,12 @@ export const confirmMembershipUpgrade = async (
       acknowledged: payload.success,
       message: payload.message ?? null,
     });
+
+    logNumberedDebugBlock('membership.upgrade.confirm.summary', 3, 'summary', () => ({
+      plan,
+      acknowledged: payload.success,
+      message: payload.message ?? null,
+    }));
 
     return payload;
   } catch (error) {
