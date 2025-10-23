@@ -17,6 +17,7 @@ import {
   ensureMemberQrCode,
   validateMemberQrCode,
   ensureValidSession,
+  __test as wordpressAuthTestUtils,
 } from '../src/services/wordpressAuthService';
 
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -64,6 +65,24 @@ describe('wordpressAuthService', () => {
     if (typeof EncryptedStorage.clear === 'function') {
       await EncryptedStorage.clear();
     }
+  });
+
+  describe('normalizeApiToken', () => {
+    const { normalizeApiToken } = wordpressAuthTestUtils;
+
+    it('preserves bare token strings that do not look like URLs', () => {
+      const token =
+        'pjR4zEZ4BF6g0HfsxeenTvxaowMRxbTvqnnBEkz3egolDN5xPLpjL2hBUP8CU5Qn';
+      expect(normalizeApiToken(token)).toBe(token);
+    });
+
+    it('extracts tokens from login URLs when present', () => {
+      const token = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl';
+      const loginUrl =
+        `https://example.com/wp-login.php?action=gn_token_login&token=${token}`;
+
+      expect(normalizeApiToken(loginUrl)).toBe(token);
+    });
   });
 
   it('retries WordPress requests using rest_route when the JWT token route is missing', async () => {
