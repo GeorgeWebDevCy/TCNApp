@@ -673,6 +673,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
           session = {
             token: sessionRef.current?.token,
             refreshToken: sessionRef.current?.refreshToken,
+            tokenExpiresAt:
+              sessionRef.current?.tokenExpiresAt ?? null,
             user: state.user,
             locked: false,
           };
@@ -686,6 +688,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         refreshToken: session.refreshToken ?? sessionRef.current?.refreshToken,
         tokenLoginUrl:
           session.tokenLoginUrl ?? sessionRef.current?.tokenLoginUrl ?? null,
+        tokenExpiresAt:
+          session.tokenExpiresAt ?? sessionRef.current?.tokenExpiresAt ?? null,
         user: session.user ?? state.user ?? sessionRef.current?.user ?? null,
         locked: session.locked,
       };
@@ -713,6 +717,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
         token: snapshot.token,
         refreshToken: snapshot.refreshToken,
         tokenLoginUrl: snapshot.tokenLoginUrl ?? null,
+        tokenExpiresAt:
+          snapshot.tokenExpiresAt ?? sessionRef.current?.tokenExpiresAt ?? null,
         user: snapshot.user ?? state.user ?? null,
         locked: true,
       };
