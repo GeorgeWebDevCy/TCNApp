@@ -16,6 +16,13 @@ import {
   setSecureValue,
 } from './secureTokenStorage';
 import {
+  describeBodyForLog,
+  describeResponsePayloadForLog,
+  extractQueryParamsForLog,
+  logNumberedDebugBlock,
+  normalizeHeadersForLog,
+} from './loggingHelpers';
+import {
   AuthUser,
   AccountStatus,
   LoginOptions,
@@ -695,26 +702,68 @@ const fetchWithRouteFallback = async (
 ): Promise<Response> => {
   const primaryRequestInit = await buildWordPressRequestInit(init);
   const primaryUrl = appendWooCommerceCredentialsIfNeeded(buildUrl(path), path);
+  logNumberedDebugBlock(
+    'wordpressAuth.fetchRoute',
+    1,
+    'primary.request',
+    () => ({
+      path,
+      url: primaryUrl,
+      method: primaryRequestInit.method ?? 'GET',
+      headers: normalizeHeadersForLog(primaryRequestInit.headers, {
+        redactAuthorization: false,
+      }),
+      query: extractQueryParamsForLog(primaryUrl),
+      hasBody: Boolean(primaryRequestInit.body),
+      body: describeBodyForLog(primaryRequestInit.body ?? null),
+    }),
+  );
+
   const primaryResponse = await fetch(primaryUrl, primaryRequestInit);
   await syncWordPressCookiesFromResponse(primaryResponse);
 
+  const primaryPayloadForLog = await describeResponsePayloadForLog(primaryResponse);
+  logNumberedDebugBlock(
+    'wordpressAuth.fetchRoute',
+    2,
+    'primary.response',
+    () => ({
+      path,
+      url: primaryResponse.url,
+      status: primaryResponse.status,
+      ok: primaryResponse.ok,
+      headers: normalizeHeadersForLog(primaryResponse.headers, {
+        redactAuthorization: false,
+      }),
+      payload: primaryPayloadForLog,
+    }),
+  );
+
   if (primaryResponse.status !== 404) {
+    logNumberedDebugBlock('wordpressAuth.fetchRoute', 3, 'fallback.skip', () => ({
+      path,
+      reason: 'status_not_404',
+      status: primaryResponse.status,
+    }));
     return primaryResponse;
   }
 
   let shouldFallback = false;
-  try {
-    const payload = await primaryResponse.clone().json();
-    shouldFallback =
-      payload &&
-      typeof payload === 'object' &&
-      'code' in payload &&
-      payload.code === 'rest_no_route';
-  } catch (error) {
-    shouldFallback = false;
+  if (
+    primaryPayloadForLog &&
+    typeof primaryPayloadForLog === 'object' &&
+    'code' in primaryPayloadForLog &&
+    (primaryPayloadForLog as Record<string, unknown>).code === 'rest_no_route'
+  ) {
+    shouldFallback = true;
   }
 
   if (!shouldFallback) {
+    logNumberedDebugBlock('wordpressAuth.fetchRoute', 3, 'fallback.skip', () => ({
+      path,
+      reason: 'code_mismatch',
+      status: primaryResponse.status,
+    }));
     return primaryResponse;
   }
 
@@ -723,8 +772,44 @@ const fetchWithRouteFallback = async (
     buildRestRouteUrl(path),
     path,
   );
+
+  logNumberedDebugBlock(
+    'wordpressAuth.fetchRoute',
+    3,
+    'fallback.request',
+    () => ({
+      path,
+      url: fallbackUrl,
+      method: fallbackRequestInit.method ?? 'GET',
+      headers: normalizeHeadersForLog(fallbackRequestInit.headers, {
+        redactAuthorization: false,
+      }),
+      query: extractQueryParamsForLog(fallbackUrl),
+      hasBody: Boolean(fallbackRequestInit.body),
+      body: describeBodyForLog(fallbackRequestInit.body ?? null),
+    }),
+  );
+
   const fallbackResponse = await fetch(fallbackUrl, fallbackRequestInit);
   await syncWordPressCookiesFromResponse(fallbackResponse);
+
+  const fallbackPayloadForLog = await describeResponsePayloadForLog(fallbackResponse);
+  logNumberedDebugBlock(
+    'wordpressAuth.fetchRoute',
+    4,
+    'fallback.response',
+    () => ({
+      path,
+      url: fallbackResponse.url,
+      status: fallbackResponse.status,
+      ok: fallbackResponse.ok,
+      headers: normalizeHeadersForLog(fallbackResponse.headers, {
+        redactAuthorization: false,
+      }),
+      payload: fallbackPayloadForLog,
+    }),
+  );
+
   return fallbackResponse;
 };
 
@@ -1473,15 +1558,47 @@ const fetchSessionUser = async (
   });
 
   try {
-    const response = await fetchWithRouteFallback(
-      WORDPRESS_CONFIG.endpoints.profile,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${normalizedToken}`,
-          Accept: 'application/json',
-        },
+    const endpoint = WORDPRESS_CONFIG.endpoints.profile;
+    const requestInit: RequestInit = {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${normalizedToken}`,
+        Accept: 'application/json',
       },
+    };
+
+    logNumberedDebugBlock(
+      'wordpressAuth.fetchSessionUser.trace',
+      1,
+      'request',
+      () => ({
+        endpoint,
+        url: buildUrl(endpoint),
+        method: requestInit.method ?? 'GET',
+        headers: normalizeHeadersForLog(requestInit.headers, {
+          redactAuthorization: false,
+        }),
+        tokenPreview: maskTokenForLogging(normalizedToken),
+        query: extractQueryParamsForLog(buildUrl(endpoint)),
+      }),
+    );
+
+    const response = await fetchWithRouteFallback(endpoint, requestInit);
+
+    const responsePayloadForLog = await describeResponsePayloadForLog(response);
+    logNumberedDebugBlock(
+      'wordpressAuth.fetchSessionUser.trace',
+      2,
+      'response',
+      () => ({
+        endpoint,
+        status: response.status,
+        ok: response.ok,
+        headers: normalizeHeadersForLog(response.headers, {
+          redactAuthorization: false,
+        }),
+        payload: responsePayloadForLog,
+      }),
     );
 
     deviceLog.debug('wordpressAuth.fetchSessionUser.response', {
@@ -1494,7 +1611,21 @@ const fetchSessionUser = async (
     }
 
     const payload = (await response.json()) as Record<string, unknown>;
-    return { user: parseProfileUserPayload(payload), status: response.status };
+    const parsedUser = parseProfileUserPayload(payload);
+
+    logNumberedDebugBlock(
+      'wordpressAuth.fetchSessionUser.trace',
+      3,
+      'summary',
+      () => ({
+        endpoint,
+        status: response.status,
+        userId: parsedUser?.id ?? null,
+        hasMembership: Boolean(parsedUser?.membership),
+      }),
+    );
+
+    return { user: parsedUser, status: response.status };
   } catch (error) {
     deviceLog.warn('wordpressAuth.fetchSessionUser.error', {
       message: error instanceof Error ? error.message : String(error),
