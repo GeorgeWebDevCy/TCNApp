@@ -26,6 +26,7 @@ interface LogEntry {
   level: LogLevel;
   message: string;
   timestamp: number;
+  sequence: number;
   params?: unknown[];
 }
 
@@ -64,6 +65,7 @@ const originalConsole: Partial<
   Record<ConsoleMethod, (...args: unknown[]) => void>
 > = {};
 const timers = new Map<string, number>();
+let logSequence = 0;
 
 const logLevelPriority: Record<LogLevel, number> = {
   debug: 0,
@@ -100,6 +102,51 @@ const getRenderableEntries = (): LogEntry[] => {
   return [...entries];
 };
 
+const formatMessageWithSequence = (sequence: number, message: string): string => {
+  return `[#${sequence}] ${message}`;
+};
+
+const ensureSequencePrefix = (sequence: number, message: string): string => {
+  if (typeof message !== 'string' || message.length === 0) {
+    return formatMessageWithSequence(sequence, '');
+  }
+
+  const expectedPrefix = `[#${sequence}]`;
+  if (message.startsWith(`${expectedPrefix} `)) {
+    return message;
+  }
+
+  if (message.startsWith(expectedPrefix)) {
+    return `${expectedPrefix} ${message.slice(expectedPrefix.length).trimStart()}`;
+  }
+
+  const stripped = message.replace(/^\[#\d+\]\s*/, '');
+  return formatMessageWithSequence(sequence, stripped);
+};
+
+const stripSequencePrefix = (message: string, sequence?: number): string => {
+  if (typeof message !== 'string') {
+    return '';
+  }
+
+  if (typeof sequence === 'number') {
+    const directPrefix = `[#${sequence}]`;
+    if (message.startsWith(`${directPrefix} `)) {
+      return message.slice(directPrefix.length + 1);
+    }
+    if (message.startsWith(directPrefix)) {
+      return message.slice(directPrefix.length).trimStart();
+    }
+  }
+
+  const match = message.match(/^\[#(\d+)\]\s*(.*)$/);
+  if (match) {
+    return match[2];
+  }
+
+  return message;
+};
+
 const formatTimestamp = (timestamp: number, format?: string) => {
   const date = new Date(timestamp);
   if (format === 'HH:mm:ss') {
@@ -120,10 +167,75 @@ const formatEntriesAsText = (data: LogEntry[], timeStampFormat?: string) => {
   lines.push('');
   data.forEach(entry => {
     const ts = formatTimestamp(entry.timestamp, timeStampFormat);
-    lines.push(`[${ts}] ${entry.level.toUpperCase()} ${entry.message}`);
+    const prefix = typeof entry.sequence === 'number' ? `[#${entry.sequence}] ` : '';
+    const messageBody = stripSequencePrefix(entry.message, entry.sequence);
+    lines.push(`[${ts}] ${entry.level.toUpperCase()} ${prefix}${messageBody}`);
   });
   lines.push('');
   return lines.join('\n');
+};
+
+const normalizeStoredEntries = (raw: unknown[]): LogEntry[] => {
+  const normalized: LogEntry[] = [];
+  let maxSequence = logSequence;
+
+  raw.forEach(item => {
+    if (!item || typeof item !== 'object') {
+      return;
+    }
+
+    const candidate = item as Partial<LogEntry> & { params?: unknown[] };
+    const sequenceValue = candidate.sequence;
+    let sequence: number;
+    if (typeof sequenceValue === 'number' && Number.isFinite(sequenceValue)) {
+      sequence = sequenceValue;
+      if (sequence > maxSequence) {
+        maxSequence = sequence;
+      }
+    } else {
+      sequence = ++maxSequence;
+    }
+
+    const timestamp =
+      typeof candidate.timestamp === 'number' && Number.isFinite(candidate.timestamp)
+        ? candidate.timestamp
+        : Date.now();
+
+    const id =
+      typeof candidate.id === 'string' && candidate.id.length > 0
+        ? candidate.id
+        : `${timestamp}-${Math.random().toString(16).slice(2)}`;
+
+    const levelCandidate = candidate.level;
+    const level: LogLevel =
+      typeof levelCandidate === 'string' && levelCandidate in logLevelPriority
+        ? (levelCandidate as LogLevel)
+        : 'info';
+
+    const rawMessage = typeof candidate.message === 'string' ? candidate.message : '';
+    const message = ensureSequencePrefix(sequence, rawMessage);
+
+    const entry: LogEntry = {
+      id,
+      level,
+      message,
+      timestamp,
+      sequence,
+    };
+
+    if (candidate.params) {
+      Object.defineProperty(entry, 'params', {
+        value: candidate.params,
+        enumerable: false,
+      });
+    }
+
+    normalized.push(entry);
+  });
+
+  logSequence = maxSequence;
+
+  return normalized;
 };
 
 const notifySubscribers = () => {
@@ -159,6 +271,7 @@ const handleNewEntry = (
   params: unknown[],
   skipConsoleOutput = false,
 ) => {
+  const sequence = ++logSequence;
   const formattedMessage = params
     .map(item => {
       if (typeof item === 'string') {
@@ -176,11 +289,14 @@ const handleNewEntry = (
     })
     .join(' ');
 
+  const messageWithSequence = ensureSequencePrefix(sequence, formattedMessage);
+
   const entry: LogEntry = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     level,
-    message: formattedMessage,
+    message: messageWithSequence,
     timestamp: Date.now(),
+    sequence,
   };
 
   Object.defineProperty(entry, 'params', {
@@ -203,16 +319,21 @@ const handleNewEntry = (
   if (shouldSendToActivityMonitor(level)) {
     enqueueActivityLog({
       level,
-      message: formattedMessage,
+      message: messageWithSequence,
       timestamp: entry.timestamp,
       params,
+      sequence,
     });
   }
 
   if (!skipConsoleOutput && activeOptions.logToConsole !== false) {
     const consoleMethod: ConsoleMethod = level === 'success' ? 'info' : level;
     const logger = originalConsole[consoleMethod] ?? console[consoleMethod];
-    logger?.(...params);
+    if (params.length === 0) {
+      logger?.(messageWithSequence);
+    } else {
+      logger?.(`[#${sequence}]`, ...params);
+    }
   }
 };
 
@@ -260,9 +381,9 @@ const deviceLog = {
           storageAdapter.getItem(LOG_STORAGE_KEY),
         );
         if (storedValue) {
-          const parsed: LogEntry[] = JSON.parse(storedValue);
+          const parsed: unknown = JSON.parse(storedValue);
           if (Array.isArray(parsed)) {
-            entries = parsed;
+            entries = normalizeStoredEntries(parsed);
           }
         }
       } catch (error) {
@@ -306,6 +427,7 @@ const deviceLog = {
 
   clear() {
     entries = [];
+    logSequence = 0;
     notifySubscribers();
     void (async () => {
       try {
@@ -431,10 +553,16 @@ export const LogView: React.FC<LogViewProps> = ({
         data.map(entry => (
           <View key={entry.id} style={[styles.item, levelStyles[entry.level]]}>
             <Text style={styles.meta}>
-              {formatTimestamp(entry.timestamp, timeStampFormat)} ·{' '}
-              {entry.level.toUpperCase()}
+              {formatTimestamp(entry.timestamp, timeStampFormat)} · {entry.level.toUpperCase()}
+              {typeof entry.sequence === 'number'
+                ? ` · [#${entry.sequence}]`
+                : ''}
             </Text>
-            <Text style={styles.message}>{entry.message}</Text>
+            <Text style={styles.message}>
+              {typeof entry.sequence === 'number'
+                ? `[#${entry.sequence}] ${stripSequencePrefix(entry.message, entry.sequence)}`
+                : entry.message}
+            </Text>
           </View>
         ))
       )}
