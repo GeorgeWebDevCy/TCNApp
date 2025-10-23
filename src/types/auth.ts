@@ -1,3 +1,5 @@
+import type { PersistedSession } from '../services/wordpressAuthService';
+
 export type AuthMethod = 'password' | 'pin' | 'biometric';
 
 export type AccountType =
@@ -129,6 +131,7 @@ export interface AuthContextValue {
   resetError: () => void;
   refreshSession: () => Promise<void>;
   getSessionToken: () => Promise<string | null>;
+  getPersistedSession: () => Promise<PersistedSession | null>;
   requestPasswordReset: (identifier: string) => Promise<string | undefined>;
   registerAccount: (options: RegisterOptions) => Promise<string | undefined>;
   resetPasswordWithCode: (

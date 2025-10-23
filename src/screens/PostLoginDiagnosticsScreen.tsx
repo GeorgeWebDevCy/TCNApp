@@ -13,6 +13,7 @@ import { useLocalization } from '../contexts/LocalizationContext';
 import { WORDPRESS_CONFIG } from '../config/authConfig';
 import { COLORS } from '../config/theme';
 import { buildWordPressRequestInit } from '../services/wordpressCookieService';
+import type { PersistedSession } from '../services/wordpressAuthService';
 import deviceLog from '../utils/deviceLog';
 
 type DiagnosticKey = 'server' | 'token' | 'lifetime' | 'endpoint';
@@ -156,6 +157,58 @@ const maskToken = (token: string): string => {
   return `${trimmed.slice(0, 4)}…${trimmed.slice(-4)}`;
 };
 
+const parseIsoToEpochSeconds = (
+  value: string | null | undefined,
+): number | null => {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) {
+    return null;
+  }
+
+  return Math.floor(parsed / 1000);
+};
+
+const parseExpiresInSeconds = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) {
+      return Math.floor(numeric);
+    }
+  }
+
+  return null;
+};
+
+const parseEpochSeconds = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return Math.floor(value);
+  }
+
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric)) {
+      return Math.floor(numeric);
+    }
+  }
+
+  return null;
+};
+
+type SessionWithExpiryMetadata = PersistedSession & {
+  expires_in?: unknown;
+  expiresIn?: unknown;
+  token_expires_in?: unknown;
+  tokenExpiresIn?: unknown;
+};
+
 const formatRelativeDuration = (seconds: number): string => {
   if (!Number.isFinite(seconds)) {
     return '';
@@ -214,7 +267,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
   onComplete,
   onSkip,
 }) => {
-  const { getSessionToken, state } = useAuthContext();
+  const { getSessionToken, getPersistedSession, state } = useAuthContext();
   const { t } = useLocalization();
   const {
     authMethod,
@@ -372,6 +425,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
     }
 
     let token: string | null = null;
+    let session: PersistedSession | null = null;
     try {
       deviceLog.info('postLoginDiagnostics.token.request', {
         userId: user?.id ?? null,
@@ -432,44 +486,143 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       return;
     }
 
-    const payload = token ? decodeJwtPayload(token) : null;
-    if (!payload) {
-      handleFailure(
-        'lifetime',
-        t('auth.postLoginDiagnostics.lifetime.decodeError'),
-        [
-          ['Token preview', maskToken(token ?? '')],
-          ['Token length', token?.length ?? 0],
-        ],
-      );
-      return;
-    }
-
-    const expRaw = (payload.exp ?? payload.expiry) as unknown;
-    const iatRaw = (payload.iat ?? payload.issued_at) as unknown;
-    const exp = typeof expRaw === 'number' ? expRaw : Number(expRaw);
-    const issuedAt =
-      typeof iatRaw === 'number'
-        ? iatRaw
-        : Number.isFinite(Number(iatRaw))
-        ? Number(iatRaw)
-        : null;
-
-    if (!Number.isFinite(exp)) {
-      handleFailure(
-        'lifetime',
-        t('auth.postLoginDiagnostics.lifetime.decodeError'),
-        [
-          ['Token preview', maskToken(token ?? '')],
-          ['exp raw value', expRaw ?? null],
-          ['iat raw value', iatRaw ?? null],
-        ],
-      );
-      return;
+    try {
+      session = await getPersistedSession();
+    } catch (error) {
+      deviceLog.warn('postLoginDiagnostics.session.fetchFailed', {
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000);
-    const secondsUntilExpiry = exp - nowSeconds;
+
+    const lifetimeContext: Array<[string, unknown]> = [
+      ['Token preview', maskToken(token ?? '')],
+      ['Token length', token?.length ?? 0],
+      ['User ID', user?.id ?? null],
+    ];
+
+    if (session) {
+      lifetimeContext.push([
+        'Session tokenExpiresAt (raw)',
+        session.tokenExpiresAt ?? null,
+      ]);
+    }
+
+    let expiresAtSeconds: number | null = null;
+    let expirySource: 'sessionExpiresAt' | 'sessionExpiresIn' | 'jwt' | null = null;
+    let lifetimeSeconds: number | null = null;
+    let issuedAt: number | null = null;
+
+    if (session?.tokenExpiresAt) {
+      const parsedExpiry = parseIsoToEpochSeconds(session.tokenExpiresAt);
+      if (parsedExpiry != null) {
+        expiresAtSeconds = parsedExpiry;
+        expirySource = 'sessionExpiresAt';
+      } else {
+        lifetimeContext.push([
+          'Session tokenExpiresAt parse result',
+          'invalid',
+        ]);
+      }
+    }
+
+    const sessionWithMetadata = session as SessionWithExpiryMetadata | null;
+    if (sessionWithMetadata) {
+      const expiresInCandidates: Array<[string, unknown]> = [
+        ['session.expires_in', sessionWithMetadata.expires_in],
+        ['session.expiresIn', sessionWithMetadata.expiresIn],
+        ['session.token_expires_in', sessionWithMetadata.token_expires_in],
+        ['session.tokenExpiresIn', sessionWithMetadata.tokenExpiresIn],
+      ];
+
+      for (const [label, rawValue] of expiresInCandidates) {
+        if (rawValue == null) {
+          continue;
+        }
+
+        lifetimeContext.push([label, rawValue]);
+        const parsed = parseExpiresInSeconds(rawValue);
+        if (parsed != null) {
+          lifetimeSeconds = parsed;
+          if (expiresAtSeconds == null) {
+            expiresAtSeconds = nowSeconds + parsed;
+            expirySource = 'sessionExpiresIn';
+          }
+          break;
+        }
+      }
+    }
+
+    let payload: Record<string, unknown> | null = null;
+    let payloadUsedForExpiry = false;
+
+    if (!expiresAtSeconds) {
+      payload = token ? decodeJwtPayload(token) : null;
+      payloadUsedForExpiry = true;
+    } else if (lifetimeSeconds == null) {
+      payload = token ? decodeJwtPayload(token) : null;
+    }
+
+    if (!expiresAtSeconds && !payload) {
+      handleFailure(
+        'lifetime',
+        t('auth.postLoginDiagnostics.lifetime.noExpiry'),
+        [
+          ...lifetimeContext,
+          ['Session available', Boolean(session)],
+        ],
+      );
+      return;
+    }
+
+    if (payload) {
+      const expRaw = (payload.exp ?? payload.expiry) as unknown;
+      const expValue = parseEpochSeconds(expRaw);
+
+      const iatRaw = (payload.iat ?? payload.issued_at) as unknown;
+      const issuedAtValue = parseEpochSeconds(iatRaw);
+
+      if (expValue == null) {
+        if (payloadUsedForExpiry) {
+          handleFailure(
+            'lifetime',
+            t('auth.postLoginDiagnostics.lifetime.decodeError'),
+            [
+              ...lifetimeContext,
+              ['exp raw value', expRaw ?? null],
+              ['iat raw value', iatRaw ?? null],
+            ],
+          );
+          return;
+        }
+      } else if (!expiresAtSeconds || payloadUsedForExpiry) {
+        expiresAtSeconds = expValue;
+        if (!expirySource) {
+          expirySource = 'jwt';
+        }
+      }
+
+      if (issuedAtValue != null) {
+        issuedAt = issuedAtValue;
+        if (!lifetimeSeconds && expValue != null) {
+          lifetimeSeconds = expValue - issuedAtValue;
+        }
+      } else if (payloadUsedForExpiry) {
+        deviceLog.warn('postLoginDiagnostics.lifetime.missingIat');
+      }
+    }
+
+    if (!expiresAtSeconds) {
+      handleFailure(
+        'lifetime',
+        t('auth.postLoginDiagnostics.lifetime.noExpiry'),
+        lifetimeContext,
+      );
+      return;
+    }
+
+    const secondsUntilExpiry = expiresAtSeconds - nowSeconds;
 
     if (secondsUntilExpiry <= 0) {
       handleFailure(
@@ -480,20 +633,14 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
           },
         }),
         [
-          ['Token preview', maskToken(token ?? '')],
-          ['Expires (epoch seconds)', exp],
+          ...lifetimeContext,
+          ['Expiry source', expirySource ?? 'unknown'],
+          ['Expires (epoch seconds)', expiresAtSeconds],
           ['Current time (epoch seconds)', nowSeconds],
           ['Seconds until expiry', secondsUntilExpiry],
         ],
       );
       return;
-    }
-
-    let lifetimeSeconds: number | null = null;
-    if (typeof issuedAt === 'number' && Number.isFinite(issuedAt)) {
-      lifetimeSeconds = exp - issuedAt;
-    } else {
-      deviceLog.warn('postLoginDiagnostics.lifetime.missingIat');
     }
 
     const comparisonLifetime = lifetimeSeconds ?? secondsUntilExpiry;
@@ -511,17 +658,18 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
           },
         }),
         [
-          ['Token preview', maskToken(token ?? '')],
+          ...lifetimeContext,
+          ['Expiry source', expirySource ?? 'unknown'],
           ['Expected lifetime (seconds)', EXPECTED_TOKEN_LIFETIME_SECONDS],
           ['Actual lifetime (seconds)', comparisonLifetime],
           ['Issued at (epoch seconds)', issuedAt ?? 'unknown'],
-          ['Expires (epoch seconds)', exp],
+          ['Expires (epoch seconds)', expiresAtSeconds],
         ],
       );
       return;
     }
 
-    const expiresDate = new Date(exp * 1000);
+    const expiresDate = new Date(expiresAtSeconds * 1000);
     let lifetimeMessage = t('auth.postLoginDiagnostics.lifetime.success', {
       replace: {
         relative: formatRelativeDuration(secondsUntilExpiry),
@@ -529,7 +677,20 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
       },
     });
 
-    if (lifetimeSeconds == null) {
+    const sourceMessageKey =
+      expirySource === 'sessionExpiresIn'
+        ? 'auth.postLoginDiagnostics.lifetime.metadataSource.expiresIn'
+        : expirySource === 'sessionExpiresAt'
+        ? 'auth.postLoginDiagnostics.lifetime.metadataSource.expiresAt'
+        : expirySource === 'jwt'
+        ? 'auth.postLoginDiagnostics.lifetime.metadataSource.jwt'
+        : null;
+
+    if (sourceMessageKey) {
+      lifetimeMessage = `${lifetimeMessage} ${t(sourceMessageKey)}`.trim();
+    }
+
+    if (expirySource === 'jwt' && lifetimeSeconds == null) {
       lifetimeMessage = `${lifetimeMessage} ${t(
         'auth.postLoginDiagnostics.lifetime.missingIat',
       )}`.trim();
@@ -611,6 +772,7 @@ export const PostLoginDiagnosticsScreen: React.FC<PostLoginDiagnosticsScreenProp
     deviceLog.success('postLoginDiagnostics.complete');
   }, [
     authMethod,
+    getPersistedSession,
     getSessionToken,
     handleFailure,
     hasPasswordAuthenticated,

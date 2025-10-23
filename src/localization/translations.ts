@@ -160,6 +160,12 @@ export const translations: Record<Language, TranslationDictionary> = {
           mismatch: 'Expected about {{expectedDays}} days. Received {{actualDays}} days.',
           missingIat:
             'Token did not include its issued time; using remaining lifetime for verification.',
+          noExpiry: 'No expiration metadata was provided for this session.',
+          metadataSource: {
+            expiresAt: 'Validated using session metadata (expires at).',
+            expiresIn: 'Validated using session metadata (expires in).',
+            jwt: 'Validated using the token payload.',
+          },
         },
         endpoint: {
           title: 'Protected endpoints',
@@ -745,6 +751,12 @@ export const translations: Record<Language, TranslationDictionary> = {
           mismatch: 'คาดว่า {{expectedDays}} วัน แต่ได้รับ {{actualDays}} วัน',
           missingIat:
             'โทเค็นไม่ได้ระบุเวลาออก ใช้เวลาเหลืออยู่สำหรับการตรวจสอบ',
+          noExpiry: 'ไม่มีข้อมูลวันหมดอายุสำหรับเซสชันนี้',
+          metadataSource: {
+            expiresAt: 'ยืนยันด้วยข้อมูลหมดอายุจากเซสชัน',
+            expiresIn: 'ยืนยันด้วยระยะเวลาหมดอายุจากเซสชัน',
+            jwt: 'ยืนยันด้วยข้อมูลจากโทเค็น',
+          },
         },
         endpoint: {
           title: 'ปลายทางที่ต้องยืนยันตัวตน',

@@ -1025,6 +1025,19 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
     reauthenticateWithStoredCredentials,
   ]);
 
+  const getPersistedSession = useCallback(async () => {
+    if (sessionRef.current) {
+      return sessionRef.current;
+    }
+
+    const session = await ensureValidSession();
+    if (session) {
+      sessionRef.current = session;
+    }
+
+    return session ?? null;
+  }, []);
+
   const registerAccount = useCallback(async (options: RegisterOptions) => {
     const normalizedAccountType =
       (options.accountType ?? 'member').toLowerCase();
@@ -1172,6 +1185,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       resetError,
       refreshSession,
       getSessionToken,
+      getPersistedSession,
       requestPasswordReset,
       registerAccount,
       resetPasswordWithCode,
@@ -1190,6 +1204,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren> = ({
       resetError,
       refreshSession,
       getSessionToken,
+      getPersistedSession,
       requestPasswordReset,
       registerAccount,
       resetPasswordWithCode,
